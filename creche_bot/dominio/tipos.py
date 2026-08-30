@@ -126,6 +126,29 @@ class Concorrencia:
 
 
 @dataclass(frozen=True)
+class PanoramaRegiao:
+    """O que ACONTECEU na região no processo passado. Passado observado, nunca previsão.
+
+    Existe porque a família decide entre creches sem saber se está numa região onde
+    quase todo mundo foi atendido ou numa onde a fila dobrou a oferta — e esse é o único
+    contexto honesto que dá para oferecer antes da classificação rodar. Todos os campos
+    são contagem de fato consumado, e `ano` é obrigatório para a tela ser forçada a dizer
+    de quando é o número.
+
+    NÃO é probabilidade, e não vira uma. A classificação do processo vigente (Resolução
+    SME nº 542/2025) roda em SQL determinístico depois do fechamento das inscrições: no
+    momento da conversa ela não existe, e nenhuma razão entre esses números a antecipa.
+    """
+    microarea: str
+    bairro: str
+    demanda: int            # inscritos de 1ª opção na microárea
+    atendidos: int          # confirmados
+    espera: int             # ainda na fila quando a base foi fechada
+    vagas_ociosas: int      # vagas livres nas unidades da microárea, HOJE
+    ano: int
+
+
+@dataclass(frozen=True)
 class VagaSugerida:
     """Uma creche sugerida. Só carrega o que é fato verificável hoje."""
     id_escola: str
@@ -138,6 +161,15 @@ class VagaSugerida:
     distancia_km: float
     vaga_ociosa: bool                       # tem vaga aberta AGORA
     concorrencia: Concorrencia | None = None   # None = sem histórico comparável
+    # Estimativa de chance nesta unidade, de 0 a 1, calculada sobre o processo passado:
+    # dos que pediram esta creche como 1ª opção, a fração que foi atendida. `None` = a
+    # unidade não teve demanda de creche no ano-base, então não há o que estimar.
+    #
+    # NÃO é a classificação. Essa é norma (Resolução SME nº 542/2025), roda em SQL
+    # determinístico depois do fechamento das inscrições e não existe no momento da
+    # conversa: pontuação de prioridade, empate e ordem de convocação não entram nesta
+    # conta. Quem renderiza é obrigado a dizer de que ano é o número e que é estimativa.
+    chance: float | None = None
     referencia: str = ""                    # "RIO 2", "PARK SHOPPING" — o apelido do lugar
     polo: str = ""                          # unidade real de classificação; não é microárea
     horario_atendimento: str = ""

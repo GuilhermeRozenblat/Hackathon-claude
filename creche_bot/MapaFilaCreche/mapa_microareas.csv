@@ -1,0 +1,233 @@
+cod,cre,cre_nome,bairro,unidades,demanda,conf,espera,perdeu,ociosas,pressao
+1.1,1,Centro / Sta Teresa,Caju,7,471,435,10,78,0,1.08
+1.2,1,Centro / Sta Teresa,São Cristóvão / Benfica,5,623,366,91,159,0,1.7
+1.3,1,Centro / Sta Teresa,Mangueira / São Cristóvão,6,305,246,6,31,0,1.24
+1.4,1,Centro / Sta Teresa,Vasco da Gama / São Cristóvão,3,211,209,1,42,0,1.01
+1.5,1,Centro / Sta Teresa,Santo Cristo,2,167,138,14,42,0,1.21
+1.6,1,Centro / Sta Teresa,Santo Cristo / Gamboa,2,131,102,6,55,0,1.28
+1.7,1,Centro / Sta Teresa,Centro / Praça Onze,5,393,241,9,171,0,1.63
+1.8,1,Centro / Sta Teresa,Catumbi / Rio Comprido,4,270,208,4,88,0,1.3
+1.9,1,Centro / Sta Teresa,Estácio / Cidade Nova,6,350,319,3,63,0,1.1
+1.10,1,Centro / Sta Teresa,Rio Comprido / Turano,4,190,119,13,39,0,1.6
+1.11,1,Centro / Sta Teresa,Santa Teresa / Rio Comprido,7,307,231,15,85,0,1.33
+1.12,1,Centro / Sta Teresa,Paquetá,1,56,55,0,0,0,1.02
+2.1,2,Zona Sul / Tijuca,Botafogo / Flamengo,6,414,347,58,228,33,1.19
+2.2,2,Zona Sul / Tijuca,Laranjeiras / Cosme Velho,7,588,260,94,208,8,2.26
+2.3,2,Zona Sul / Tijuca,Copacabana / Leme,6,390,277,66,206,6,1.41
+2.4,2,Zona Sul / Tijuca,Copacabana / Ipanema,4,271,165,55,46,0,1.64
+2.5,2,Zona Sul / Tijuca,Vidigal / Ipanema,5,275,232,5,89,5,1.19
+2.6,2,Zona Sul / Tijuca,Gávea / Rocinha,7,424,300,66,144,13,1.41
+2.7,2,Zona Sul / Tijuca,Rocinha,1,173,81,26,41,0,2.14
+2.8,2,Zona Sul / Tijuca,Rocinha,9,522,449,38,127,58,1.16
+2.9,2,Zona Sul / Tijuca,Rocinha,1,48,50,0,13,0,0.96
+2.10,2,Zona Sul / Tijuca,Rocinha / São Conrado,6,229,176,33,99,21,1.3
+2.11,2,Zona Sul / Tijuca,Tijuca / Alto da Boa Vista,7,263,225,3,43,36,1.17
+2.12,2,Zona Sul / Tijuca,Tijuca / Rio Comprido,5,263,186,6,62,0,1.41
+2.13,2,Zona Sul / Tijuca,Tijuca / Andaraí,5,187,165,0,98,0,1.13
+2.14,2,Zona Sul / Tijuca,Grajaú / Andaraí,7,254,207,4,89,0,1.23
+2.15,2,Zona Sul / Tijuca,Tijuca,1,101,54,6,19,0,1.87
+2.16,2,Zona Sul / Tijuca,Andaraí / Grajaú,2,87,55,4,22,8,1.58
+2.17,2,Zona Sul / Tijuca,Vila Isabel,2,93,75,1,23,0,1.24
+2.18,2,Zona Sul / Tijuca,Vila Isabel,5,253,165,40,97,0,1.53
+3.1,3,Méier / Engenho Novo,Rocha / Sampaio,5,572,483,28,126,28,1.18
+3.2,3,Méier / Engenho Novo,Rocha / São Francisco Xavier,5,201,170,10,53,37,1.18
+3.3,3,Méier / Engenho Novo,Engenho Novo / Lins de Vasconcelos,3,176,115,12,54,2,1.53
+3.4,3,Méier / Engenho Novo,Lins de Vasconcelos / Méier,2,116,101,12,44,0,1.15
+3.5,3,Méier / Engenho Novo,Lins de Vasconcelos,5,319,278,14,89,5,1.15
+3.6,3,Méier / Engenho Novo,Engenho de Dentro,4,409,174,131,66,2,2.35
+3.7,3,Méier / Engenho Novo,Água Santa,1,94,66,10,11,0,1.42
+3.8,3,Méier / Engenho Novo,Piedade / Pilares,7,576,399,25,280,11,1.44
+3.9,3,Méier / Engenho Novo,Pilares / Piedade,5,338,222,69,123,0,1.52
+3.10,3,Méier / Engenho Novo,Méier / Cachambi,5,422,369,48,121,40,1.14
+3.11,3,Méier / Engenho Novo,Largo do Jacaré / Méier,3,135,133,1,50,33,1.02
+3.12,3,Méier / Engenho Novo,Jacarezinho,3,283,111,28,58,0,2.55
+3.13,3,Méier / Engenho Novo,Jacarezinho / Cachambi,2,151,156,7,73,0,0.97
+3.14,3,Méier / Engenho Novo,Del Castilho / Bonsucesso,6,623,427,74,175,0,1.46
+3.15,3,Méier / Engenho Novo,Del Castilho / Pilares,3,511,267,111,167,8,1.91
+3.16,3,Méier / Engenho Novo,Engenho da Rainha / Vicente de Carvalho,3,220,195,37,64,0,1.13
+3.17,3,Méier / Engenho Novo,Engenho da Rainha / Tomás Coelho,2,152,108,19,36,0,1.41
+3.18,3,Méier / Engenho Novo,Inhaúma / Bonsucesso,2,155,139,24,27,0,1.12
+3.19,3,Méier / Engenho Novo,Inhaúma,2,308,173,65,37,17,1.78
+3.20,3,Méier / Engenho Novo,Inhaúma / Bonsucesso,3,105,99,4,38,0,1.06
+3.21,3,Méier / Engenho Novo,Bonsucesso / Ramos,3,266,199,34,44,0,1.34
+3.22,3,Méier / Engenho Novo,Inhaúma / Ramos,2,87,77,0,12,37,1.13
+3.23,3,Méier / Engenho Novo,Ramos / Complexo do Alemão,4,343,176,39,46,19,1.95
+3.24,3,Méier / Engenho Novo,Ramos / Bonsucesso,5,416,315,29,63,47,1.32
+4.1,4,Ilha / Penha,Manguinhos / Bonsucesso,2,128,46,21,14,3,2.78
+4.2,4,Ilha / Penha,Manguinhos,1,314,65,68,39,0,4.83
+4.3,4,Ilha / Penha,Manguinhos / Benfica,4,270,165,42,83,3,1.64
+4.4,4,Ilha / Penha,Bonsucesso,1,193,34,211,17,0,5.68
+4.5,4,Ilha / Penha,Maré / Bonsucesso,6,365,336,230,191,0,1.09
+4.6,4,Ilha / Penha,Bonsucesso,1,133,37,98,23,0,3.59
+4.7,4,Ilha / Penha,Bonsucesso / Parada de Lucas,6,274,225,39,66,32,1.22
+4.8,4,Ilha / Penha,Bonsucesso,6,325,238,38,80,0,1.37
+4.9,4,Ilha / Penha,Bonsucesso / Ramos,4,195,147,22,92,0,1.33
+4.10,4,Ilha / Penha,Bonsucesso / Ramos,4,385,286,55,77,0,1.35
+4.11,4,Ilha / Penha,Ramos,2,100,63,17,29,0,1.59
+4.12,4,Ilha / Penha,Ramos / Bonsucesso,6,490,245,145,104,0,2.0
+4.13,4,Ilha / Penha,Olaria / Penha,4,240,225,2,70,0,1.07
+4.14,4,Ilha / Penha,Penha / Penha Circular,4,330,284,1,73,77,1.16
+4.15,4,Ilha / Penha,Olaria,5,444,304,21,158,0,1.46
+4.16,4,Ilha / Penha,Penha / Olaria,4,208,168,11,81,0,1.24
+4.17,4,Ilha / Penha,Penha,1,94,92,0,11,2,1.02
+4.18,4,Ilha / Penha,Penha,3,277,176,30,88,0,1.57
+4.19,4,Ilha / Penha,Penha / Praça do Carmo,6,301,281,1,93,12,1.07
+4.20,4,Ilha / Penha,Vila da Penha / Brás de Pina,4,187,135,19,32,6,1.39
+4.21,4,Ilha / Penha,Cordovil,3,282,271,1,32,44,1.04
+4.22,4,Ilha / Penha,Cordovil,4,217,195,1,43,24,1.11
+4.23,4,Ilha / Penha,Parada de Lucas,3,97,92,6,12,0,1.05
+4.24,4,Ilha / Penha,Vigário Geral,3,264,165,68,51,4,1.6
+4.25,4,Ilha / Penha,Jardim América,3,273,213,72,72,0,1.28
+4.26,4,Ilha / Penha,Jardim América,2,297,213,79,59,3,1.39
+5.1,5,Irajá / Pavuna,Vila Cosmos / Vila Kosmos,2,193,112,22,43,0,1.72
+5.2,5,Irajá / Pavuna,Vila da Penha / Irajá,4,459,271,51,134,0,1.69
+5.3,5,Irajá / Pavuna,Irajá / Vila da Penha,6,562,281,31,252,3,2.0
+5.4,5,Irajá / Pavuna,Irajá,3,477,407,0,112,66,1.17
+5.5,5,Irajá / Pavuna,Vicente de Carvalho,2,124,110,0,68,0,1.13
+5.6,5,Irajá / Pavuna,Madureira / Cavalcante,3,262,168,4,84,3,1.56
+5.7,5,Irajá / Pavuna,Madureira,3,152,117,11,48,0,1.3
+5.8,5,Irajá / Pavuna,Colégio / Madureira,6,447,330,80,185,0,1.35
+5.9,5,Irajá / Pavuna,Coelho Neto / Rocha Miranda,2,123,107,0,13,0,1.15
+5.10,5,Irajá / Pavuna,Rocha Miranda,3,275,172,91,171,0,1.6
+5.11,5,Irajá / Pavuna,Rocha Miranda / Honório Gurgel,3,578,215,163,96,0,2.69
+5.12,5,Irajá / Pavuna,Cascadura / Cavalcante,2,77,75,0,5,0,1.03
+5.13,5,Irajá / Pavuna,Rocha Miranda,1,206,98,28,59,2,2.1
+5.14,5,Irajá / Pavuna,Marechal Hermes / Bento Ribeiro,3,335,256,61,91,0,1.31
+5.15,5,Irajá / Pavuna,Cascadura / Quintino Bocaiúva,2,160,58,26,21,1,2.76
+5.16,5,Irajá / Pavuna,Cascadura / Campinho,3,238,191,4,199,0,1.25
+5.17,5,Irajá / Pavuna,Osvaldo Cruz / Campinho,3,426,195,46,91,5,2.18
+5.18,5,Irajá / Pavuna,Marechal Hermes,2,199,126,17,59,0,1.58
+6.1,6,Madureira / Anchieta,Pavuna,2,156,92,29,37,0,1.7
+6.2,6,Madureira / Anchieta,Pavuna / Acari,2,153,83,34,12,0,1.84
+6.3,6,Madureira / Anchieta,Acari / Conj. Hab. Amarelinho,2,235,67,59,58,0,3.51
+6.4,6,Madureira / Anchieta,Pavuna / Caminho do Job,2,385,276,12,120,0,1.39
+6.5,6,Madureira / Anchieta,Costa Barros / Pavuna,5,462,366,25,182,0,1.26
+6.6,6,Madureira / Anchieta,Costa Barros,3,213,208,17,42,0,1.02
+6.7,6,Madureira / Anchieta,Acari / Pavuna,4,456,324,35,79,0,1.41
+6.8,6,Madureira / Anchieta,Pavuna / Costa Barros,3,247,199,28,40,0,1.24
+6.9,6,Madureira / Anchieta,Costa Barros,1,93,62,2,14,0,1.5
+6.10,6,Madureira / Anchieta,Barros Filho / Guadalupe,4,318,266,20,98,0,1.2
+6.11,6,Madureira / Anchieta,,0,0,0,0,0,0,
+6.12,6,Madureira / Anchieta,Anchieta,5,569,446,16,193,2,1.28
+6.13,6,Madureira / Anchieta,Ricardo de Albuquerque / Anchieta,3,348,249,62,55,0,1.4
+6.14,6,Madureira / Anchieta,Jardim Cristina Capri / Anchieta,1,67,72,1,18,0,0.93
+6.15,6,Madureira / Anchieta,Guadalupe,2,190,82,58,11,0,2.32
+6.16,6,Madureira / Anchieta,Guadalupe / Marechal Hermes,6,464,228,82,198,0,2.04
+6.17,6,Madureira / Anchieta,Parque Anchieta,1,157,54,30,26,0,2.91
+6.18,6,Madureira / Anchieta,Anchieta,2,181,201,2,42,0,0.9
+6.19,6,Madureira / Anchieta,Acari,4,385,207,95,83,0,1.86
+7.1,7,Jacarepaguá / Barra,Vila Valqueire,3,523,176,172,93,1,2.97
+7.2,7,Jacarepaguá / Barra,Praça Seca,1,65,77,0,35,0,0.84
+7.3,7,Jacarepaguá / Barra,Praça Seca / Jacarepaguá,5,846,450,250,158,0,1.88
+7.4,7,Jacarepaguá / Barra,Taquara / Jacarepaguá,2,447,215,228,56,0,2.08
+7.5,7,Jacarepaguá / Barra,Jacarepaguá / Taquara,3,372,225,172,50,0,1.65
+7.6,7,Jacarepaguá / Barra,Freguesia / Jacarepaguá,1,290,180,15,112,0,1.61
+7.7,7,Jacarepaguá / Barra,Freguesia / Jacarepaguá,2,214,164,95,73,0,1.3
+7.8,7,Jacarepaguá / Barra,Jacarepaguá / Taquara,5,320,349,229,75,2,0.92
+7.9,7,Jacarepaguá / Barra,Curicica,3,390,342,324,79,0,1.14
+7.10,7,Jacarepaguá / Barra,Taquara,1,169,90,125,20,0,1.88
+7.11,7,Jacarepaguá / Barra,Curicica / Jacarepaguá,4,551,206,544,82,0,2.67
+7.12,7,Jacarepaguá / Barra,Cidade de Deus / Jacarepaguá,4,520,216,469,63,11,2.41
+7.13,7,Jacarepaguá / Barra,Itanhangá,1,67,53,1,39,27,1.26
+7.14,7,Jacarepaguá / Barra,Jacarepaguá / Cidade de Deus,6,589,431,366,99,0,1.37
+7.15,7,Jacarepaguá / Barra,Cidade de Deus,3,90,109,0,57,0,0.83
+7.16,7,Jacarepaguá / Barra,Jacarepaguá / Cidade de Deus,2,177,131,199,25,0,1.35
+7.17,7,Jacarepaguá / Barra,Jacarepaguá / Gardênia Azul,6,618,467,199,104,21,1.32
+7.18,7,Jacarepaguá / Barra,Anil / Jacarepaguá,5,610,464,208,157,0,1.31
+7.19,7,Jacarepaguá / Barra,Freguesia,1,435,67,763,20,0,6.49
+7.20,7,Jacarepaguá / Barra,,0,0,0,0,0,0,
+7.21,7,Jacarepaguá / Barra,,0,0,0,0,0,0,
+7.22,7,Jacarepaguá / Barra,Jacarepaguá / Rio das Pedras,2,443,208,564,57,0,2.13
+7.23,7,Jacarepaguá / Barra,Jacarepaguá / Rio das Pedras,3,596,198,689,71,0,3.01
+7.24,7,Jacarepaguá / Barra,Itanhangá / Barra da Tijuca,3,239,184,35,55,0,1.3
+7.25,7,Jacarepaguá / Barra,Vargem Grande / Vargem Pequena,4,368,261,52,84,0,1.41
+7.26,7,Jacarepaguá / Barra,Vargem Pequena / Vargem Grande,3,220,201,41,70,0,1.09
+7.27,7,Jacarepaguá / Barra,Jacarepaguá / Camorim,2,466,68,318,9,0,6.85
+7.28,7,Jacarepaguá / Barra,Recreio dos Bandeirantes / Recreio,5,528,427,22,208,0,1.24
+7.29,7,Jacarepaguá / Barra,Recreio dos Bandeirantes / Vargem Grande,4,249,255,3,65,22,0.98
+7.30,7,Jacarepaguá / Barra,Barra da Tijuca,2,175,174,45,109,0,1.01
+8.1,8,Bangu / Realengo,Sulacap / Jardim Sulacap,2,63,55,1,9,0,1.15
+8.2,8,Bangu / Realengo,Realengo,2,169,119,5,35,4,1.42
+8.3,8,Bangu / Realengo,,0,0,0,0,0,0,
+8.4,8,Bangu / Realengo,Realengo,4,382,318,24,133,118,1.2
+8.5,8,Bangu / Realengo,,0,0,0,0,0,0,
+8.6,8,Bangu / Realengo,Realengo / Padre Miguel,4,423,224,62,154,1,1.89
+8.7,8,Bangu / Realengo,Realengo,1,221,189,0,17,0,1.17
+8.8,8,Bangu / Realengo,Bangu,1,18,36,0,9,0,0.5
+8.9,8,Bangu / Realengo,Bangu,4,354,190,45,83,0,1.86
+8.10,8,Bangu / Realengo,Bangu,2,119,157,4,52,0,0.76
+8.11,8,Bangu / Realengo,Bangu,1,230,66,95,2,0,3.48
+8.12,8,Bangu / Realengo,Senador Camará / Jabour,4,448,281,59,117,0,1.59
+8.13,8,Bangu / Realengo,Santíssimo,1,104,100,0,38,0,1.04
+8.14,8,Bangu / Realengo,Deodoro / Magalhães Bastos,5,651,401,59,170,0,1.62
+8.15,8,Bangu / Realengo,Padre Miguel / Realengo,3,189,126,19,46,0,1.5
+8.16,8,Bangu / Realengo,Padre Miguel,4,353,372,35,127,0,0.95
+8.17,8,Bangu / Realengo,Bangu / Realengo,3,245,227,15,185,0,1.08
+8.18,8,Bangu / Realengo,Bangu,1,117,74,38,35,0,1.58
+8.19,8,Bangu / Realengo,Bangu,3,188,166,4,45,0,1.13
+8.20,8,Bangu / Realengo,Senador Camará / Bangu,4,430,252,157,91,0,1.71
+8.21,8,Bangu / Realengo,Vila Kennedy / Bangu,3,325,196,118,108,1,1.66
+8.22,8,Bangu / Realengo,Senador Camará,3,287,284,4,107,0,1.01
+8.23,8,Bangu / Realengo,Vila Kennedy,1,133,56,97,27,0,2.38
+8.24,8,Bangu / Realengo,Realengo,3,184,139,4,90,0,1.32
+8.25,8,Bangu / Realengo,Bangu / Realengo,4,305,250,21,99,0,1.22
+8.26,8,Bangu / Realengo,Bangu,3,218,206,0,104,0,1.06
+8.27,8,Bangu / Realengo,Bangu,1,242,229,19,118,0,1.06
+9.1,9,Campo Grande,Campo Grande / Carobinha,3,330,160,14,42,0,2.06
+9.2,9,Campo Grande,Santíssimo / Campo Grande,5,613,405,62,182,0,1.51
+9.3,9,Campo Grande,,0,0,0,0,0,0,
+9.4,9,Campo Grande,Campo Grande,5,406,288,26,84,0,1.41
+9.5,9,Campo Grande,Campo Grande,1,146,63,7,34,0,2.32
+9.6,9,Campo Grande,Campo Grande,5,327,303,0,33,1,1.08
+9.7,9,Campo Grande,Campo Grande / Santíssimo,6,450,271,86,147,0,1.66
+9.8,9,Campo Grande,Campo Grande / Senador Vasconcelos,6,391,357,2,111,48,1.1
+9.9,9,Campo Grande,Campo Grande / Inhoaíba,9,649,488,13,138,34,1.33
+9.10,9,Campo Grande,Inhoaíba / Campo Grande,4,364,337,7,83,0,1.08
+9.11,9,Campo Grande,Inhoaíba,3,313,317,0,26,9,0.99
+9.12,9,Campo Grande,Cosmos / Campo Grande,3,278,206,1,79,17,1.35
+9.13,9,Campo Grande,Cosmos,6,499,307,33,117,0,1.63
+9.14,9,Campo Grande,Campo Grande / Cosmos,7,537,425,38,154,20,1.26
+9.15,9,Campo Grande,Senador Vasconcelos / Campo Grande,5,420,266,35,166,0,1.58
+9.16,9,Campo Grande,Campo Grande,5,408,336,0,63,0,1.21
+9.17,9,Campo Grande,Campo Grande,2,146,83,18,18,2,1.76
+9.18,9,Campo Grande,Campo Grande,4,98,94,0,22,0,1.04
+9.19,9,Campo Grande,Campo Grande,5,463,264,22,117,0,1.75
+9.20,9,Campo Grande,Campo Grande / Guaratiba,4,337,158,28,113,0,2.13
+9.21,9,Campo Grande,Campo Grande,4,135,111,2,20,0,1.22
+9.22,9,Campo Grande,Inhoaíba / Cosmos,3,268,198,4,64,0,1.35
+9.23,9,Campo Grande,Cosmos / Santa Cruz,7,580,368,16,156,2,1.58
+10.1,10,Santa Cruz / Sepetiba,Santa Cruz,2,222,93,91,7,0,2.39
+10.2,10,Santa Cruz / Sepetiba,Santa Cruz,3,236,207,0,34,0,1.14
+10.3,10,Santa Cruz / Sepetiba,Paciência / Inhoaíba,5,462,328,74,90,1,1.41
+10.4,10,Santa Cruz / Sepetiba,Paciência,3,385,220,16,58,0,1.75
+10.5,10,Santa Cruz / Sepetiba,Paciência / Santa Cruz,5,379,294,11,121,15,1.29
+10.6,10,Santa Cruz / Sepetiba,Santa Cruz,6,352,287,11,48,24,1.23
+10.7,10,Santa Cruz / Sepetiba,Santa Cruz,8,381,311,20,82,34,1.23
+10.8,10,Santa Cruz / Sepetiba,Santa Cruz,3,158,123,14,22,0,1.28
+10.9,10,Santa Cruz / Sepetiba,Sepetiba,4,354,282,20,70,20,1.26
+10.10,10,Santa Cruz / Sepetiba,Santa Cruz,3,220,172,24,23,8,1.28
+10.11,10,Santa Cruz / Sepetiba,Santa Cruz,7,346,321,6,43,52,1.08
+10.12,10,Santa Cruz / Sepetiba,Santa Cruz,7,334,299,9,48,0,1.12
+10.13,10,Santa Cruz / Sepetiba,Santa Cruz,4,265,208,7,35,0,1.27
+10.14,10,Santa Cruz / Sepetiba,Santa Cruz,1,99,94,0,8,0,1.05
+10.15,10,Santa Cruz / Sepetiba,Santa Cruz,7,454,391,4,66,0,1.16
+10.16,10,Santa Cruz / Sepetiba,Santa Cruz,3,155,141,1,51,4,1.1
+10.17,10,Santa Cruz / Sepetiba,Paciência / Santa Cruz,5,395,316,2,72,14,1.25
+10.18,10,Santa Cruz / Sepetiba,Paciência,3,281,209,44,47,0,1.34
+10.19,10,Santa Cruz / Sepetiba,"Paciência / Jardim dos Vieiras, Paciência",2,136,104,9,62,0,1.31
+10.20,10,Santa Cruz / Sepetiba,Sepetiba,4,88,81,0,35,0,1.09
+10.21,10,Santa Cruz / Sepetiba,Sepetiba / Santa Cruz,6,583,544,7,89,0,1.07
+10.22,10,Santa Cruz / Sepetiba,Guaratiba / Pedra de Guaratiba,5,487,349,92,114,0,1.4
+10.23,10,Santa Cruz / Sepetiba,Sepetiba / Santa Cruz,8,565,458,17,119,22,1.23
+10.24,10,Santa Cruz / Sepetiba,Guaratiba / Pedra de Guaratiba,6,355,268,89,122,11,1.32
+10.25,10,Santa Cruz / Sepetiba,Guaratiba,3,381,193,126,80,0,1.97
+10.26,10,Santa Cruz / Sepetiba,Guaratiba,4,273,280,78,93,1,0.98
+10.27,10,Santa Cruz / Sepetiba,Pedra de Guaratiba / Guaratiba,7,468,400,38,89,22,1.17
+10.28,10,Santa Cruz / Sepetiba,Guaratiba / Campo Grande,3,392,296,46,95,5,1.32
+10.29,10,Santa Cruz / Sepetiba,Guaratiba,1,207,48,96,12,0,4.31
+11.1,11,Ilha do Governador,Ilha do Governador,2,297,125,138,39,0,2.38
+11.2,11,Ilha do Governador,Ilha do Governador / Parque Royal,2,204,139,44,82,0,1.47
+11.3,11,Ilha do Governador,Ilha do Governador / Guarabu,2,173,153,13,88,0,1.13
+11.4,11,Ilha do Governador,Ilha do Governador / Tauá,2,274,266,38,139,0,1.03
+11.5,11,Ilha do Governador,Ilha do Governador / Freguesia,7,453,379,28,230,0,1.2
+11.6,11,Ilha do Governador,Cocotá / Ilha do Governador,2,179,119,15,37,0,1.5

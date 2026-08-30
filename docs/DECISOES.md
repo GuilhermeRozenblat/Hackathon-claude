@@ -30,10 +30,10 @@ fluxo todo construído em cima da premissa errada.
 
 ## D2 · A extração e os dados do município ficam atrás de uma porta
 
-**Decisão.** `creche_bot/backend/porta.py` define 16 operações, agrupadas em processo
-(período, resultado, data de corte, régua), histórico, endereço, oferta, inscrição,
-consulta e notificação. `BackendMock` roda hoje; `BackendHTTP` entra quando o outro time publicar. Nada
-do JSON deles sai de `backend/`.
+**Decisão.** `creche_bot/backend/porta.py` define 17 operações, agrupadas em processo
+(período, resultado, data de corte, régua), histórico, endereço, oferta (escolas próximas e
+panorama da região), inscrição, consulta e notificação. `BackendMapa` roda hoje;
+`BackendHTTP` entra quando o outro time publicar. Nada do JSON deles sai de `backend/`.
 
 **Por quê.** O backend é construído por outro time, em outra máquina. Sem camada
 anticorrupção, o nome de campo deles vira dependência de `conversa/`, e a primeira
@@ -49,9 +49,10 @@ de lugar, e vale conversar antes.
 
 ## D3 · A persistência fica atrás de outra porta, com dono próprio
 
-**Decisão.** `creche_bot/dados/porta.py`, 16 operações, duas implementações
-(`RepositorioMemoria` e `RepositorioSQLite`). Fora dessa pasta não existe `sqlite3`,
-`SELECT`, `cursor` nem `session` — e há teste que varre o pacote e falha se aparecer.
+**Decisão.** `creche_bot/dados/porta.py`, 21 operações, duas implementações
+(`RepositorioMemoria` e `RepositorioPostgres` — ver [D18](#d18--postgres-no-supabase-em-schema-próprio-sem-orm)).
+Fora dessa pasta não existe `sqlite3`, `psycopg`, `SELECT`, `cursor` nem `session` — e há
+teste que varre o pacote e falha se aparecer.
 
 **Por quê.** Essa pasta é trabalhada em paralelo por outra pessoa, que vai conectar o
 Postgres. Sem a fronteira, uma refatoração no banco bloqueia quem mexe no chat.
@@ -81,10 +82,13 @@ andou, sem inventar cobrança. Mandar a família à creche à toa é o erro caro
 
 ## D5 · Nem nota de corte, nem pontuação, nem posição na fila
 
-**Decisão.** Sobre uma creche o bot mostra três coisas, e só elas: **distância**, **vaga
-ociosa agora** e **concorrência do ano passado** (`Concorrencia.familias_por_vaga`, com
-`ano` obrigatório no tipo). Não existe "probabilidade de conseguir a vaga", pontuação nem
-posição na fila em lugar nenhum do código.
+> **Revisto em 30/08/2026 — ver [D19](#d19--a-chance-estimada-entra-a-classificação-continua-fora).**
+> A chance estimada por creche passou a aparecer. O resto desta decisão continua valendo
+> inteiro: pontuação, nota de corte e posição na fila seguem fora do código.
+
+**Decisão.** Sobre uma creche o bot mostra **distância**, **vaga ociosa agora** e
+**concorrência do ano passado** (`Concorrencia.familias_por_vaga`, com `ano` obrigatório no
+tipo). Não existe pontuação nem posição na fila em lugar nenhum do código.
 
 **Por quê.** O sistema não seleciona quem entra — quem aloca é o município, por norma
 (Resolução SME nº 542/2025), em SQL determinístico que roda **depois do fechamento das
@@ -372,3 +376,88 @@ valendo só para a resposta livre, que é a chamada cara.
 mensagem delimitada em `<mensagem>`. Nunca `pergunta_alt`, que interpola o nome da
 criança. Há teste que dirige o cadastro e falha se um dado da família aparecer no
 contexto.
+---
+
+## D18 · Postgres no Supabase, em schema próprio, sem ORM
+
+**Decisão.** `creche_bot/dados/postgres.py` com psycopg 3 e `ConnectionPool`, contra o
+Postgres do Supabase pelo pooler em modo transação. As tabelas ficam no schema **`creche`**,
+não no `public`. O `sqlite.py` da validação foi removido: sobraram as duas implementações
+que o contrato prevê — `RepositorioMemoria` e `RepositorioPostgres`.
+
+**Por que schema próprio.** No Supabase o `public` é servido pela Data API (PostgREST) a
+quem tiver a chave anônima, e essa chave costuma acabar no front. Estas tabelas guardam
+nome de criança e CPF. Um schema fora da lista de exposição não é alcançável pela API,
+ponto — e isso não depende de ninguém lembrar de manter RLS restritiva numa tabela nova.
+RLS fica ligada mesmo assim, sem política, e `anon`, `authenticated` e `service_role`
+perdem acesso ao schema: segunda linha, não a primeira.
+
+**Por que sem SQLAlchemy e sem Alembic.** São 21 métodos sobre onze tabelas, num arquivo
+só, com uma implementação. Um ORM aqui é exatamente a abstração especulativa que o
+`CLAUDE.md` proíbe, e migração versionada só paga quando o schema para de mudar toda
+semana — até lá, DDL idempotente no boot custa menos. O `pyproject` deixou de listar os
+dois.
+
+**Consequência prática.** O bot passou a ter uma dependência de runtime (`psycopg`), o que
+D9 evitava. `REPOSITORIO=memoria` continua rodando o bot inteiro sem banco, então a válvula
+de escape de D3 sobrevive; o que se perdeu foi o `python -m creche_bot` funcionando logo
+depois do `git clone`, sem `pip install`.
+
+**Detalhes que custaram teste.** `prepare_threshold=None`, porque o pooler em modo
+transação troca a conexão de servidor embaixo do processo e o prepared statement some;
+`check=check_connection`, porque o pooler derruba conexão ociosa e o worker de outbox
+pegaria uma morta; nome de tabela qualificado em toda query, porque um `SET search_path`
+não sobrevive à troca de sessão; e savepoint em `contato_de()`, porque duas threads
+escrevem e um contato duplicado faz a pessoa perder a conversa no meio.
+
+**Recusado.** Deixar as tabelas em `public` com RLS restritiva. Funciona até alguém
+adicionar uma política permissiva para destravar um dashboard — e aí o vazamento é de nome
+de criança.
+
+**Mudaria se.** O schema estabilizar (aí entra Alembic), ou alguém precisar ler estes dados
+pela API — nesse caso, uma view em `public` com `security_invoker = true` expondo só as
+colunas necessárias, nunca o schema inteiro.
+
+---
+
+## D19 · A chance estimada entra. A classificação continua fora
+
+**Decisão.** O painel do bloco 10 mostra, para cada creche, uma **chance estimada** —
+`confirmados ÷ demanda de 1ª opção` naquela unidade, no processo de 2025. Vem de
+`backend/mapa.py`, sobre os CSVs de `creche_bot/MapaFilaCreche/`. É uma revisão parcial de
+[D5](#d5--nem-nota-de-corte-nem-pontuação-nem-posição-na-fila): pontuação, nota de corte e
+posição na fila continuam não existindo no código.
+
+**Por quê.** A família decide entre creches, e "1,4 km" não é suficiente para decidir. O
+dado que responde a pergunta dela existe e é observado, não inventado: das 820 unidades com
+demanda em 2025, sabemos quantas famílias pediram cada uma como 1ª opção e quantas foram
+atendidas. Esconder isso não deixava a família mais informada — deixava só mais ansiosa.
+
+**Por que não é a nota de corte que D5 recusou.** A nota de corte é a pontuação do último
+aprovado, e o teto da régua foi 465 pontos em 2023 e 100 em 2024 — número sem régua
+comparável. A chance aqui é uma razão entre duas contagens do mesmo ano, ambas na base.
+
+**As três condições que fazem isso ser honesto.**
+
+1. **O ano vai colado no número**, em toda tela. Sem ele a estimativa vira previsão sobre o
+   processo de agora, que é o que o bot não pode dizer. Há teste.
+2. **Nunca 0% e nunca 100%** (`CHANCE_MIN`/`CHANCE_MAX`). Vaga ociosa hoje não garante vaga
+   em fevereiro, e fila cheia no ano passado não fecha a porta deste ano.
+3. **A classificação não está dentro dela**, e o rodapé diz isso. Duas famílias que veem
+   40% na mesma tela podem ter desfechos opostos por causa da régua de prioridade — que
+   roda em SQL determinístico depois do fechamento das inscrições e não existe durante a
+   conversa.
+
+**O que mudou no filtro.** `ia/redacao.py` deixou de barrar "probabilidade" e "chance", e
+passou a barrar "está na frente". O que a lista protege continua sendo o salto de
+estimativa para promessa: "garantido", "com certeza", "vai conseguir", "sua pontuação",
+"posição na fila".
+
+**Limitação conhecida, e é real.** A chance é medida sobre quem pediu a unidade como **1ª
+opção**, porque é o recorte que a base tem. Quem coloca a creche em 2ª ou 3ª opção enfrenta
+condição diferente, e o número na tela não distingue. O texto diz "contando quem a pediu
+como 1a opção" justamente por isso.
+
+**Mudaria se.** O backend do município publicar a classificação real, ou a base passar a
+trazer demanda por posição de preferência — aí a estimativa deixa de ser necessária, ou
+fica bem melhor.

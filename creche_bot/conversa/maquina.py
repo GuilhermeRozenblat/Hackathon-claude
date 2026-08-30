@@ -250,7 +250,22 @@ class Maquina:
             return dizer(self._redator, "backend_fora")
 
         self._repo.salvar_sessao(contato_id, passo.proximo or estado, passo.dados)
+        self._projetar(contato_id, passo.dados)
         return resposta
+
+    def _projetar(self, contato_id: str, dados: dict) -> None:
+        """Espelha o contexto nas colunas consultáveis. Nunca derruba a conversa.
+
+        A sessão já foi salva quando isto roda: se a projeção falhar, o diálogo continua
+        de onde estava e só o espelho fica para trás. O contrário — perder o turno da
+        família porque uma coluna nova não existia ainda — seria trocar o produto pelo
+        relatório.
+        """
+        try:
+            if (cadastro := projecao.cadastro_de(contato_id, dados)) is not None:
+                self._repo.salvar_cadastro(cadastro)
+        except Exception:
+            log.exception("projeção do cadastro falhou para o contato %s", contato_id)
 
     def _executar(self, passo: Passo, estado: str) -> MensagemSaida:
         if estado in ("INICIO", "ACOMPANHAR"):

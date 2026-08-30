@@ -40,6 +40,26 @@ Subir o bot **não exige nenhuma dependência**: canal, banco e conversa usam s�
 | `make contratos` | Os contratos congelados — devem passar sempre |
 | `make fronteira` | Falha se a persistência vazar para fora de `dados/` |
 | `make lint` · `make limpar` | ruff · apaga o `creche.db` |
+cp .env.example .env      # cole o token do @BotFather — passo a passo em TELEGRAM.md
+make banco                # aplica o schema no Postgres — passo a passo em docs/BANCO.md
+make bot                  # a conversa sobrevive ao restart
+```
+
+A única dependência de runtime é o driver do Postgres (`pip install -e .`); canal e
+conversa são stdlib pura. `make memoria` roda o bot inteiro sem banco nenhum.
+
+| Comando | O que faz |
+|---|---|
+| `make bot` | Sobe o bot com Postgres e backend mockado |
+| `make memoria` | Mesmo bot, sem banco nenhum (`REPOSITORIO=memoria`) |
+| `make banco` | Aplica o schema e prova a porta contra o Postgres |
+| `make verificar` | Checa o token e as configurações do @BotFather |
+| `make eco` | Bot de eco, para provar que o polling chega |
+| `make test` | Tudo |
+| `make contratos` | Só os contratos congelados — devem passar sempre |
+| `make fronteira` | Falha se a persistência vazar para fora de `dados/` |
+| `make lint` | ruff |
+| `make limpar` | Derruba o schema `creche` inteiro (pede confirmação) |
 
 Dois opcionais, e o bot roda inteiro sem os dois. **`ANTHROPIC_API_KEY`**: sem ela valem os
 textos escritos à mão em `ia/persona.py` e a classificação por heurística; com ela o Claude
@@ -47,8 +67,8 @@ varia a linguagem, classifica cada mensagem digitada e responde dúvida solta.
 **`pip install -e ".[audio]"`**: liga a transcrição, que roda **local** (`faster-whisper`) —
 a voz da família não sai da máquina; sem ela o bot pede para a pessoa escrever.
 
-O `docker-compose.yml` sobe um Postgres para quem está migrando a persistência; o bot do
-dia a dia não precisa dele.
+O `DATABASE_URL` aponta para o Supabase — veja [docs/BANCO.md](docs/BANCO.md). O
+`docker-compose.yml` sobe um Postgres local, alternativa para teste offline.
 
 ## Como está montado
 
@@ -135,6 +155,58 @@ O texto completo, com o porquê de cada uma, está em [CLAUDE.md](CLAUDE.md).
   caiu de 465 para 100 pontos. Ver [D15](docs/DECISOES.md).
 - **Uma pergunta por mensagem**, texto do cidadão é dado e nunca instrução, e no log só ID —
   nunca conteúdo, bytes, CPF ou nome.
+**Privacidade (elegibilidade a ZDR da Anthropic).** Documento de usuário e dado de criança
+passam por aqui:
+
+- Modelo é `claude-haiku-4-5`. Nunca Fable 5 nem Mythos 5 — são Covered Models, exigem
+  retenção de 30 dias e não existem sob ZDR.
+- Imagem vai **base64 inline** no `/v1/messages`. Proibido `client.files.*`, Batch API,
+  code execution, MCP connector, Managed Agents — nenhum é elegível a ZDR.
+- Extrai uma vez, guarda estruturado, **nunca reenvia a imagem** nos turnos seguintes.
+  A V1 não persiste documento nenhum.
+
+**LGPD art. 14.** Nenhum passo que toca dado de criança é alcançável sem consentimento
+registrado — `EXIGEM_CONSENTIMENTO` em `maquina.py` garante, mesmo se alguém forçar o
+estado na sessão.
+
+**LGPD art. 11 — dado sensível.** Deficiência e TGD/TEA são dado de saúde; violência
+doméstica, doença crônica, uso de substâncias e situação prisional também são sensíveis.
+Consentimento **específico e destacado**, separado do geral, sempre com a opção de pular,
+**nunca bloqueante**, e a resposta **nunca é ecoada de volta** — o histórico do chat fica
+no aparelho da família. Ver [D7](docs/DECISOES.md).
+
+**Plataforma.** Os limites do WhatsApp valem em todo lugar, mesmo no código Telegram: máx.
+3 botões, máx. 10 itens de lista, rótulo de 20 caracteres, texto puro sem markdown.
+`MensagemSaida.__post_init__` cobra isso — a tela que estoura o limite quebra no pytest
+hoje, não em produção depois do flip.
+
+**Mensagem proativa é `(ChaveTemplate, variáveis)`, nunca string pronta.** No Telegram
+vira texto com figurinha; no WhatsApp vira template aprovado pela Meta. Quem emite o
+evento não sabe a diferença.
+
+**Fronteira com a persistência.** Ninguém fora de `creche_bot/dados/` conhece banco: nem
+`sqlite3`, nem `SELECT`, nem `session`, nem `cursor`. Quem precisa recebe um `Repositorio`
+injetado. `make fronteira` varre o pacote e falha se vazar.
+
+**Fronteira com o backend.** Histórico do responsável, régua do processo vigente, endereço
+a partir do CEP, oferta de creches, extração de documento e situação da inscrição vêm do
+backend do município. Não recalcule nada disso aqui, e nada do JSON dele sai de `backend/`.
+
+**A régua é dado, não código.** Entre 2023 e 2024 só 3 das 13 perguntas de prioridade
+sobreviveram e o teto caiu de 465 para 100 pontos. O bloco de critérios é montado em tempo
+de execução a partir de `backend.criterios_do_processo()`. Ver [D15](docs/DECISOES.md).
+
+**Uma pergunta por mensagem.** Nunca empilhe duas no mesmo balão — exceto os checklists de
+situação familiar e sensível, que são deliberados.
+
+**Texto do cidadão é dado, nunca instrução.** Entrada livre vai delimitada para o modelo, o
+system prompt manda ignorar ordem escrita ali dentro, e a resposta passa por filtro antes
+de entrar na conversa.
+
+**Log.** Só IDs. Nunca conteúdo de mensagem, bytes de arquivo, CPF ou nome.
+`creche_bot/segredos.py` redige token, chave e `DATABASE_URL` de log e de traceback. O
+banco guarda CPF, nome de criança e telefone: fica num schema fora do alcance da Data API
+do Supabase, com RLS ligada e TLS obrigatório — ver [docs/BANCO.md](docs/BANCO.md).
 
 ## Estado
 
@@ -171,6 +243,8 @@ abstração especulativa. Cada lógica não trivial deixa **um** teste, só pyte
 | [docs/DECISOES.md](docs/DECISOES.md) | As decisões que custariam caro reverter |
 | [docs/ROTEIRO.md](docs/ROTEIRO.md) | Roteiro da conversa mapeado nos estados do código |
 | [docs/MODULOS.md](docs/MODULOS.md) | Quem trabalha em quê, e como não se atropelam |
+| [docs/MODELO_DADOS.md](docs/MODELO_DADOS.md) | As 7 tabelas, o ER, e o que não está no banco |
+| [docs/BANCO.md](docs/BANCO.md) | Configurar o Postgres do Supabase, 5 min |
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Criar e configurar o bot no @BotFather, 10 min |
 | [CLAUDE.md](CLAUDE.md) | Regras para qualquer agente neste repositório |
 

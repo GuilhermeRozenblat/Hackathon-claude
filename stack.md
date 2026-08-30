@@ -16,7 +16,7 @@ biblioteca externa é opcional (`extras`) e o sistema funciona sem ela.
 | Módulo | Para quê | Onde |
 |---|---|---|
 | `urllib.request` | Cliente HTTP da Telegram Bot API (6 métodos, long polling) | `canal/telegram.py` |
-| `sqlite3` | Persistência padrão. Único arquivo do projeto que escreve SQL | `dados/sqlite.py` |
+| `psycopg` 3 | Postgres do Supabase. Único arquivo do projeto que escreve SQL | `dados/postgres.py` |
 | `json` | Payload do Telegram e campos livres no banco | `canal/`, `dados/` |
 | `threading` | Worker do outbox ao lado do polling | `__main__.py`, `notificacao/outbox.py` |
 | `logging` | Log com formatador que redige segredo em mensagem e traceback | `segredos.py` |

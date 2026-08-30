@@ -57,7 +57,7 @@ para o **WhatsApp**, que é onde o público está.
 | Linguagem | Python 3.12, **sem dependência para rodar** |
 | Canal hoje | Telegram, long polling — roda no localhost |
 | Dados do município | `BackendMock` com os dados do roteiro v2; o backend real é de outro time |
-| Persistência | `RepositorioSQLite` por padrão; `RepositorioMemoria` disponível |
+| Persistência | `RepositorioPostgres` (Supabase) por padrão; `RepositorioMemoria` disponível |
 | Escolha da vaga | Lista **ordenada** de preferências, montada em toques |
 | Régua de prioridade | Dado do backend, montada em tempo de execução |
 | Seleção de quem entra | **Não é nossa.** Cadastramos e informamos; quem aloca é o município |
@@ -152,12 +152,12 @@ flowchart TB
     end
 
     subgraph PORTAS[" "]
-        PD["dados/porta.py<br/>16 operações"]
-        PB["backend/porta.py<br/>16 operações"]
+        PD["dados/porta.py<br/>21 operações"]
+        PB["backend/porta.py<br/>17 operações"]
     end
 
     MEM["memoria.py"]
-    SQL["sqlite.py"]
+    SQL["postgres.py"]
     MOCK["mock.py"]
     HTTP["http.py<br/>(quando existir)"]
 
@@ -198,11 +198,11 @@ congelados**, e em mais nenhum.
         └───────┬──────────────────────────┬───────────┘
                 │                          │
       dados/porta.py               backend/porta.py     ← CONGELADOS
-      16 operações                 16 operações
+      21 operações                 17 operações
                 │                          │
     ┌───────────┴────────────┐  ┌──────────┴───────────────────┐
     │ dados/                 │  │ backend/                     │
-    │ memoria.py · sqlite.py │  │ mock.py · http.py            │
+    │ memoria.py·postgres.py │  │ mock.py · http.py            │
     │ estado NOSSO           │  │ dados do MUNICÍPIO           │
     │ outra pessoa           │  │ outro time, outra máquina    │
     └────────────────────────┘  └──────────────────────────────┘

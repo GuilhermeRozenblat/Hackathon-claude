@@ -30,6 +30,7 @@ from creche_bot.dominio.tipos import (
     FormaEntrega,
     Grupamento,
     Horario,
+    PanoramaRegiao,
     Pendencia,
     PontoEntrega,
     Situacao,
@@ -99,6 +100,14 @@ _CRITERIOS: tuple[Criterio, ...] = (
              "Alguém de casa está preso ou saiu da prisão nos últimos 5 anos", 2, "8.4",
              sensivel=True, documento="Declaração", documento_opcional=True),
 )
+
+# Microárea 7.9 do mapa territorial da fila, que é onde o roteiro se passa. Ao contrário
+# do resto deste arquivo, estes números são reais: saíram de `MapaFilaCreche/`, recorte
+# de 2025. Ficam aqui para o painel do bloco 10 ter contexto de região mesmo rodando no
+# mock — o `BackendMapa` lê a microárea de verdade a partir do CEP.
+_PANORAMA_CURICICA = PanoramaRegiao(
+    microarea="7.9", bairro="Curicica", demanda=390, atendidos=342, espera=324,
+    vagas_ociosas=0, ano=2025)
 
 _CRAS: tuple[PontoEntrega, ...] = (
     PontoEntrega("CRAS Curicica", "Estrada dos Bandeirantes, 4100",
@@ -265,6 +274,11 @@ class BackendMock:
         # Vaga aberta agora vem primeiro; depois, a mais perto. Nunca por pontuação.
         sugestoes.sort(key=lambda v: (not v.vaga_ociosa, v.distancia_km))
         return sugestoes[:n]
+
+    def panorama_da_regiao(self, endereco: Endereco) -> PanoramaRegiao | None:
+        # Microárea 7.9 (Curicica), que é onde o roteiro se passa. Números do processo
+        # de 2025 — passado consumado, e é assim que a tela tem que apresentá-los.
+        return _PANORAMA_CURICICA
 
     # ------------------------------------------------------------ inscrição
     def validar_nis(self, nis: str) -> tuple[bool, tuple[str, ...]]:

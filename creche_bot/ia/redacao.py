@@ -41,8 +41,14 @@ MAX_RESPOSTA = 600     # o que o modelo devolve, cortado antes de virar mensagem
 MAX_LINHAS = 4
 
 # O sistema cadastra e informa; ele não decide quem entra. Nada disto pode sair daqui.
+#
+# "probabilidade" e "chance" saíram da lista: o painel do bloco 10 agora mostra a chance
+# estimada por creche, calculada em `backend/mapa.py` sobre o que aconteceu em 2025. O que
+# a lista continua barrando é o salto de estimativa para promessa — garantia, certeza, e a
+# classificação que o bot não faz (pontuação, nota, posição na fila). Um número com ano
+# estampado é informação; "você vai conseguir" continua sendo mentira.
 PROMESSAS = ("garantid", "com certeza", "certamente", "vai conseguir", "prometo",
-             "asseguro", "probabilidade", "chance de conseguir", "pode comemorar",
+             "asseguro", "pode comemorar", "está na frente",
              "sua pontuação", "sua nota", "posição na fila")
 
 REESCRITA = "Reescreva com suas palavras, mantendo o sentido e os números exatos:\n\n{base}"

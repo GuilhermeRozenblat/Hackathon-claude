@@ -1,10 +1,14 @@
-.PHONY: bot memoria debug fronteira test contratos seguranca conversa canal ia dados backend notificacao lint limpar
+.PHONY: bot memoria roteiro debug fronteira test contratos seguranca conversa canal ia dados backend notificacao lint limpar banco esquema up
 
 bot:          ; python -m creche_bot
-memoria:      ; REPOSITORIO=memoria python -m creche_bot   # roda sem tocar em disco
+memoria:      ; REPOSITORIO=memoria python -m creche_bot   # roda sem banco nenhum
+roteiro:      ; BACKEND=mock python -m creche_bot          # as 3 escolas fixas do roteiro
 debug:        ; DEBUG_CONTEUDO=1 python -m creche_bot      # espelha a conversa no console
 verificar:    ; python scripts/verificar_telegram.py
 eco:          ; python scripts/verificar_telegram.py --eco
+banco:        ; python scripts/verificar_banco.py          # aplica o schema e testa a porta
+esquema:      ; python scripts/verificar_banco.py --esquema
+up:           ; docker compose up -d                       # Postgres local, alternativa ao Supabase
 
 test:         ; python -m pytest -q
 contratos:    ; python -m pytest tests/test_contratos.py -q
@@ -18,4 +22,4 @@ notificacao:  ; python -m pytest tests/notificacao -q
 
 fronteira:    ; python -m pytest tests/test_contratos.py -q -k 'vaza or porta'
 lint:         ; ruff check creche_bot fakes tests scripts
-limpar:       ; rm -f creche.db creche.db-wal creche.db-shm
+limpar:       ; python scripts/verificar_banco.py --apagar   # derruba o schema inteiro

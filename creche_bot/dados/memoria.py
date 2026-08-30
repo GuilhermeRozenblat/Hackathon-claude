@@ -8,12 +8,28 @@ sem tocar em disco.
 from __future__ import annotations
 
 import itertools
+import json
 import uuid
+from dataclasses import replace
 from typing import Any
 
-from creche_bot.dados.porta import EventoPendente, Inscricao
+from creche_bot.dados.porta import Cadastro, EventoInscricao, EventoPendente, Inscricao
 
 MAX_TENTATIVAS = 5
+
+
+def _copia(contexto: dict[str, Any]) -> dict[str, Any]:
+    """Cópia PROFUNDA, pelo mesmo caminho do jsonb — e as duas coisas importam.
+
+    `dict(contexto)` copia só o primeiro nível, e o roteiro guarda listas na sessão
+    (`preferencias`, `comprovados`). Os passos mutam essas listas no lugar, então com
+    cópia rasa o estado mudaria sem passar por `salvar_sessao()` — em memória, mas não
+    no Postgres. Duas implementações divergentes é o bug que a bateria existe para pegar.
+
+    Ida e volta por JSON em vez de `deepcopy` porque é o que o `jsonb` faz: tupla vira
+    lista, chave não-string vira string. Divergir aqui só adiaria a surpresa.
+    """
+    return json.loads(json.dumps(contexto, ensure_ascii=False, default=str))
 
 
 class RepositorioMemoria:
@@ -25,6 +41,10 @@ class RepositorioMemoria:
         self._outbox: dict[int, dict[str, Any]] = {}
         self._marcas: dict[str, str] = {}
         self._seq = itertools.count(1)
+        # Chave (contato_id, protocolo): None é o cadastro aberto, e é o que o turno
+        # sobrescreve. Espelha a UNIQUE parcial do Postgres.
+        self._cadastros: dict[tuple[str, str | None], Cadastro] = {}
+        self._eventos: dict[str, list[EventoInscricao]] = {}
 
     # ------------------------------------------------------------- identidade
     def contato_de(self, canal: str, id_externo: str) -> str:
@@ -45,10 +65,22 @@ class RepositorioMemoria:
     # ------------------------------------------------------------------ sessão
     def carregar_sessao(self, contato_id: str) -> tuple[str, dict[str, Any]]:
         estado, contexto = self._sessoes.get(contato_id, ("INICIO", {}))
-        return estado, dict(contexto)          # cópia: o chamador muta o dict
+        return estado, _copia(contexto)
 
     def salvar_sessao(self, contato_id: str, estado: str, contexto: dict[str, Any]) -> None:
-        self._sessoes[contato_id] = (estado, dict(contexto))
+        self._sessoes[contato_id] = (estado, _copia(contexto))
+
+    # ---------------------------------------------------------------- cadastro
+    def salvar_cadastro(self, cadastro: Cadastro) -> None:
+        self._cadastros[(cadastro.contato_id, cadastro.protocolo)] = cadastro
+
+    def cadastro_de(self, contato_id: str, protocolo: str | None = None) -> Cadastro | None:
+        return self._cadastros.get((contato_id, protocolo))
+
+    def fechar_cadastro(self, contato_id: str, protocolo: str) -> None:
+        aberto = self._cadastros.pop((contato_id, None), None)
+        if aberto is not None:
+            self._cadastros[(contato_id, protocolo)] = replace(aberto, protocolo=protocolo)
 
     # --------------------------------------------------------------- inscrição
     def salvar_inscricao(self, inscricao: Inscricao) -> None:
@@ -63,6 +95,17 @@ class RepositorioMemoria:
                 i.protocolo, i.contato_id, i.id_escola, i.nome_escola,
                 i.nome_crianca, etapa_codigo,
             )
+
+    # ---------------------------------------------------- acompanhamento da vaga
+    def registrar_evento(self, evento: EventoInscricao) -> None:
+        historia = self._eventos.setdefault(evento.protocolo, [])
+        # O polling relê a mesma situação; sem isto a linha do tempo repete a etapa.
+        if any(e.etapa_codigo == evento.etapa_codigo for e in historia):
+            return
+        historia.append(evento)
+
+    def eventos(self, protocolo: str) -> list[EventoInscricao]:
+        return list(self._eventos.get(protocolo, ()))
 
     # ------------------------------------------------------------------ outbox
     def enfileirar(self, protocolo: str, chave: str, variaveis: dict[str, Any]) -> None:
@@ -105,6 +148,10 @@ class RepositorioMemoria:
             del self._inscricoes[p]
         for eid in [k for k, v in self._outbox.items() if v["protocolo"] in protocolos]:
             del self._outbox[eid]
+        for p in protocolos:
+            self._eventos.pop(p, None)
+        for chave in [k for k in self._cadastros if k[0] == contato_id]:
+            del self._cadastros[chave]
         self._sessoes.pop(contato_id, None)
         self._consentimentos.pop(contato_id, None)
         for chave in [k for k, v in self._identidades.items() if v == contato_id]:

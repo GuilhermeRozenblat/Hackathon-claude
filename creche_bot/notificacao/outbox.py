@@ -15,7 +15,7 @@ from typing import Any, Protocol
 
 from creche_bot.backend.porta import BackendCreche, BackendIndisponivel
 from creche_bot.canal.tipos import MensagemSaida
-from creche_bot.dados.porta import Repositorio
+from creche_bot.dados.porta import EventoInscricao, Repositorio
 from creche_bot.dominio.tipos import Situacao
 from creche_bot.notificacao.catalogo import renderizar
 from creche_bot.notificacao.chaves import POR_TIPO_ETAPA, ChaveTemplate
@@ -75,6 +75,11 @@ def sincronizar(backend: BackendCreche, repo: Repositorio) -> int:
         chave, variaveis = variaveis_de(sit, registro.nome_crianca)
         repo.enfileirar(sit.numero, chave.value, variaveis)
         repo.atualizar_etapa(sit.numero, sit.etapa.codigo)
+        # A mesma passagem que dispara a notificação escreve a linha do tempo: é o único
+        # ponto do sistema que sabe que a etapa MUDOU, e não só qual ela é agora.
+        repo.registrar_evento(EventoInscricao(
+            protocolo=sit.numero, etapa_codigo=sit.etapa.codigo,
+            tipo=sit.etapa.tipo, titulo=sit.etapa.titulo))
         enfileirados += 1
 
     repo.gravar_marca(MARCA, nova_marca)
