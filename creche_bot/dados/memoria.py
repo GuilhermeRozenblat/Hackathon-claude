@@ -8,12 +8,27 @@ sem tocar em disco.
 from __future__ import annotations
 
 import itertools
+import json
 import uuid
 from typing import Any
 
 from creche_bot.dados.porta import EventoPendente, Inscricao
 
 MAX_TENTATIVAS = 5
+
+
+def _copia(contexto: dict[str, Any]) -> dict[str, Any]:
+    """Cópia PROFUNDA, pelo mesmo caminho do jsonb — e as duas coisas importam.
+
+    `dict(contexto)` copia só o primeiro nível, e o roteiro guarda listas na sessão
+    (`preferencias`, `comprovados`). Os passos mutam essas listas no lugar, então com
+    cópia rasa o estado mudaria sem passar por `salvar_sessao()` — em memória, mas não
+    no Postgres. Duas implementações divergentes é o bug que a bateria existe para pegar.
+
+    Ida e volta por JSON em vez de `deepcopy` porque é o que o `jsonb` faz: tupla vira
+    lista, chave não-string vira string. Divergir aqui só adiaria a surpresa.
+    """
+    return json.loads(json.dumps(contexto, ensure_ascii=False, default=str))
 
 
 class RepositorioMemoria:
@@ -45,10 +60,10 @@ class RepositorioMemoria:
     # ------------------------------------------------------------------ sessão
     def carregar_sessao(self, contato_id: str) -> tuple[str, dict[str, Any]]:
         estado, contexto = self._sessoes.get(contato_id, ("INICIO", {}))
-        return estado, dict(contexto)          # cópia: o chamador muta o dict
+        return estado, _copia(contexto)
 
     def salvar_sessao(self, contato_id: str, estado: str, contexto: dict[str, Any]) -> None:
-        self._sessoes[contato_id] = (estado, dict(contexto))
+        self._sessoes[contato_id] = (estado, _copia(contexto))
 
     # --------------------------------------------------------------- inscrição
     def salvar_inscricao(self, inscricao: Inscricao) -> None:

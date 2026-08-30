@@ -12,6 +12,9 @@ import pytest
 from creche_bot.backend.mock import CPF_CONHECIDO, BackendMock
 from creche_bot.canal.tipos import Anexo, MensagemEntrada, MensagemSaida
 from creche_bot.conversa.maquina import Maquina
+# Os testes que montam a própria Maquina (processo fechado, por ex.) usam este direto —
+# não passam pela fixture `repo`, porque precisam inspecionar o repositório depois.
+from creche_bot.dados.memoria import RepositorioMemoria
 from creche_bot.ia.redacao import RedatorEstatico
 
 _seq = itertools.count(1)
