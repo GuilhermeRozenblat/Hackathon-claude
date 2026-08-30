@@ -126,7 +126,7 @@ select:focus-visible,.botao:focus-visible,.nav button:focus-visible,.pilula:focu
 .tile .nota{font-size:11px;color:var(--ink-faint);line-height:1.4;}
 .tile .marcador{width:22px;height:3px;border-radius:2px;margin-bottom:2px;}
 
-.grade{display:grid;gap:14px;}
+.grade{display:grid;gap:14px;align-items:start;}
 .grade.principal-lateral{grid-template-columns:1.15fr .85fr;}
 .grade.mapa-lateral{grid-template-columns:minmax(0,1fr) 300px;}
 .grade.duas{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -148,7 +148,7 @@ select:focus-visible,.botao:focus-visible,.nav button:focus-visible,.pilula:focu
 .tabela-envelope{overflow-x:auto;margin-top:12px;-webkit-overflow-scrolling:touch;}
 table{border-collapse:collapse;width:100%;font-size:12px;}
 th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
-th:first-child,td:first-child{text-align:left;}
+th:first-child,td:first-child{text-align:left;white-space:normal;min-width:11ch;}
 th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);
   position:sticky;top:0;background:var(--surface);}
 tbody tr:hover{background:var(--surface-2);}
@@ -158,9 +158,11 @@ td.num{font-variant-numeric:tabular-nums;}
 
 /* ---- mapa ---- */
 .mapa-caixa{background:var(--surface-2);border-radius:10px;padding:8px;position:relative;}
-.mapa-caixa svg{display:block;width:100%;height:auto;}
-.mapa-caixa circle{cursor:pointer;}
-.mapa-caixa circle.selecionado{stroke:var(--ink);stroke-width:2.5;}
+/* só o SVG do mapa estica: `.mapa-caixa svg` pegava também o desenho de 60x26 da
+   legenda e o inflava para a largura toda, empurrando o mapa para fora da tela */
+.mapa-caixa > svg{display:block;width:100%;height:auto;}
+.mapa-caixa > svg circle{cursor:pointer;}
+.mapa-caixa > svg circle.selecionado{stroke:var(--ink);stroke-width:2.5;}
 .legenda{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-soft);}
 .legenda .escala{display:flex;align-items:center;gap:4px;}
 .legenda .degrau{width:22px;height:10px;border-radius:2px;}
@@ -4100,7 +4102,9 @@ desig7,grupamento,vagas,DENOMINACAO,BAIRRO,LATITUDE,LONGITUDE,sobra_3km
 function lerCSV(texto){
   const linhas = [];
   let campo = "", linha = [], entreAspas = false;
-  const t = texto.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  /* trim: o textContent de um <script type="text/csv"> vem com a quebra de linha
+     que separa o conteúdo da tag, e ela viraria um cabeçalho vazio */
+  const t = texto.replace(/^﻿/, "").replace(/\r\n?/g, "\n").trim();
   for (let i = 0; i < t.length; i++){
     const c = t[i];
     if (entreAspas){
@@ -4311,7 +4315,7 @@ function comTabela(idBase, grafico, colunas, linhas){
 
 function tile(rotulo, valor, nota, cor){
   return `<div class="tile">
-    ${cor ? `<div class="marcador" style="background:${cor}"></div>` : ""}
+    <div class="marcador" style="background:${cor || "var(--border-strong)"}"></div>
     <div class="rotulo">${esc(rotulo)}</div>
     <div class="valor" ${cor ? `style="color:${cor}"` : ""}>${esc(valor)}</div>
     ${nota ? `<div class="nota">${esc(nota)}</div>` : ""}
@@ -4814,8 +4818,9 @@ function vistaMapa(){
       <h3>Sobra sem fila</h3>
       <p class="legenda-painel">Microáreas com mais vaga ociosa do que criança esperando: oferta que existe e
       não está sendo procurada ali.</p>
-      ${sobra.length ? tabela(["Microárea", "Ociosas", "Fila"],
-        sobra.map(m => [`${m.cod} · ${m.bairro}`, fmt.format(m.ociosas), fmt.format(m.espera)]))
+      ${sobra.length ? tabela(["Microárea", "Ociosas", "Fila", "Sobra"],
+        sobra.map(m => [`${m.cod} · ${m.bairro}`, fmt.format(m.ociosas), fmt.format(m.espera),
+                        fmt.format(m.ociosas - m.espera)]))
         : `<p class="legenda-painel">Nenhuma no recorte.</p>`}
     </section>
     <section class="cartao painel">
@@ -5131,7 +5136,18 @@ function renderNav(){
     </button>`).join("");
 }
 
+function lerHash(){
+  const partes = (location.hash || "").replace(/^#/, "").split("/");
+  if (VISTAS.some(v => v.chave === partes[0])) estado.vista = partes[0];
+  if (partes[1] && M.listaCre.some(c => c.n === partes[1])) estado.cre = partes[1];
+}
+function escreverHash(){
+  const alvo = "#" + estado.vista + (estado.cre ? "/" + estado.cre : "");
+  if (location.hash !== alvo) history.replaceState(null, "", alvo);
+}
+
 function render(){
+  escreverHash();
   renderNav();
   const alvo = document.getElementById("conteudo");
   alvo.innerHTML = estado.vista === "painel" ? vistaPainel()
@@ -5233,10 +5249,13 @@ function trocarTema(){
 
 /* ------------------------------------------------------------------ início */
 (async function inicio(){
+  /* ?tema=claro|escuro força o tema — útil para demonstração e impressão */
+  const forcado = new URLSearchParams(location.search).get("tema");
   let salvo = null;
   try { salvo = localStorage.getItem("creche-tema"); } catch (_) {}
-  aplicarTema(salvo || (window.matchMedia &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro"));
+  aplicarTema(forcado === "claro" || forcado === "escuro" ? forcado
+    : salvo || (window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro"));
 
   const { dados, redeOk } = await carregarFontes();
   if (!dados.microareas.length){
@@ -5252,6 +5271,8 @@ function trocarTema(){
     ? "Lendo os CSVs do disco a cada carregamento."
     : "CSVs embutidos na página (abra por HTTP para ler os arquivos do disco).";
   document.getElementById("origem-dados").textContent = ORIGEM;
+  lerHash();
+  window.addEventListener("hashchange", () => { lerHash(); render(); });
   render();
 })();
 </script>

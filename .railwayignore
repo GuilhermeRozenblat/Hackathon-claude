@@ -1,0 +1,34 @@
+# O que NÃO sobe no contexto de build do `railway up`.
+#
+# O `.gitignore` já barra o `.env` de entrar no Git, mas `railway up` empacota o
+# diretório de trabalho, não o commit. Sem esta lista, o segredo viajaria para o
+# builder mesmo nunca tendo sido commitado.
+
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Sinks de dado pessoal — sessão tem CPF, nome e telefone em claro.
+*.db
+*.db-wal
+*.db-shm
+documentos/
+cache_geo.json
+
+# Nada disso entra na imagem (ver deploy/site.Dockerfile); fora do contexto o
+# build também fica mais rápido.
+.git/
+.claude/
+tests/
+docs/
+fakes/
+scripts/
+creche-conectada.html
