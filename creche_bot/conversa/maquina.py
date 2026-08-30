@@ -18,6 +18,7 @@ from datetime import datetime
 
 from creche_bot.backend.porta import BackendCreche
 from creche_bot.canal.tipos import MensagemEntrada, MensagemSaida
+from creche_bot.conversa.formulario import campo_de
 from creche_bot.conversa.passos import (
     consulta,
     criterios,
@@ -34,6 +35,17 @@ from creche_bot.dados.porta import Repositorio
 from creche_bot.ia.redacao import Redator
 
 log = logging.getLogger(__name__)
+
+
+def _etapa(estado: str, dados: dict) -> str:
+    """O que o bot acabou de perguntar, para o classificador julgar a resposta.
+
+    Só a pergunta ESTÁTICA do campo entra: `pergunta_alt` interpola nome da criança, e
+    dado da família não vai para prompt nenhum. Estado sem formulário viaja só pelo nome,
+    que já diz o suficiente ("ENDERECO_CEP", "HORARIO").
+    """
+    campo = campo_de(dados.get("perguntou", ""))
+    return f"{estado} — {campo.pergunta}" if campo else estado
 
 
 def _cadastro(p: Passo) -> MensagemSaida:
@@ -174,6 +186,7 @@ class Maquina:
         self._repo = repo
         self._transcritor = transcritor
         self._duvidas: dict[str, list[float]] = {}
+        self._perdidos: set[str] = set()   # quem já foi reorientado na última mensagem
 
     def processar(self, msg: MensagemEntrada) -> MensagemSaida:
         # Voz vira texto antes de qualquer decisão: quem falou segue o mesmo caminho de
@@ -215,13 +228,15 @@ class Maquina:
         if estado in EXIGEM_CONSENTIMENTO and not self._repo.tem_consentimento(contato_id):
             estado, dados = "INICIO", {}      # sem autorização, volta ao começo
 
-        if (duvida := self._duvida(msg, estado, contato_id)) is not None:
-            return duvida     # estado intacto: perguntar não faz perder o lugar na fila
-
         dados["visto_em"] = datetime.now().isoformat(timespec="seconds")
         passo = Passo(msg=msg, contato_id=contato_id, dados=dados,
                       backend=self._backend, redator=self._redator, repo=self._repo)
         try:
+            # Sai do roteiro sem SALVAR nada: quem perguntou ou se perdeu não perde o
+            # lugar na fila, e a próxima mensagem cai no mesmo estado.
+            if (fora := self._fora_do_roteiro(passo, estado)) is not None:
+                return fora
+            self._perdidos.discard(contato_id)
             resposta = (entrada.retomada(passo, retomar_de) if retomar_de
                         else self._executar(passo, estado))
         except Exception:
@@ -236,21 +251,44 @@ class Maquina:
             return entrar(passo, estado) if estado == "INICIO" else PASSOS[estado](passo)
         return PASSOS[estado](passo)
 
-    def _duvida(self, msg: MensagemEntrada, estado: str,
-                contato_id: str) -> MensagemSaida | None:
-        """Pergunta solta no meio do cadastro. `None` = não é dúvida, segue o roteiro.
+    def _fora_do_roteiro(self, passo: Passo, estado: str) -> MensagemSaida | None:
+        """Toda mensagem digitada passa por aqui antes de virar resposta de campo.
 
-        Só o nome da etapa vai para o modelo. Nada do que a família já contou — CPF, nome
-        da criança, endereço — precisa estar lá para responder "como funciona a fila".
+        A pessoa está respondendo, perguntando, ou se perdeu? `None` = segue o roteiro.
+        Só a etapa e a pergunta estática vão para o modelo — nada do que a família já
+        contou precisa estar lá para decidir isso.
         """
-        if msg.escolha or not msg.texto:
+        texto = passo.texto
+        if passo.msg.escolha or not texto or texto.startswith("/"):
+            return None      # botão e comando já têm dono; classificar seria gastar à toa
+
+        etapa = _etapa(estado, passo.dados)
+        intencao = self._redator.classificar(texto, etapa).intencao
+
+        if intencao == "duvida":
+            if not self._cota(passo.contato_id):
+                return None
+            resposta = self._redator.responder_duvida(texto, etapa)
+            return MensagemSaida(resposta) if resposta else None
+        if intencao == "fora_de_contexto":
+            return self._reorientar(passo, estado)
+        return None
+
+    def _reorientar(self, passo: Passo, estado: str) -> MensagemSaida | None:
+        """Veio coisa que não responde a pergunta: repete a pergunta, sem contar erro.
+
+        Duas vezes seguidas seria loop — classificador que erra prenderia a família fora
+        do cadastro. Na segunda, deixa passar: `_errar` sabe reclamar sozinho, conta as
+        três tentativas e oferece a CRE. Estado sem tela de reentrada também passa, porque
+        redesenhar ali significaria chamar o handler, que CONSOME a mensagem.
+        """
+        if estado not in ENTRADAS or passo.contato_id in self._perdidos:
             return None
-        if self._redator.classificar(msg.texto, estado).intencao != "duvida":
-            return None
-        if not self._cota(contato_id):
-            return None
-        resposta = self._redator.responder_duvida(msg.texto, estado)
-        return MensagemSaida(resposta) if resposta else None
+        if len(self._perdidos) > 5_000:      # quem some no meio nunca sai daqui sozinho
+            self._perdidos.clear()
+        self._perdidos.add(passo.contato_id)
+        tela = entrar(passo, estado)
+        return replace(tela, texto=f"{passo.txt('me_perdi')}\n\n{tela.texto}")
 
     def _cota(self, contato_id: str) -> bool:
         """Janela deslizante de uma hora, por contato.

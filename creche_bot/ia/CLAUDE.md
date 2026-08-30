@@ -23,8 +23,14 @@ def classificar(self, mensagem: str, estado: str) -> Classificacao
 def responder_duvida(self, pergunta: str, etapa: str) -> str | None   # None = sem IA
 ```
 
-`responder_duvida` recebe **só o nome da etapa** — nada de CPF, nome ou endereço. Para
-responder "como funciona a fila" o modelo não precisa saber quem está perguntando.
+`classificar` e `responder_duvida` recebem **a etapa e a pergunta estática que está no
+ar** — nada de CPF, nome ou endereço. Para responder "como funciona a fila" o modelo não
+precisa saber quem está perguntando, e para decidir se a mensagem responde a pergunta ele
+precisa da pergunta, não da resposta anterior.
+
+`classificar` é chamada de modelo no `RedatorClaude`, uma por mensagem digitada. A saída
+tem que estar no vocabulário de `Intencao`; qualquer outra coisa, ou API fora, cai na
+heurística de string do `RedatorEstatico`. Ver [D18](../../docs/DECISOES.md).
 
 Duas implementações, e a escolha é config:
 
@@ -52,6 +58,7 @@ sem passar por `_limpo` (tira markdown) e `_promete` (barra "garantido", "com ce
 | `texto()` | `_numeros(novo) == _numeros(base)` | número mexido é CPF, protocolo ou nota errada na tela |
 | `responder_duvida()` | descarta `\d{5,}` e link | CPF, CEP, telefone e protocolo inventados; link leva a golpe |
 | `responder_duvida()` | pergunta truncada em 500 chars, sem `<` nem `>` | sem eles ninguém fecha a tag e escapa do bloco de dado |
+| `classificar()` | saída obrigatoriamente em `Intencao` | rótulo inventado viraria estado que a máquina não conhece |
 | `conversa/maquina.py` | `LIMITE_DUVIDAS` por contato/hora | chat aberto é um botão de gastar dinheiro dos outros |
 
 Reprovou, cai para o texto estático. Um filtro que barra não pode emudecer o bot.

@@ -9,7 +9,10 @@ from creche_bot.backend.mock import BackendMock
 from creche_bot.canal.tipos import Anexo, MensagemEntrada
 from creche_bot.conversa.maquina import LIMITE_DUVIDAS, Maquina
 from creche_bot.dados.memoria import RepositorioMemoria
+from creche_bot.dominio.tipos import Classificacao
 from creche_bot.ia.redacao import RedatorEstatico
+
+CPF_NOVO = "111.444.777-35"      # válido, e o histórico não conhece
 
 
 class RedatorFalante(RedatorEstatico):
@@ -80,3 +83,83 @@ def test_dado_pessoal_nao_vai_junto_com_a_duvida():
     bot.processar(texto("como funciona a fila?", "2"))
 
     assert redator.perguntas == ["como funciona a fila?"]
+
+
+# --------------------------------------------- quem se perdeu, e não quem errou
+
+
+class RedatorPerdido(RedatorEstatico):
+    """Como o RedatorClaude quando o modelo diz que a mensagem não responde a pergunta."""
+
+    def classificar(self, mensagem: str, estado: str) -> Classificacao:
+        return Classificacao(intencao="fora_de_contexto")
+
+
+class RedatorEspiao(RedatorEstatico):
+    """Anota o contexto que iria para o modelo, e deixa o roteiro seguir normalmente."""
+
+    def __init__(self) -> None:
+        self.etapas: list[str] = []
+
+    def classificar(self, mensagem: str, estado: str) -> Classificacao:
+        self.etapas.append(estado)
+        return super().classificar(mensagem, estado)
+
+
+def ate_o_cpf(bot) -> None:
+    bot.processar(texto("/start"))
+    for i, escolha in enumerate(("inscrever", "autorizo"), start=2):
+        bot.processar(MensagemEntrada(canal="telegram", id_externo="777",
+                                      id_mensagem=str(i), escolha=escolha))
+
+
+def test_quem_se_perdeu_ouve_a_pergunta_de_novo_em_vez_de_um_erro():
+    bot = montar(RedatorPerdido())
+    ate_o_cpf(bot)
+
+    r = bot.processar(texto("minha filha tem 2 anos e a gente mudou de casa", "4"))
+
+    assert "desencontrou" in r.texto
+    assert "CPF" in r.texto, "a pergunta que estava no ar volta junto com o aviso"
+
+
+def test_reorientar_duas_vezes_seguidas_seria_loop():
+    """Classificador que erra não pode prender a família fora do próprio cadastro."""
+    bot = montar(RedatorPerdido())
+    ate_o_cpf(bot)
+
+    primeira = bot.processar(texto("qualquer coisa", "4"))
+    segunda = bot.processar(texto("outra coisa qualquer", "5"))
+
+    assert "desencontrou" in primeira.texto
+    assert "desencontrou" not in segunda.texto, "na segunda o campo valida e reclama"
+
+
+def test_se_perder_nao_consome_a_resposta_nem_conta_erro():
+    bot = montar(RedatorPerdido())
+    ate_o_cpf(bot)
+    bot.processar(texto("não sei o que você quer", "4"))
+
+    # O CPF continua sendo o que o bot espera: a mensagem anterior não foi consumida.
+    assert "nome completo" in bot.processar(texto(CPF_NOVO, "5")).texto
+
+
+def test_o_classificador_ve_a_pergunta_no_ar_mas_nao_o_que_a_familia_respondeu():
+    """Dado da família não entra em prompt. A pergunta estática do campo, sim."""
+    redator = RedatorEspiao()
+    bot = montar(redator)
+    ate_o_cpf(bot)
+    for i, t in enumerate((CPF_NOVO, "Maria da Silva Santos", "07/11/1990"), start=4):
+        bot.processar(texto(t, str(i)))
+
+    assert any("Qual é o seu nome completo?" in e for e in redator.etapas)
+    assert not any("Maria da Silva Santos" in e or CPF_NOVO in e for e in redator.etapas)
+
+
+def test_comando_nao_gasta_chamada_de_classificacao():
+    redator = RedatorEspiao()
+    bot = montar(redator)
+    bot.processar(texto("/start"))
+    bot.processar(texto("/ajuda", "2"))
+
+    assert redator.etapas == [], "barra é comando, não é resposta nem pergunta"

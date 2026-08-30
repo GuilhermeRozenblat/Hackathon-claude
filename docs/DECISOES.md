@@ -339,8 +339,36 @@ resposta do roteiro — o cadastro continua, só a IA descansa.
 
 **Por quê o prompt.** O campo é aberto e alguém vai tentar dobrar o prompt. A defesa é
 delimitar (`<pergunta>`), declarar que ali dentro é dado, e não mandar nada da família
-para o modelo: só o nome da etapa. Ninguém precisa do CPF da criança para explicar como
-funciona a fila.
+para o modelo: só a etapa e a pergunta estática que está no ar. Ninguém precisa do CPF da
+criança para explicar como funciona a fila.
 
 **ponytail assumido.** O contador é um dicionário em memória, de um processo só —
 marcado no código, com o `clear` que impede virar vazamento no dia do pico.
+
+## D18 · Quem classifica a mensagem é o modelo, não uma regra de string
+
+**Decisão.** Toda mensagem **digitada** — não botão, não comando — passa por
+`Redator.classificar()` antes de virar resposta de campo, e no `RedatorClaude` isso é uma
+chamada ao Haiku. A saída é o vocabulário fechado de `Intencao`, e a máquina age em duas
+delas: `duvida` responde e mantém o estado (D17), `fora_de_contexto` repete a pergunta.
+
+**O que isso reverteu.** Antes era `endswith("?")` mais uma lista de palavras iniciais, e
+o `RedatorClaude` reusava a mesma função com um comentário dizendo que modelo ali seria
+gastar à toa. A heurística acerta "como funciona a fila?" e erra tudo que importa: "meu
+marido perdeu o emprego mês passado" não termina em "?", não é resposta de CPF nenhum, e
+ia direto para o validador virar "esse CPF não confere".
+
+**Por quê `fora_de_contexto` não bloqueia.** O prompt manda escolher `responder` no
+empate, o reconhecimento não conta erro no campo, e reorientar duas vezes seguidas é
+proibido — na segunda a mensagem passa e o `_errar` do formulário assume, que já sabe
+contar três tentativas e oferecer a CRE. Classificador que erra pode custar um turno; não
+pode prender a família fora do próprio cadastro.
+
+**Custo.** Uma chamada de Haiku por mensagem digitada, com system de ~250 tokens e saída
+de uma palavra. Botão e comando não gastam nada. Não tem cota própria — a de D17 continua
+valendo só para a resposta livre, que é a chamada cara.
+
+**Privacidade.** O que vai para o modelo é `ESTADO — pergunta estática do campo` mais a
+mensagem delimitada em `<mensagem>`. Nunca `pergunta_alt`, que interpola o nome da
+criança. Há teste que dirige o cadastro e falha se um dado da família aparecer no
+contexto.

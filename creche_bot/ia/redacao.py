@@ -2,8 +2,8 @@
 
 `RedatorEstatico` roda sem chave da Anthropic e sem rede — é o que permite validar o
 fluxo inteiro no Telegram antes de gastar um token.
-`RedatorClaude` usa os mesmos textos como base, dá a variação humana em cima e responde
-pergunta solta.
+`RedatorClaude` usa os mesmos textos como base, dá a variação humana em cima, responde
+pergunta solta e classifica o que a família manda.
 
 ## Os guardrails, e por que existem
 
@@ -16,7 +16,9 @@ modelo devolve entra na conversa sem passar por `_limpo` + `_promete`, e mais:
   · em `responder_duvida()`, sequência longa de dígito é descartada inteira (CPF, CEP,
     telefone e protocolo inventados), e link também (leva a família para golpe);
   · a pergunta do usuário entra truncada, sem `<` nem `>`, dentro de uma tag que o prompt
-    declara ser dado.
+    declara ser dado;
+  · em `classificar()`, a palavra que volta tem que estar no vocabulário de `Intencao` —
+    rótulo inventado viraria intenção que a máquina de estados não sabe tratar.
 
 Qualquer reprovação cai para o texto estático. Um filtro que barra não pode emudecer o bot.
 """
@@ -25,10 +27,10 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, get_args, runtime_checkable
 
-from creche_bot.dominio.tipos import Classificacao
-from creche_bot.ia.persona import SISTEMA, SISTEMA_DUVIDA, TEXTOS
+from creche_bot.dominio.tipos import Classificacao, Intencao
+from creche_bot.ia.persona import SISTEMA, SISTEMA_CLASSIFICA, SISTEMA_DUVIDA, TEXTOS
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +46,15 @@ PROMESSAS = ("garantid", "com certeza", "certamente", "vai conseguir", "prometo"
              "sua pontuação", "sua nota", "posição na fila")
 
 REESCRITA = "Reescreva com suas palavras, mantendo o sentido e os números exatos:\n\n{base}"
+
+# Sai do contrato congelado, não de uma segunda lista aqui: vocabulário novo em
+# `dominio/tipos.py` passa a ser aceito sem ninguém lembrar de mexer neste arquivo.
+#
+# A chave é a palavra SEM separador porque `_limpo` tira `_` achando que é markdown:
+# "fora_de_contexto" chegava aqui como "foradecontexto" e a intenção mais importante do
+# classificador caía fora do vocabulário em silêncio. De quebra aceita "fora de contexto"
+# e "Fora-De-Contexto", que é o que um modelo escreve quando quer ser prestativo.
+INTENCOES: dict[str, str] = {re.sub(r"[^a-z]", "", i): i for i in get_args(Intencao)}
 
 
 def _limpo(resposta: str) -> str:
@@ -120,9 +131,25 @@ class RedatorClaude:
             return None
         return resposta
 
-    # Classificar é regra de string, não trabalho de modelo: uma chamada por mensagem
-    # digitada para decidir "isto é pergunta?" custa dinheiro e latência à toa.
-    classificar = RedatorEstatico.classificar
+    def classificar(self, mensagem: str, etapa: str) -> Classificacao:
+        """Uma chamada por mensagem digitada. É cara em latência e barata em dinheiro, e
+        paga porque a heurística de string não distingue quem responde de quem se perdeu:
+        "meu marido perdeu o emprego" não termina em "?" e não é resposta de CPF nenhum.
+
+        Qualquer tropeço — API fora, palavra fora do vocabulário, filtro reprovando —
+        volta para a heurística. Classificador mudo não pode emudecer o cadastro.
+        """
+        limpa = mensagem[:MAX_PERGUNTA].replace("<", "(").replace(">", ")")
+        palavra = self._pedir(
+            SISTEMA_CLASSIFICA,
+            f"O bot acabou de perguntar: {etapa}\n\n<mensagem>{limpa}</mensagem>",
+        )
+        chave = re.sub(r"[^a-z]", "", (palavra or "").lower())
+        if chave not in INTENCOES:
+            if palavra is not None:
+                log.warning("classificação fora do vocabulário: %r", palavra[:40])
+            return self._reserva.classificar(mensagem, etapa)
+        return Classificacao(intencao=INTENCOES[chave])
 
     def texto(self, chave: str, **vars: Any) -> str:
         base = self._reserva.texto(chave, **vars)

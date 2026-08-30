@@ -81,9 +81,19 @@ são todos derivados. Perguntar qualquer um deles é bug de desenho, não featur
 `maquina.processar()` resolve duas coisas antes do despacho:
 
 1. **Áudio vira texto** (`ia/transcricao.py`). Nenhum passo sabe que existe voz.
-2. **Pergunta solta é respondida sem mexer no estado** — perguntar não faz perder o lugar
-   na fila. Com cota por contato, e só o nome da etapa vai para o modelo: nada do que a
-   família já contou. Ver [D17](../../docs/DECISOES.md).
+2. **Toda mensagem digitada é classificada antes de virar resposta de campo**
+   (`_fora_do_roteiro`). Botão e comando passam direto — já têm dono. Três saídas:
+
+   - `duvida` → responde e **não** mexe no estado; perguntar não faz perder o lugar na
+     fila. Com cota por contato. Ver [D17](../../docs/DECISOES.md).
+   - `fora_de_contexto` → repete a pergunta com o texto `me_perdi`, sem consumir a
+     mensagem e **sem contar erro no campo**. Nunca duas vezes seguidas, e só onde há
+     `ENTRADAS[estado]`: redesenhar pelo `PASSOS` consumiria a mensagem. Ver
+     [D18](../../docs/DECISOES.md).
+   - qualquer outra → segue o roteiro.
+
+   Para o modelo vai só a etapa e a pergunta **estática** do campo (`_etapa`) — nunca
+   `pergunta_alt`, que interpola o nome da criança.
 
 ## Rodar sozinho
 
