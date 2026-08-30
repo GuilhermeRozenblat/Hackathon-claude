@@ -11,8 +11,12 @@ isso seria mais código que os dados.
 
 from __future__ import annotations
 
+import json
+import logging
 import re
+import urllib.request
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 
 from creche_bot.dominio.tipos import (
     CadastroAnterior,
@@ -40,7 +44,10 @@ NUMERO_CONHECIDO = "2026-0847213"
 _CURICICA = Endereco(cep="22710560", numero="100", logradouro="Rua Franz Weissmann",
                      bairro="Curicica", lat=-22.9601, lng=-43.4048)
 
-# CEPs que o mock resolve. Fora daqui devolve None, que é o caminho de CEP inexistente.
+log = logging.getLogger(__name__)
+
+# CEPs do roteiro: resolvem sem rede, e é o que mantém teste e demo determinísticos.
+# Fora daqui o mock consulta a BrasilAPI — ver `_buscar_cep`.
 _CEPS: dict[str, tuple[str, str, float, float]] = {
     "22710560": ("Rua Franz Weissmann", "Curicica", -22.9601, -43.4048),
     "22775003": ("Avenida Ayrton Senna", "Barra da Tijuca", -22.9946, -43.3654),
@@ -153,6 +160,45 @@ def so_digitos(v: str) -> str:
     return re.sub(r"\D", "", v or "")
 
 
+_BRASILAPI = "https://brasilapi.com.br/api/cep/v2/{}"
+
+
+@lru_cache(maxsize=512)
+def _buscar_cep(cep: str) -> tuple[str, str, float, float] | None:
+    """CEP de verdade, para o mock não travar a conversa nos três CEPs do roteiro.
+
+    Vai só o CEP — nunca o número, nunca o nome, e a resposta não é logada. CEP sozinho
+    é dado público dos Correios; o número da casa, que junto com ele localiza a família,
+    fica aqui dentro.
+
+    ponytail: o backend do município resolve isto do lado de lá, com a base de logradouro
+    e o geocoder dele. Enquanto ele não sobe, o dublê consulta a BrasilAPI. Rede fora ou
+    CEP inexistente devolve None — o mesmo caminho de antes, "não achei esse CEP".
+    """
+    if len(cep) != 8 or cep.startswith("00"):
+        return None   # nenhum CEP brasileiro começa com 00: nem gasta a consulta
+    # Sem User-Agent próprio a BrasilAPI devolve 403 para o urllib.
+    pedido = urllib.request.Request(_BRASILAPI.format(cep),
+                                    headers={"User-Agent": "creche-bot"})
+    try:
+        with urllib.request.urlopen(pedido, timeout=4) as r:
+            d = json.load(r)
+    except Exception:
+        log.warning("consulta de CEP falhou; caindo para CEP não encontrado")
+        return None
+
+    logradouro = d.get("street") or d.get("city") or ""
+    bairro = d.get("neighborhood") or d.get("city") or ""
+    if not logradouro:
+        return None
+    coord = (d.get("location") or {}).get("coordinates") or {}
+    try:
+        lat, lng = float(coord["latitude"]), float(coord["longitude"])
+    except (KeyError, TypeError, ValueError):
+        lat, lng = _CURICICA.lat, _CURICICA.lng   # sem geocoder, o pino não é o forte do mock
+    return logradouro, bairro, lat, lng
+
+
 class BackendMock:
     def __init__(self, processo_aberto: bool = True) -> None:
         self._processo_aberto = processo_aberto
@@ -194,11 +240,12 @@ class BackendMock:
 
     # ------------------------------------------------------------- endereço
     def resolver_cep(self, cep: str, numero: str) -> Endereco | None:
-        dados = _CEPS.get(so_digitos(cep))
+        digitos = so_digitos(cep)
+        dados = _CEPS.get(digitos) or _buscar_cep(digitos)
         if dados is None:
             return None
         logradouro, bairro, lat, lng = dados
-        return Endereco(so_digitos(cep), numero, logradouro, bairro, lat, lng)
+        return Endereco(digitos, numero, logradouro, bairro, lat, lng)
 
     # ---------------------------------------------------------------- oferta
     def escolas_proximas(self, endereco: Endereco, grupamento: Grupamento,

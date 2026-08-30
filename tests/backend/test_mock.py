@@ -6,6 +6,8 @@ base histórica de 2021 a 2025.
 
 from __future__ import annotations
 
+import io
+import json
 from datetime import date, timedelta
 
 import pytest
@@ -73,6 +75,35 @@ def test_cep_resolve_com_coordenadas(b):
 
 def test_cep_desconhecido_nao_inventa(b):
     assert b.resolver_cep("00000-000", "1") is None
+
+
+def test_cep_fora_do_roteiro_vem_da_consulta_externa(b, monkeypatch):
+    """Fora dos três CEPs do roteiro o mock pergunta para a BrasilAPI. Sem isso a conversa
+    trava no bloco 6 para todo mundo que digita o CEP de casa."""
+    from creche_bot.backend import mock
+
+    resposta = json.dumps({"street": "Rua Santa Clara", "neighborhood": "Copacabana",
+                           "location": {"coordinates": {"latitude": "-22.9721912",
+                                                        "longitude": "-43.1865895"}}})
+    mock._buscar_cep.cache_clear()
+    monkeypatch.setattr(mock.urllib.request, "urlopen",
+                        lambda *a, **k: io.StringIO(resposta))
+    e = b.resolver_cep("22041-011", "45")
+    assert str(e) == "Rua Santa Clara, 45 — Copacabana"
+    assert (e.lat, e.lng) == (-22.9721912, -43.1865895)
+    mock._buscar_cep.cache_clear()
+
+
+def test_cep_sem_rede_nao_inventa_endereco(b, monkeypatch):
+    from creche_bot.backend import mock
+
+    def cai(*a, **k):
+        raise OSError("sem rede")
+
+    mock._buscar_cep.cache_clear()
+    monkeypatch.setattr(mock.urllib.request, "urlopen", cai)
+    assert b.resolver_cep("22041-011", "45") is None
+    mock._buscar_cep.cache_clear()
 
 
 # ---------------------------------------------------------------------- oferta
