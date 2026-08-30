@@ -109,6 +109,38 @@ CREATE TABLE IF NOT EXISTS {s}.marca (
     valor          text NOT NULL
 );
 
+-- As decisões não óbvias ficam legíveis no psql e no dashboard do Supabase, para quem
+-- for mexer no schema sem ter lido docs/MODELO_DADOS.md.
+COMMENT ON SCHEMA {s} IS
+    'Estado do bot Zé Matrícula. Fora do public: não alcançável pela Data API.';
+COMMENT ON TABLE {s}.contato IS
+    'A pessoa, independente do canal. UUID nosso, nunca o id do Telegram.';
+COMMENT ON TABLE {s}.identidade_canal IS
+    'Como alcançar o contato. PK (canal, id_externo): é o que faz a mesma família '
+    'migrar do Telegram para o WhatsApp sem recomeçar o cadastro.';
+COMMENT ON TABLE {s}.consentimento IS
+    'LGPD art. 14. Guarda QUAL versão do texto foi aceita, quando e por onde.';
+COMMENT ON TABLE {s}.sessao IS
+    'Onde a conversa parou. Faz o diálogo sobreviver ao restart do bot.';
+COMMENT ON COLUMN {s}.sessao.contexto IS
+    'jsonb, não colunas: o formato muda toda semana e não vale migração por pergunta.';
+COMMENT ON TABLE {s}.inscricao IS
+    'Vínculo família <-> protocolo. Escola e etapa moram no backend do município.';
+COMMENT ON COLUMN {s}.inscricao.id_escola IS
+    'Referência ao backend, não FK: não existe tabela de escola neste banco.';
+COMMENT ON COLUMN {s}.inscricao.etapa_codigo IS
+    'Última etapa JÁ notificada. É o que impede a notificação repetida.';
+COMMENT ON TABLE {s}.outbox IS
+    'Transactional outbox. SEM FK para inscricao, de propósito: o expurgo da LGPD '
+    'art. 18 apaga por protocolo, explicitamente, e um CASCADE escondido tornaria '
+    'fácil esquecer que variaveis guarda nome de criança.';
+COMMENT ON COLUMN {s}.outbox.chave IS
+    'ChaveTemplate, NUNCA a mensagem pronta: no WhatsApp vira template aprovado '
+    'pela Meta, que não aceita texto livre.';
+COMMENT ON COLUMN {s}.outbox.enviado_em IS 'NULL = ainda na fila.';
+COMMENT ON TABLE {s}.marca IS
+    'Até onde o backend já foi lido. Sem dado pessoal: sobrevive ao expurgo.';
+
 ALTER TABLE {s}.contato           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE {s}.identidade_canal  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE {s}.consentimento     ENABLE ROW LEVEL SECURITY;

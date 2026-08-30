@@ -216,6 +216,8 @@ Cada lógica não trivial deixa **um** teste. Só pytest, sem fixture elaborada.
 | [docs/DECISOES.md](docs/DECISOES.md) | As decisões que custariam caro reverter |
 | [docs/ROTEIRO.md](docs/ROTEIRO.md) | Roteiro da conversa mapeado nos estados do código |
 | [docs/MODULOS.md](docs/MODULOS.md) | Quem trabalha em quê, e como não se atropelam |
+| [docs/MODELO_DADOS.md](docs/MODELO_DADOS.md) | As 7 tabelas, o ER, e o que não está no banco |
+| [docs/BANCO.md](docs/BANCO.md) | Configurar o Postgres do Supabase, 5 min |
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Criar e configurar o bot no @BotFather, 10 min |
 | [CLAUDE.md](CLAUDE.md) | Regras para qualquer agente neste repositório |
 
