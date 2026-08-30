@@ -66,12 +66,16 @@ def main() -> None:
     backend = escolher_backend()
     redator = criar(os.environ.get("ANTHROPIC_API_KEY") or None)
     canal = Telegram(token)
-    maquina = Maquina(backend, redator, repo, Transcritor())
+    transcritor = Transcritor()
+    maquina = Maquina(backend, redator, repo, transcritor)
 
     for nome, obj in (("repositório", repo), ("backend", backend), ("redator", redator)):
         logging.info("%s: %s", nome, type(obj).__name__)
 
     threading.Thread(target=rodar_worker, args=(backend, canal, repo), daemon=True).start()
+    # O modelo de voz aquece em paralelo: no primeiro boot ele baixa ~460 MB, e o polling
+    # é síncrono. Áudio que chegar antes de ficar pronto vira pedido para escrever.
+    threading.Thread(target=transcritor.carregar, daemon=True).start()
 
     try:
         canal.rodar(maquina.processar)

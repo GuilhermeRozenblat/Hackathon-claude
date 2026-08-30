@@ -1,9 +1,14 @@
-"""Bloco 11 — o resumo antes de enviar.
+"""Bloco 5 — o resumo dos dados, antes de partir para a escolha das creches.
 
-Mostra o que é acionável: o que já está comprovado e o que ainda falta comprovar.
+Mostra o que a família declarou nos blocos 1 a 4, para conferir ou corrigir.
 
-NUNCA mostra pontuação nem posição na fila. A classificação roda depois do fechamento das
-inscrições; prometer posição aqui é criar expectativa que a SME não pode honrar.
+Duas coisas que NÃO aparecem aqui:
+
+· Pontuação e posição na fila. A classificação roda depois do fechamento das inscrições;
+  prometer posição aqui é criar expectativa que a SME não pode honrar.
+· Resposta sensível. O roteiro pede "necessidades especiais" no resumo, mas ecoar dado de
+  saúde num histórico que fica no aparelho da família é exatamente o que a LGPD art. 11
+  manda evitar. Fica guardado, não fica repetido.
 """
 
 from __future__ import annotations
@@ -12,26 +17,27 @@ from creche_bot.canal.tipos import Botao, ItemLista, MensagemSaida
 from creche_bot.conversa.formulario import campo_de, formatar
 from creche_bot.conversa.passos.criterios import pendentes
 from creche_bot.conversa.sessao import Passo
-from creche_bot.dominio.tipos import GRUPAMENTO_LEGIVEL, HORARIO_LEGIVEL
+from creche_bot.dominio.tipos import GRUPAMENTO_LEGIVEL
 
-BOTOES_RESUMO = (Botao("enviar", "Enviar inscrição"), Botao("corrigir", "Quero corrigir"))
+BOTOES_RESUMO = (Botao("certo", "Está tudo certo"), Botao("corrigir", "Quero corrigir"))
+
+ORIGEM_LEGIVEL = {"rede_municipal": "já estuda na rede municipal",
+                  "nunca": "nunca estudou",
+                  "particular": "estuda em escola particular",
+                  "outra_rede": "estuda em outra rede ou cidade"}
 
 # Correção volta ao BLOCO dono do campo, não a um campo solto: é assim que o roteiro
 # descreve, e é o que evita deixar a conversa num estado meio preenchido.
 AREAS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("crianca", "Dados da criança", "CADASTRO",
-     ("nome_crianca", "nascimento_crianca", "sexo", "filiacao_consta", "filiacao",
-      "documento_crianca", "cpf_crianca", "dnv", "nis_crianca", "grupamento")),
+     ("cpf_crianca", "nome_crianca", "nascimento_crianca", "grupamento",
+      "filiacao_consta", "filiacao", "origem", "origem_outra", "matricula",
+      "tem_especial", "tipo_especial", "tipo_especial_outro")),
     ("responsavel", "Meus dados", "CADASTRO",
-     ("nome_responsavel", "nascimento_responsavel", "relacao", "relacao_outra")),
-    ("endereco", "Endereço", "ENDERECO_CEP", ("endereco",)),
-    ("horario", "Horário da vaga", "HORARIO", ("horario",)),
-    ("criterios", "Perguntas de prioridade", "CRIT_CADUNICO",
-     ("declarados", "comprovados", "nis", "nome_irmao", "criterios")),
+     ("nome_responsavel", "cpf_responsavel", "nascimento_responsavel",
+      "deficiencia_responsavel")),
     ("contato", "Meu contato", "CONTATO",
-     ("numero_de_contato", "telefone", "tem_outro_contato", "outro_contato",
-      "quer_email", "email")),
-    ("escolas", "Creches escolhidas", "ESCOLAS", ("escolas", "preferencias")),
+     ("telefone", "tem_outro_contato", "outro_contato", "quer_email", "email")),
 )
 
 
@@ -42,30 +48,33 @@ def _rotulo(dados: dict, codigo: str) -> str:
     return codigo.replace("_", " ")
 
 
+def _fone(numero: str) -> str:
+    return formatar(campo_de("telefone"), numero)
+
+
 def montar(dados: dict) -> str:
     linhas = []
 
     nome = dados.get("nome_crianca", "a criança")
     turma = GRUPAMENTO_LEGIVEL.get(dados.get("grupamento", ""), "creche")
-    horario = HORARIO_LEGIVEL.get(dados.get("horario", ""), "")
-    linhas.append(f"👶 {nome} — {turma}, {horario}".rstrip(", "))
+    linhas.append(f"👶 {nome} — {turma}")
+    if (cpf := dados.get("cpf_crianca")) and cpf != "nao_tenho":
+        linhas.append(f"🪪 CPF {formatar(campo_de('cpf_crianca'), cpf)}")
+    if (origem := ORIGEM_LEGIVEL.get(dados.get("origem_outra") or dados.get("origem", ""))):
+        linhas.append(f"🏫 {origem}")
+    if (filiacao := dados.get("filiacao")):
+        linhas.append(f"👪 Filiação: {filiacao}")
 
-    if (e := dados.get("endereco")):
-        linhas.append(f"📍 {e['logradouro']}, {e['numero']} — {e['bairro']}")
-
-    if (prefs := dados.get("preferencias")):
-        nomes = {x["id"]: x["nome"] for x in dados.get("escolas", ())}
-        escolhidas = " · ".join(f"{i}. {nomes.get(x, x)}"
-                                for i, x in enumerate(prefs, 1))
-        linhas.append(f"🏫 {escolhidas}")
-
+    if (responsavel := dados.get("nome_responsavel")):
+        linhas.append(f"🙋 Responsável: {responsavel}")
     if (telefone := dados.get("telefone")):
-        linhas.append(f"📞 {formatar(campo_de('telefone'), telefone)}")
+        linhas.append(f"📞 {_fone(telefone)}")
+    if (outro := dados.get("outro_contato")):
+        linhas.append(f"📞 Outro contato: {_fone(outro)}")
     if (email := dados.get("email")):
         linhas.append(f"✉️ {email}")
 
-    comprovados = dados.get("comprovados", ())
-    if comprovados:
+    if (comprovados := dados.get("comprovados", ())):
         linhas.append("")
         linhas.append("✅ Já comprovado: "
                       + ", ".join(_rotulo(dados, c) for c in comprovados))
@@ -81,7 +90,9 @@ def resumo(p: Passo) -> MensagemSaida:
 
 
 def confirmacao(p: Passo) -> MensagemSaida:
-    from creche_bot.conversa.passos.pendencias import enviar
+    """Confirmado, o roteiro entra no bloco 6 — endereço e escolas."""
+    from creche_bot.conversa.passos.endereco import pedir_cep
+    from creche_bot.conversa.passos.escolas import pedir_horario
 
     if p.msg.escolha == "corrigir":
         p.ir("CORRECAO")
@@ -89,8 +100,9 @@ def confirmacao(p: Passo) -> MensagemSaida:
             p.txt("qual_corrigir"),
             lista=tuple(ItemLista(codigo, rotulo) for codigo, rotulo, _, _ in AREAS))
 
-    if p.msg.escolha == "enviar":
-        return enviar(p)
+    if p.msg.escolha == "certo":
+        # Endereço vindo do cadastro anterior já foi confirmado no bloco 3.
+        return pedir_horario(p) if p.dados.get("endereco") else pedir_cep(p)
 
     return resumo(p)
 

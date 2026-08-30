@@ -45,6 +45,14 @@ def perguntar(p: Passo, lista: str, seguir: Seguir, prefixo: str = "") -> Mensag
         p.dados.pop("perguntou", None)
         return replace(prox := seguir(p), texto=prefixo + prox.texto)
 
+    # Pergunta de saúde não passa sem o consentimento específico do art. 11. O gate é
+    # pedido uma vez só, e vale para o resto da conversa — inclusive para o bloco 8.
+    if campo.sensivel and p.dados.get("consentimento_sensivel") is None:
+        from creche_bot.conversa.passos.criterios import pedir_gate
+
+        p.dados["gate_volta"] = lista
+        return pedir_gate(p, prefixo)
+
     p.dados["perguntou"] = campo.chave
     return MensagemSaida(prefixo + _texto(p, campo), botoes=_botoes(campo))
 
@@ -71,10 +79,17 @@ def responder(p: Passo, lista: str, seguir: Seguir) -> MensagemSaida:
 
     p.dados.pop(f"erros_{campo.chave}", None)
 
-    # Único ponto do formulário que pode interromper a lista. Creche vai até 3 anos e 11
-    # meses: falhe cedo e explique, em vez de deixar a família descobrir no resultado.
+    # Os dois pontos do formulário que podem interromper a lista.
+    # Creche vai até 3 anos e 11 meses: falhe cedo e explique, em vez de deixar a família
+    # descobrir no resultado.
     if campo.chave == "nascimento_crianca" and (fora := _fora_da_faixa(p)) is not None:
         return fora
+    # E o CPF do responsável é a chave do histórico: 27,9% já têm cadastro.
+    if campo.chave == "cpf_responsavel":
+        from creche_bot.conversa.passos.responsavel import olhar_historico
+
+        if (achou := olhar_historico(p)) is not None:
+            return achou
 
     eco = (f"Recebido: {formatar(campo, p.dados[campo.chave])} ✅\n\n"
            if campo.eco and p.dados[campo.chave] != (campo.escape or ("",))[0] else "")
@@ -107,6 +122,12 @@ def _fora_da_faixa(p: Passo) -> MensagemSaida | None:
                  idade=f"{anos} anos e {meses} meses", mes=f"{corte:%m/%Y}",
                  botoes=(Botao("pre_escola", "Como faço?"),
                          Botao("outra", "Outra criança")))
+
+
+def _primeiro_nome(dados: dict) -> str:
+    """No bloco 1 a data vem antes do nome: a mensagem tem que funcionar sem ele."""
+    return (dados.get("nome_crianca") or "").split()[0] if dados.get("nome_crianca") \
+        else "a criança"
 
 
 def _errar(p: Passo, campo: Campo) -> MensagemSaida:

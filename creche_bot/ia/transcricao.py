@@ -26,30 +26,44 @@ MAX_CARACTERES = 500
 
 
 class Transcritor:
-    """Carrega o modelo na primeira voz que chega, não no boot — subir o bot não pode
-    depender de um download de centenas de MB."""
+    """Nunca carrega o modelo no caminho da mensagem: quem chega falando não espera."""
 
     def __init__(self, modelo: str = MODELO) -> None:
         self._nome = modelo
         self._whisper = None
 
+    def carregar(self) -> None:
+        """O `__main__` chama isto numa thread no boot, e engole tudo o que der errado.
+
+        Em disco frio o modelo baixa ~460 MB: medimos 159s. Como o polling do Telegram é
+        síncrono, carregar na primeira voz deixaria o bot inteiro mudo esse tempo todo —
+        para todo mundo, não só para quem mandou o áudio. Sem a dependência ou sem rede,
+        `_whisper` fica `None` e áudio vira pedido para escrever; o bot sobe do mesmo
+        jeito.
+        """
+        if self._whisper is not None:
+            return
+        try:
+            from faster_whisper import WhisperModel
+
+            log.info("carregando o modelo de voz %r", self._nome)
+            self._whisper = WhisperModel(self._nome, device="cpu", compute_type="int8")
+        except ImportError:
+            log.warning("faster-whisper não instalado, áudio vai virar pedido para "
+                        "escrever — para ligar: pip install -e '.[audio]'")
+        except Exception:
+            log.exception("não deu para carregar o modelo de voz")
+
     def __call__(self, audio: bytes) -> str | None:
         """`None` = não deu para ouvir. Quem chama pede para a pessoa escrever."""
+        self.carregar()   # no-op depois do boot; só é lento se o boot falhou
+        if self._whisper is None:
+            return None
         try:
-            if self._whisper is None:
-                from faster_whisper import WhisperModel
-
-                log.info("carregando o modelo de voz %r", self._nome)
-                self._whisper = WhisperModel(self._nome, device="cpu", compute_type="int8")
-
             segmentos, _ = self._whisper.transcribe(
                 io.BytesIO(audio), language="pt", vad_filter=True,
             )
             texto = " ".join(s.text.strip() for s in segmentos).strip()
-        except ImportError:
-            log.error("chegou áudio e o faster-whisper não está instalado — "
-                      "rode: pip install -e '.[audio]'")
-            return None
         except Exception:
             log.exception("transcrição falhou")
             return None

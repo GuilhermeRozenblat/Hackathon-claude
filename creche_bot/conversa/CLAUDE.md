@@ -19,6 +19,7 @@ Só lê: `canal/tipos.py`, `backend/porta.py`, `dados/porta.py`, `ia/redacao.py`
 | O texto de uma mensagem | `ia/persona.py` |
 | O emoji que acompanha uma mensagem | `ia/persona.py` — mapa `FIGURINHAS` |
 | Uma pergunta do cadastro ou do contato, ou a ordem delas | `formulario.py` — é uma tupla de `Campo` |
+| Marcar uma pergunta como dado de saúde | `Campo.sensivel=True` — o gate do art. 11 vem sozinho antes dela |
 | A ramificação de uma pergunta | `Campo.pular_se`, uma lambda |
 | A forma de um turno da régua de prioridade | `passos/criterios.py` |
 | **O conteúdo** da régua de prioridade | Nada aqui. Vem de `backend.criterios_do_processo()` |
@@ -43,9 +44,11 @@ turno (sim/não, checklist, número, anexo); o conteúdo chega em `p.dados["crit
 - **Sem consentimento, nada é alcançável.** `EXIGEM_CONSENTIMENTO` em `maquina.py`.
   LGPD art. 14 — guarda no código, não confiança no fluxo.
 - **Dado sensível tem consentimento próprio, é opcional, e NUNCA é ecoado.**
-  `Criterio.sensivel` dispara `CONSENTIMENTO_SENSIVEL` antes do bloco 8.4. O eco de
-  confirmação vale para CPF, nome e telefone; não vale para violência doméstica nem
-  situação prisional — o histórico fica no aparelho da família. Ver
+  `Campo.sensivel` e `Criterio.sensivel` disparam `CONSENTIMENTO_SENSIVEL` antes da
+  primeira pergunta de saúde, uma vez só na conversa — a partir daí a resposta vale para
+  o resto, inclusive para a régua. Recusar pula todas elas e não interrompe o cadastro. O
+  eco de confirmação vale para CPF, nome e telefone; não vale para deficiência, violência
+  doméstica nem situação prisional — o histórico fica no aparelho da família. Ver
   [D7](../../docs/DECISOES.md).
 - **Nada bloqueia a inscrição** além do consentimento e da faixa etária. Documento que
   falta vira pendência com lembrete, nunca parede.
@@ -66,7 +69,8 @@ turno (sim/não, checklist, número, anexo); o conteúdo chega em `p.dados["crit
 
 **Entrar num bloco sem desenhar a tela.** Cada estado tem duas portas:
 `PASSOS[estado]` **consome** a resposta que chegou, `ENTRADAS[estado]` **desenha** a tela
-pela primeira vez. Correção e retomada usam `maquina.entrar()`, nunca `p.ir("CADASTRO")`
+pela primeira vez. Correção, retomada, o gate do dado sensível e a volta do cadastro
+anterior usam `maquina.entrar()`, nunca `p.ir("CADASTRO")`
 seco — senão a próxima mensagem da família é engolida como resposta de uma pergunta que
 nunca foi feita. No formulário isso vira `perguntar` (que marca `dados["perguntou"]`)
 contra `responder` (que só consome se houver pergunta no ar). Estado novo com tela própria
@@ -81,9 +85,19 @@ são todos derivados. Perguntar qualquer um deles é bug de desenho, não featur
 `maquina.processar()` resolve duas coisas antes do despacho:
 
 1. **Áudio vira texto** (`ia/transcricao.py`). Nenhum passo sabe que existe voz.
-2. **Pergunta solta é respondida sem mexer no estado** — perguntar não faz perder o lugar
-   na fila. Com cota por contato, e só o nome da etapa vai para o modelo: nada do que a
-   família já contou. Ver [D17](../../docs/DECISOES.md).
+2. **Toda mensagem digitada é classificada antes de virar resposta de campo**
+   (`_fora_do_roteiro`). Botão e comando passam direto — já têm dono. Três saídas:
+
+   - `duvida` → responde e **não** mexe no estado; perguntar não faz perder o lugar na
+     fila. Com cota por contato. Ver [D17](../../docs/DECISOES.md).
+   - `fora_de_contexto` → repete a pergunta com o texto `me_perdi`, sem consumir a
+     mensagem e **sem contar erro no campo**. Nunca duas vezes seguidas, e só onde há
+     `ENTRADAS[estado]`: redesenhar pelo `PASSOS` consumiria a mensagem. Ver
+     [D18](../../docs/DECISOES.md).
+   - qualquer outra → segue o roteiro.
+
+   Para o modelo vai só a etapa e a pergunta **estática** do campo (`_etapa`) — nunca
+   `pergunta_alt`, que interpola o nome da criança.
 
 ## Rodar sozinho
 

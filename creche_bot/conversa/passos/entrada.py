@@ -26,10 +26,15 @@ BOTOES_CONSENTIMENTO = (Botao("autorizo", "Autorizo"),
 
 # Onde a conversa parou, em português de gente. É o que a retomada diz de volta.
 ONDE_PAROU: dict[str, str] = {
-    "CADASTRO": "nos seus dados",
+    "CADASTRO": "nos dados da criança",
+    "CADASTRO_ANTERIOR": "nos dados da criança",
+    "CONTATO": "no seu contato",
+    "RESUMO": "no resumo",
     "ENDERECO_CEP": "no endereço",
     "ENDERECO_CONFIRMA": "no endereço",
     "HORARIO": "no horário da vaga",
+    "ESCOLAS": "na escolha das creches",
+    "CONFIRMA_ESCOLAS": "na escolha das creches",
     "CRIT_CADUNICO": "nas perguntas de prioridade",
     "CRIT_NIS": "no número do NIS",
     "CRIT_ESPECIAL": "nas perguntas de prioridade",
@@ -38,9 +43,6 @@ ONDE_PAROU: dict[str, str] = {
     "CRIT_GATE": "nas perguntas de prioridade",
     "CRIT_SENSIVEL": "nas perguntas de prioridade",
     "CRIT_ANEXO": "nos documentos",
-    "CONTATO": "no seu contato",
-    "ESCOLAS": "na escolha das creches",
-    "RESUMO": "no resumo",
     "PENDENCIAS": "nos documentos",
 }
 
@@ -123,9 +125,10 @@ def consentimento(p: Passo) -> MensagemSaida:
 
     p.repo.registrar_consentimento(p.contato_id, f"inscricao/{CONSENTIMENTO_VERSAO}",
                                    p.msg.canal, p.msg.id_externo)
-    from creche_bot.conversa.passos.responsavel import pedir_cpf
+    from creche_bot.conversa.maquina import entrar
 
-    return pedir_cpf(p)
+    p.ir("CADASTRO")
+    return entrar(p, "CADASTRO")
 
 
 def retomar(p: Passo) -> MensagemSaida:

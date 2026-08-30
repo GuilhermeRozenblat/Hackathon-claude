@@ -1,4 +1,4 @@
-"""Blocos 12 e 13 — comprovação do que ficou pendente, e o protocolo.
+"""Bloco 8 — como entregar a documentação, e o protocolo.
 
 O WhatsApp não é uma opção entre três: é o caminho recomendado. Hoje a comprovação
 acontece depois, presencialmente, e valida 8,0% dos casos. Capturar a evidência dentro da
@@ -32,7 +32,12 @@ def _documentos(dados: dict) -> list[str]:
 
 
 def enviar(p: Passo) -> MensagemSaida:
-    """Efetiva a inscrição no matricula.rio e segue para pendências ou protocolo."""
+    """Efetiva a inscrição no matricula.rio e segue para pendências ou protocolo.
+
+    A escolha entre WhatsApp, creche e CRAS só aparece quando há documento a entregar:
+    perguntar "como você prefere enviar os documentos?" a quem não tem documento nenhum
+    pendente é fazer a família procurar papel que ninguém pediu.
+    """
     p.dados.setdefault("chave_idempotencia",
                        f"{p.contato_id}:{p.dados.get('nome_crianca', '')}")
     try:
@@ -101,7 +106,7 @@ def como_entregar(p: Passo) -> MensagemSaida:
 
 
 def receber_documento(p: Passo) -> MensagemSaida:
-    """12a — a foto chega aqui mesmo, que é o caminho que valida de verdade."""
+    """8a — a foto chega aqui mesmo, que é o caminho que valida de verdade."""
     if p.msg.escolha == "depois":
         return protocolo(p, prefixo=f"{p.txt('documento_depois')}\n\n")
 
@@ -129,7 +134,6 @@ def receber_documento(p: Passo) -> MensagemSaida:
 
 
 def protocolo(p: Passo, prefixo: str = "") -> MensagemSaida:
-    """Bloco 13."""
     p.ir("PROTOCOLO")
     return p.diz("protocolo", prefixo=prefixo, numero=p.dados["numero"],
                  resultado=p.backend.data_do_resultado().strftime("%d/%m/%Y"),
@@ -139,7 +143,7 @@ def protocolo(p: Passo, prefixo: str = "") -> MensagemSaida:
 def depois_do_protocolo(p: Passo) -> MensagemSaida:
     """1.738 responsáveis inscreveram 2 ou mais crianças em 2025. Reaproveita tudo do
     responsável — só a criança e a pergunta do irmão recomeçam."""
-    from creche_bot.conversa.passos.endereco import pedir_cep
+    from creche_bot.conversa.maquina import abrir_contato
     from creche_bot.conversa.passos.formulario_passo import perguntar
     from creche_bot.conversa.passos.responsavel import DO_RESPONSAVEL
 
@@ -148,7 +152,8 @@ def depois_do_protocolo(p: Passo) -> MensagemSaida:
         p.dados.clear()
         p.dados.update(guardado)
         p.ir("CADASTRO")
-        return perguntar(p, "CADASTRO", pedir_cep, prefixo=f"{p.txt('outra_crianca')}\n\n")
+        return perguntar(p, "CADASTRO", abrir_contato,
+                         prefixo=f"{p.txt('outra_crianca')}\n\n")
 
     p.ir("ACOMPANHAR")
     return p.diz("terminei")

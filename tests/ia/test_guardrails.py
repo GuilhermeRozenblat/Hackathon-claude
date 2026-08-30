@@ -5,7 +5,14 @@ Sem rede e sem chave — o que está sob teste é o filtro, não a API.
 
 from __future__ import annotations
 
-from creche_bot.ia.redacao import RedatorClaude, RedatorEstatico, _limpo, _numeros, _promete
+from creche_bot.ia.redacao import (
+    Redator,
+    RedatorClaude,
+    RedatorEstatico,
+    _limpo,
+    _numeros,
+    _promete,
+)
 
 
 def test_promessa_de_vaga_e_reprovada():
@@ -62,3 +69,10 @@ def test_pergunta_e_reconhecida_como_duvida():
     r = RedatorEstatico()
     assert r.classificar("como funciona a lista de espera?", "BUSCA_CPF").intencao == "duvida"
     assert r.classificar("12345678901", "BUSCA_CPF").intencao == "responder"
+
+
+def test_as_duas_implementacoes_cumprem_o_contrato():
+    """`RedatorClaude` nasceu sem `classificar` e derrubou o bot em produção: o Protocol
+    é `runtime_checkable`, mas ninguém checava."""
+    assert isinstance(RedatorEstatico(), Redator)
+    assert isinstance(RedatorClaude.__new__(RedatorClaude), Redator)

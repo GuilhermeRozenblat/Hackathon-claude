@@ -21,11 +21,14 @@ creche_bot/conversa/formulario.py
 creche_bot/conversa/maquina.py
 creche_bot/conversa/sessao.py
 creche_bot/conversa/passos/__init__.py
-creche_bot/conversa/passos/acompanhamento.py
-creche_bot/conversa/passos/busca.py
-creche_bot/conversa/passos/entrega.py
+creche_bot/conversa/passos/consulta.py
+creche_bot/conversa/passos/criterios.py
+creche_bot/conversa/passos/endereco.py
+creche_bot/conversa/passos/entrada.py
 creche_bot/conversa/passos/escolas.py
 creche_bot/conversa/passos/formulario_passo.py
+creche_bot/conversa/passos/pendencias.py
+creche_bot/conversa/passos/responsavel.py
 creche_bot/conversa/passos/resumo.py
 creche_bot/dados/__init__.py
 creche_bot/dados/memoria.py
@@ -36,6 +39,7 @@ creche_bot/dominio/tipos.py
 creche_bot/ia/__init__.py
 creche_bot/ia/persona.py
 creche_bot/ia/redacao.py
+creche_bot/ia/transcricao.py
 creche_bot/notificacao/__init__.py
 creche_bot/notificacao/catalogo.py
 creche_bot/notificacao/chaves.py
