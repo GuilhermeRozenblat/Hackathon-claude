@@ -30,8 +30,10 @@ fluxo todo construído em cima da premissa errada.
 
 ## D2 · A extração e os dados do município ficam atrás de uma porta
 
-**Decisão.** `creche_bot/backend/porta.py` define 8 operações. `BackendMock` roda hoje;
-`BackendHTTP` entra quando o outro time publicar. Nada do JSON deles sai de `backend/`.
+**Decisão.** `creche_bot/backend/porta.py` define 16 operações, agrupadas em processo
+(período, resultado, data de corte, régua), histórico, endereço, oferta, inscrição,
+consulta e notificação. `BackendMock` roda hoje; `BackendHTTP` entra quando o outro time publicar. Nada
+do JSON deles sai de `backend/`.
 
 **Por quê.** O backend é construído por outro time, em outra máquina. Sem camada
 anticorrupção, o nome de campo deles vira dependência de `conversa/`, e a primeira
@@ -58,14 +60,14 @@ Postgres. Sem a fronteira, uma refatoração no banco bloqueia quem mexe no chat
 disco. O trabalho de canal e conversa nunca depende do estado de `dados/`.
 
 **Recusado.** Repositório por entidade, UnitOfWork, CRUD genérico. Uma porta, duas
-implementações, e os 43 testes rodam parametrizados contra as duas.
+implementações, e a bateria roda parametrizada contra as duas.
 
 ---
 
 ## D4 · Vocabulário aberto, comportamento fechado
 
 **Decisão.** `Etapa.codigo` é `str` livre — o município define quais etapas existem.
-`Etapa.tipo` é `Literal` de cinco valores — nós definimos o que fazer com cada uma. A
+`Etapa.tipo` é `Literal` de seis valores — nós definimos o que fazer com cada uma. A
 tradução `codigo → tipo` mora numa tabela só, em `backend/http.py`, com default
 `"aguardando"`.
 
@@ -77,18 +79,28 @@ andou, sem inventar cobrança. Mandar a família à creche à toa é o erro caro
 
 ---
 
-## D5 · Concorrência virou nota de corte, e nenhuma vira probabilidade
+## D5 · Nem nota de corte, nem pontuação, nem posição na fila
 
-**Decisão.** O painel mostra a nota de corte com o **ano** obrigatório no tipo
-(`NotaCorte.ano`). Não existe "probabilidade de conseguir a vaga" em lugar nenhum.
+**Decisão.** Sobre uma creche o bot mostra três coisas, e só elas: **distância**, **vaga
+ociosa agora** e **concorrência do ano passado** (`Concorrencia.familias_por_vaga`, com
+`ano` obrigatório no tipo). Não existe "probabilidade de conseguir a vaga", pontuação nem
+posição na fila em lugar nenhum do código.
 
-**Por quê.** O sistema não seleciona quem entra — quem aloca é o município. Prever
-admissão seria inventar um número com cara de modelo. E a nota de corte sozinha não diz a
-chance da família, porque ela não conhece a própria pontuação: por isso o campo `ano` é
-obrigatório e a UI é forçada a dizer de quando é o número.
+**Por quê.** O sistema não seleciona quem entra — quem aloca é o município, por norma
+(Resolução SME nº 542/2025), em SQL determinístico que roda **depois do fechamento das
+inscrições**. No momento da conversa a classificação literalmente não existe.
 
-**A faixa 💚/💛/🧡 é relativa à lista mostrada**, nunca absoluta. Ela ordena as três
-opções entre si, não promete nada sobre nenhuma.
+**Por que caiu a nota de corte da v1.** Ela é a pontuação do último aprovado, e o teto da
+régua foi 465 pontos em 2023 e 100 em 2024: histórico de pontuação não é comparável entre
+anos. "5 famílias por vaga no ano passado" é fato verificável; "nota de corte 87" é um
+número sem régua.
+
+**Posição na fila também não.** A classificação é por critério, não por ordem de chegada,
+e a posição muda conforme outras famílias comprovam documento. Prometer número é criar
+expectativa que a SME não pode honrar.
+
+**O que substitui.** Na consulta, o que aparece é o que é **acionável**: o que falta
+comprovar. Ver [D14](#d14--a-família-vê-um-desfecho-nunca-a-situação-bruta-por-opção).
 
 **Testado.** Um teste varre o roteiro inteiro e falha se "garantido", "com certeza" ou
 "vai conseguir" aparecer em qualquer tela.
@@ -109,32 +121,52 @@ celular.
 
 ---
 
-## D7 · Dado de saúde tem consentimento separado
+## D7 · Dado sensível: consentimento separado, um turno só, e nunca ecoado
 
-**Decisão.** A pergunta sobre deficiência/TGD/TEA é precedida por um consentimento
-específico (`CONSENTIMENTO_SENSIVEL`) e sempre oferece "Prefiro não dizer".
+**Decisão.** Três regras para os critérios marcados `Criterio.sensivel`:
 
-**Por quê.** LGPD art. 5º II e art. 11: dado de saúde é **dado pessoal sensível** e exige
-consentimento específico e destacado. Não pode vir embutido no consentimento geral do
-início da conversa.
+1. **Consentimento próprio** (`CONSENTIMENTO_SENSIVEL`), pedido no bloco 8.4, separado do
+   consentimento geral do bloco 1 e só para quem chega lá. "Prefiro pular" é sempre uma
+   opção.
+2. **As cinco perguntas do 8.4 num turno só**, como checklist. É a exceção deliberada à
+   regra de uma pergunta por mensagem.
+3. **Nunca ecoar a resposta de volta.** O eco de confirmação vale para CPF, nome e
+   telefone; não vale para isto.
 
-**Também é UX.** A família entende por que a pergunta existe (a rede reserva atendimento
-especializado) e sabe que pode não responder.
+**Por quê (1).** LGPD art. 5º II e art. 11: violência doméstica, doença crônica, uso de
+substâncias e situação prisional são dado pessoal sensível e exigem consentimento
+específico e destacado. Sem base legal isso não pode nem ser gravado.
+
+**Por quê (2).** Individualmente essas perguntas disparam entre 1,6% e 5,3%; somadas,
+13,6% marcam ao menos uma, com média de 0,18 marcações. Cinco turnos invasivos para esse
+aproveitamento é péssimo desenho.
+
+**Por quê (3).** O histórico do chat fica no aparelho da família, que pode ser o mesmo
+aparelho do agressor. "Recebido: alguém de casa está preso ✅" é um risco que o eco não
+compra nada para justificar.
+
+**E nunca bloqueia.** `Criterio.documento_opcional` marca violência, substâncias e
+situação prisional: exigir boletim de ocorrência de uma vítima dentro de um chat, como
+condição para inscrever a criança, é violento.
 
 ---
 
-## D8 · Blocos 2, 3 e 4 são dados, não código
+## D8 · Os blocos de cadastro são dados, não código
 
-**Decisão.** `conversa/formulario.py` é uma tupla de `Campo`. A máquina caminha a lista.
-Ramificação é `pular_se`, uma lambda por campo.
+**Decisão.** `conversa/formulario.py` é uma tupla de `Campo` por lista — `CADASTRO`
+(blocos 3, 4 e 5), `CONTATO` (bloco 9) e `CONSULTA` (bloco C.1). A máquina caminha a
+lista. Ramificação é `pular_se`, uma lambda por campo.
 
 **Por quê.** "Uma pergunta por mensagem" é literalmente uma lista de perguntas. Como
-código seriam 12 handlers quase idênticos. E produto vai reescrever esses textos toda
+código seriam 15 handlers quase idênticos. E produto vai reescrever esses textos toda
 semana, sem tocar em lógica.
 
 **Bônus.** `Campo.__post_init__` cobra o limite de 3 opções, então uma pergunta com 4
-respostas fechadas quebra na importação — foi o que forçou dividir "já estuda em alguma
-escola?" em duas perguntas.
+respostas fechadas quebra na importação — foi o que forçou dividir "qual a sua relação com
+a criança?" em duas perguntas, porque `Relacao` tem cinco valores.
+
+**O bloco 8 não entra aqui.** A régua do processo é dado do backend, não do repositório —
+ver [D15](#d15--a-régua-do-processo-é-dado-do-backend-nunca-código).
 
 ---
 
@@ -198,3 +230,117 @@ apagar toda ocorrência de uma string curta destruiria log legítimo.
 
 **Recusado.** Confiar em "ninguém vai logar isso". Vazamento de segredo por log é o modo
 de falha mais comum que existe, justamente porque ninguém o escreve de propósito.
+
+---
+
+## D12 · A conta começa no CPF do responsável, não no da criança
+
+**Decisão.** A primeira pergunta depois do consentimento é o CPF do **adulto**, e é ele a
+âncora da conta: `backend.buscar_por_responsavel(cpf)`. O documento da criança (CPF, DNV
+ou NIS, nessa ordem de precedência) vem depois, no bloco 5, e **nenhum dos três é
+obrigatório** — sem eles a inscrição segue, marcada para conferência.
+
+**Por quê.** Exigir CPF de criança de 0 a 3 anos no primeiro turno derruba família na
+porta. O CPF do adulto é mais confiável, é o que a pessoa tem na mão, e é o único que
+reconhece reinscrição e irmãos.
+
+**O que isso destrava.** 27,9% das crianças de 2025 já constavam em 2024: o histórico
+preenche o cadastro inteiro num turno (bloco 2a) e ainda auto-valida o critério "esperou
+na fila no ano anterior" — hoje 14,5% declaram e só 12,1% comprovam. E 1.738 responsáveis
+inscreveram duas ou mais crianças: "É outra criança" reaproveita responsável e endereço.
+
+**Recusado.** CPF da criança + data de nascimento como chave (era a v1). Trocava um
+cadastro achado por um formulário inteiro, para a maioria das famílias.
+
+---
+
+## D13 · Endereço só por CEP + número. Bairro nunca é digitado
+
+**Decisão.** `backend.resolver_cep(cep, numero)` devolve logradouro, bairro e coordenadas.
+A família vê o bairro **uma vez, para confirmar**, e nunca digita nenhum dos dois.
+
+**Por quê.** Na base histórica o campo livre gerou 1.608 grafias para ~925 bairros —
+"Inhaúma" sozinho tem 13 variantes. O CEP é 100% preenchido e 100% válido desde 2024.
+
+**Por que o número é obrigatório.** Sem ele a precisão cai para ~1,4 km, o suficiente para
+errar a creche certa dentro do raio de 2 km que as famílias aceitam (72,8% dos confirmados
+ficaram na 1ª opção; entre os que trocaram, 82,9% andaram até 2 km).
+
+**Mudaria se.** Aparecesse CEP de logradouro único cobrindo área grande demais o
+suficiente para virar problema — aí entra confirmação por mapa, não campo de texto.
+
+---
+
+## D14 · A família vê um desfecho, nunca a situação bruta por opção
+
+**Decisão.** O banco grava **uma situação por opção de creche**. A consulta calcula
+`desfecho_entre(estados)` — a melhor situação da lista, por `PRECEDENCIA` — e mostra só
+ela. Sete estados possíveis, sete telas.
+
+**Por quê.** 77,8% das linhas `Cancelado pelo sistema` pertencem a inscrições que **foram
+atendidas**: é o cancelamento automático das outras opções quando uma é preenchida. Uma
+família que conseguiu a vaga veria "cancelado" em 4 das 5 escolhas dela. Mostrar o valor
+cru quebra a confiança na hora.
+
+**Detalhe que quebra query.** O valor gravado é `Cancelado na confirmacao` — sem cedilha e
+sem til. Filtrar pela grafia correta devolve zero linhas.
+
+**Onde isso vive.** `dominio/tipos.py`: `EstadoInscricao`, `PRECEDENCIA`,
+`desfecho_entre()` e `Desfecho`. A tradução do vocabulário do banco para esses sete
+estados é do backend, como toda tradução (§D2).
+
+---
+
+## D15 · A régua do processo é dado do backend, nunca código
+
+**Decisão.** `backend.criterios_do_processo()` devolve uma lista de `Criterio` —
+código, rótulo, pontos, grupo, se é sensível e o que comprova. O bloco 8 da conversa é
+montado caminhando essa lista. Não existe enum de critério em `dominio/`.
+
+**Por quê.** Entre 2023 e 2024 só **3 das 13 perguntas sobreviveram** e o teto caiu de 465
+para 100 pontos. Régua escrita à mão quebra na virada do ano, e a virada acontece no meio
+do período de inscrição, que é o pior momento possível.
+
+**O que fica nosso.** A **forma** da pergunta (`FormaCriterio`: sim/não, múltipla, número,
+anexo) e o desenho do turno. O **conteúdo** é do processo vigente.
+
+**Já se pagou.** Para 2026 vale a Resolução SME nº 542/2025, ainda não carregada. Quando
+carregar, é dado novo no backend — zero código aqui.
+
+---
+
+## D16 · Retomada em 72h, e chave de idempotência desde o primeiro turno
+
+**Decisão.** Sessão viva por 72h (`entrada.VALIDADE_SESSAO`). Sessão viva não recomeça: o
+bot diz onde parou e oferece continuar. `dados["chave_idempotencia"]` nasce no primeiro
+turno e viaja até `backend.inscrever()`.
+
+**Por quê.** Conversa de WhatsApp cai — o app fecha, o celular descarrega, a pessoa
+responde no dia seguinte. Sem retomada ela recomeça do zero e desiste. Sem chave de
+idempotência ela **entra duas vezes no processo**, e duas inscrições para a mesma criança
+se anulam: é um dos motivos por trás dos 9,5% de "nenhuma opção seguiu".
+
+**Consequência no código.** `BackendMock.inscrever()` devolve o mesmo número para a mesma
+chave, e o `BackendHTTP` terá que fazer igual. `inscrever()` é a única operação da porta
+que **nunca** pode ter retry automático.
+
+---
+
+## D17 · Dúvida solta é respondida, mas com cota — e o texto do cidadão é dado
+
+**Decisão.** Mensagem classificada como `duvida` no meio do cadastro é respondida pelo
+modelo sem mudar o estado da sessão: perguntar não faz perder o lugar na fila. Com dois
+limites: **8 perguntas por hora por contato** (janela deslizante em memória) e um system
+prompt (`SISTEMA_DUVIDA`) que declara o texto do usuário como dado, não instrução.
+
+**Por quê a cota.** Cada dúvida é uma chamada paga. Um chat aberto na internet é um botão
+de gastar dinheiro dos outros. Estourada a cota, a mensagem volta a ser tratada como
+resposta do roteiro — o cadastro continua, só a IA descansa.
+
+**Por quê o prompt.** O campo é aberto e alguém vai tentar dobrar o prompt. A defesa é
+delimitar (`<pergunta>`), declarar que ali dentro é dado, e não mandar nada da família
+para o modelo: só o nome da etapa. Ninguém precisa do CPF da criança para explicar como
+funciona a fila.
+
+**ponytail assumido.** O contador é um dicionário em memória, de um processo só —
+marcado no código, com o `clear` que impede virar vazamento no dia do pico.

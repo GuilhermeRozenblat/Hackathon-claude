@@ -29,6 +29,17 @@ A persistência entra pela porta (`repo.enfileirar`, `repo.pendentes`,
 `repo.marcar_enviado`, `repo.marcar_falha`). **Não escreva SQL aqui** — há teste que varre
 o pacote e falha.
 
+## Por que estes fluxos existem
+
+Em 2025, 5.519 famílias (7,7%) foram convocadas e **perderam a vaga**, concentradas em
+Pilares, Santa Teresa, Gávea e Bangu. A maior parte nunca soube que foi chamada — hoje
+"não foi avisada" e "foi avisada e desistiu" viram o mesmo registro no banco, e as duas
+são tratadas como desistência. `CONVOCACAO` (R2) e `LEMBRETE_CONVOCACAO` (R3) são a
+correção direta desse vazamento; `DOCUMENTO_PENDENTE` (R1) ataca os 8,0% de validação
+documental.
+
+Nove chaves, e nenhum texto delas promete vaga, cita pontuação ou dá posição na fila.
+
 ## A regra que existe para o flip
 
 **Nunca uma string livre na outbox.** Só `(ChaveTemplate, variáveis)`.
@@ -50,6 +61,9 @@ template do WhatsApp com variável faltando é erro em produção, não no deplo
 - **Rate limit do Telegram é ~1 msg/s por chat.** O worker respeita; um lote grande não
   pode tomar `429`.
 - **Nunca logue as variáveis** — carregam nome de criança.
+- **`ACAO_PRESENCIAL` sempre vem com endereço, `CONVOCACAO` sempre com prazo.**
+  `Etapa.__post_init__` já recusa o contrário, mas o catálogo depende disso: mandar a
+  família à unidade sem dizer onde, ou deixar o prazo vencer em silêncio, é o erro caro.
 
 ## Despacho por tipo, não por código
 
@@ -65,7 +79,7 @@ contrato congelado por PR próprio — quanto antes, melhor.
 ## Como verificar
 
 ```bash
-make up && make contratos && make notificacao
+make contratos && make notificacao
 ```
 
 Testes com `fakes/canal_fake.py`: `enfileirar()` + `drenar()` entrega uma vez só; drenar

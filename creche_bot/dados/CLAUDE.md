@@ -25,7 +25,7 @@ que são dataclasses de `porta.py`.
 `sqlite.py` **já funciona**. Ele foi escrito com a stdlib para o bot rodar sem docker e sem
 `pip install` durante a validação. A meta é Postgres + SQLAlchemy 2.0 + Alembic.
 
-Mantenha as assinaturas de `porta.py` e **os 29 testes continuam passando** — eles rodam
+Mantenha as assinaturas de `porta.py` e **a bateria continua passando** — eles rodam
 parametrizados contra `RepositorioMemoria` e a sua implementação, lado a lado. Se as duas
 divergirem em qualquer comportamento, o teste acusa antes de chegar em produção.
 

@@ -1,18 +1,25 @@
 # Zé Matrícula
 
 Assistente da **Matrícula Rio**: ajuda famílias a inscrever crianças na rede municipal.
-Uma conversa no lugar do formulário — consulta o cadastro que já existe, preenche o que
-falta, mostra as creches próximas com a nota de corte de cada uma, monta a lista de
-preferências e avisa a cada mudança de etapa.
+Uma conversa no lugar do formulário — reconhece o cadastro do ano passado, preenche o que
+falta, faz as perguntas da régua de prioridade do processo vigente, mostra as creches
+próximas, monta a lista de preferências, cobra o documento que falta e avisa a cada
+mudança de etapa. Também acompanha inscrição feita pelo site.
 
 Telegram primeiro (grátis, sem aprovação, mensagem proativa livre). WhatsApp depois — mas
 os limites do WhatsApp já valem em todo o código, então o flip é troca de adaptador, não
 reescrita.
 
-**O sistema não decide quem entra.** Ele cadastra e informa; quem aloca é o município. Em
-lugar nenhum do código existe "probabilidade de conseguir a vaga" — só a **nota de corte**
-do ano passado, sempre acompanhada do ano, porque a família não conhece a própria
-pontuação. Ver [D5](docs/DECISOES.md).
+**O sistema não decide quem entra.** Ele cadastra e informa; quem aloca é o município, por
+norma, em SQL determinístico que roda depois do fechamento das inscrições. Em lugar nenhum
+do código existe probabilidade, pontuação, posição na fila ou nota de corte. Sobre uma
+creche o bot mostra o que é fato verificável: distância, vaga aberta agora e concorrência
+do ano passado, rotulada como passado. Ver [D5](docs/DECISOES.md).
+
+**Por que ele existe.** 48,9% das famílias declaram CadÚnico e só 6,8% conseguem
+comprovar — por isso 93,8% das inscrições terminam com pontuação validada zero. E 7,7%
+foram convocadas e perderam a vaga em 2025, a maior parte sem nunca saber que foi chamada.
+Capturar a comprovação dentro da conversa e ter um canal para avisar é o produto.
 
 ## Rodar
 
@@ -38,7 +45,12 @@ Subir o bot **não exige nenhuma dependência**: canal, banco e conversa usam s�
 | `make limpar` | Apaga o `creche.db` |
 
 `ANTHROPIC_API_KEY` é opcional: sem ela o bot usa os textos escritos à mão em
-`creche_bot/ia/persona.py` e funciona igual. Com ela, o Claude varia a linguagem.
+`creche_bot/ia/persona.py` e funciona igual. Com ela, o Claude varia a linguagem e responde
+dúvidas soltas no meio do cadastro.
+
+Áudio também é opcional: `pip install -e ".[audio]"` liga a transcrição, que roda **local**
+(`faster-whisper`) — a voz da família não sai da máquina. Sem a dependência, o bot pede
+para a pessoa escrever.
 
 O `docker-compose.yml` sobe um Postgres para quem está migrando a persistência; o bot do
 dia a dia não precisa dele.
@@ -48,9 +60,9 @@ dia a dia não precisa dele.
 ```
 canal/          adaptador de transporte: Telegram hoje, WhatsApp depois
 conversa/       máquina de estados explícita — o cérebro do fluxo
-ia/             persona e redação (Claude opcional, ou texto fixo)
+ia/             persona, redação e transcrição local de áudio
 dados/          persistência. Ninguém fora daqui conhece banco
-backend/        fronteira com o município: data lake, escolas, extração, status
+backend/        fronteira com o município: histórico, régua, oferta, status
 notificacao/    outbox + catálogo de templates de mensagem proativa
 dominio/        vocabulário compartilhado, sem banco, sem canal, sem IA
 segredos.py     carga do .env e redação de segredo em log e traceback
@@ -68,16 +80,21 @@ A **entrada** é única — cada adaptador traduz seu transporte e chama a mesma
 diferentes. Por isso existe interface para uma e não para a outra.
 
 A conversa é uma máquina de estados, não um agente autônomo: determinística, testável,
-barata, e a pessoa nunca fica presa num loop. São 13 estados, mapeados um a um contra o
+barata, e a pessoa nunca fica presa num loop. Cada estado é mapeado um a um contra o
 roteiro em [docs/ROTEIRO.md](docs/ROTEIRO.md).
 
 ```
-INICIO → CONSENTIMENTO → BUSCA_CPF → BUSCA_NASCIMENTO
-       ├─ data lake achou ──────────────────────────→ RESUMO
-       └─ não achou → FORMULARIO (blocos 2, 3 e 4) ──→ RESUMO ⇄ CORRECAO
-                                    → LOCALIZACAO → ESCOLHA ⇄ CONFIRMA_ESCOLAS
-                                    → ENTREGA → [RECEBER_DOCUMENTOS] → ACOMPANHAMENTO
+INICIO → PORTA ─ acompanhar ──→ CONSULTA_* (bloco C: serve para quem se inscreveu pelo site)
+              └ inscrever ───→ CONSENTIMENTO → CPF_RESPONSAVEL
+       ├─ achou o cadastro do ano passado ──────────────────→ HORARIO
+       └─ não achou → CADASTRO → ENDERECO_CEP ⇄ CONFIRMA ──→ HORARIO
+                    → CRIT_* (a régua do processo vigente) → CONTATO
+                    → ESCOLAS → RESUMO ⇄ CORRECAO
+                    → PENDENCIAS → [RECEBER_DOC] → PROTOCOLO → ACOMPANHAR
 ```
+
+Fora do roteiro, antes de qualquer passo: **áudio vira texto** (transcrição local) e
+**pergunta solta é respondida sem perder o lugar na fila**, com cota por contato.
 
 Comandos globais em qualquer ponto: `/start`, `/ajuda`, `/status`, `/apagar`.
 E `/avancar`, que só existe enquanto o backend é mock.
@@ -92,8 +109,9 @@ um é **PR próprio, revisado por todas as trilhas** — nunca dentro de um PR d
 | `creche_bot/canal/tipos.py` | Modelo canônico de mensagem |
 | `creche_bot/dominio/tipos.py` | Vocabulário de domínio |
 | `creche_bot/notificacao/chaves.py` | Chaves de template — cada uma vira template da Meta |
-| `creche_bot/backend/porta.py` | Fronteira com o município (8 operações) |
+| `creche_bot/backend/porta.py` | Fronteira com o município (16 operações) |
 | `creche_bot/dados/porta.py` | Fronteira com a persistência (16 operações) |
+| `creche_bot/backend/mock.py` | O backend falso que roda hoje — espelho do contrato |
 
 ## Regras invioláveis
 
@@ -111,9 +129,11 @@ passam por aqui:
 registrado — `EXIGEM_CONSENTIMENTO` em `maquina.py` garante, mesmo se alguém forçar o
 estado na sessão.
 
-**LGPD art. 11 — dado sensível.** Deficiência, TGD/TEA e altas habilidades são dado de
-saúde: consentimento **específico e destacado**, separado do geral, e sempre com a opção
-"Prefiro não dizer". Ver [D7](docs/DECISOES.md).
+**LGPD art. 11 — dado sensível.** Deficiência e TGD/TEA são dado de saúde; violência
+doméstica, doença crônica, uso de substâncias e situação prisional também são sensíveis.
+Consentimento **específico e destacado**, separado do geral, sempre com a opção de pular,
+**nunca bloqueante**, e a resposta **nunca é ecoada de volta** — o histórico do chat fica
+no aparelho da família. Ver [D7](docs/DECISOES.md).
 
 **Plataforma.** Os limites do WhatsApp valem em todo lugar, mesmo no código Telegram: máx.
 3 botões, máx. 10 itens de lista, rótulo de 20 caracteres, texto puro sem markdown.
@@ -128,11 +148,20 @@ evento não sabe a diferença.
 `sqlite3`, nem `SELECT`, nem `session`, nem `cursor`. Quem precisa recebe um `Repositorio`
 injetado. `make fronteira` varre o pacote e falha se vazar.
 
-**Fronteira com o backend.** Data lake, escolas com nota de corte, extração de documento e
-situação da inscrição vêm do backend do município. Não recalcule nada disso aqui, e nada
-do JSON dele sai de `backend/`.
+**Fronteira com o backend.** Histórico do responsável, régua do processo vigente, endereço
+a partir do CEP, oferta de creches, extração de documento e situação da inscrição vêm do
+backend do município. Não recalcule nada disso aqui, e nada do JSON dele sai de `backend/`.
 
-**Uma pergunta por mensagem.** Nunca empilhe duas no mesmo balão.
+**A régua é dado, não código.** Entre 2023 e 2024 só 3 das 13 perguntas de prioridade
+sobreviveram e o teto caiu de 465 para 100 pontos. O bloco de critérios é montado em tempo
+de execução a partir de `backend.criterios_do_processo()`. Ver [D15](docs/DECISOES.md).
+
+**Uma pergunta por mensagem.** Nunca empilhe duas no mesmo balão — exceto os checklists de
+situação familiar e sensível, que são deliberados.
+
+**Texto do cidadão é dado, nunca instrução.** Entrada livre vai delimitada para o modelo, o
+system prompt manda ignorar ordem escrita ali dentro, e a resposta passa por filtro antes
+de entrar na conversa.
 
 **Log.** Só IDs. Nunca conteúdo de mensagem, bytes de arquivo, CPF ou nome.
 `creche_bot/segredos.py` redige token e chave de log e de traceback, e o `creche.db` nasce
@@ -140,19 +169,20 @@ com permissão `600` porque guarda CPF, nome de criança e telefone.
 
 ## Estado
 
-O esqueleto roda de ponta a ponta com o backend mockado.
-
-O roteiro inteiro roda de ponta a ponta com o backend mockado — 47 testes, contra as duas
-implementações de repositório.
+O roteiro **v2** roda de ponta a ponta com o backend mockado — reescrito a partir da régua
+real do processo 195/2025 e da base histórica de 2021 a 2025
+([`docs/script-chatbot-ze-matricula.md`](docs/script-chatbot-ze-matricula.md)). Os testes
+rodam contra as duas implementações de repositório. O mapa bloco a bloco está em
+[docs/ROTEIRO.md](docs/ROTEIRO.md).
 
 | Frente | Dono | Estado | O que falta |
 |---|---|---|---|
 | Canal Telegram | Guilherme | roda | Figurinhas de verdade (hoje é emoji) |
-| Conversa | Guilherme | roteiro completo | Mais casos de borda |
+| Conversa | Guilherme | roteiro v2 completo | Mais casos de borda |
 | IA / persona | Guilherme | roda sem chave | `RedatorClaude` não testado com chave real |
 | Notificação | Guilherme | roda | Retry com backoff exponencial |
 | Persistência | outra pessoa | isolada | Postgres, Alembic, cofre de documentos |
-| Backend | outro time | mock completo | `BackendHTTP` quando publicarem o contrato |
+| Backend | outro time | mock v2 completo | `BackendHTTP` quando publicarem o contrato |
 
 Bloqueios externos: o token do `@BotFather` (10 min) e o contrato HTTP do backend. Até ele
 chegar, `BackendMock` implementa a porta inteira e `/avancar` empurra as etapas à mão.
@@ -178,9 +208,10 @@ Cada lógica não trivial deixa **um** teste. Só pytest, sem fixture elaborada.
 
 | | |
 |---|---|
+| [docs/script-chatbot-ze-matricula.md](docs/script-chatbot-ze-matricula.md) | O roteiro v2 — a fonte de verdade da conversa |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | O desenho inteiro e o porquê de cada restrição |
-| [docs/DECISOES.md](docs/DECISOES.md) | As 10 decisões que custariam caro reverter |
-| [docs/ROTEIRO.md](docs/ROTEIRO.md) | Roteiro da conversa mapeado nos 13 estados |
+| [docs/DECISOES.md](docs/DECISOES.md) | As decisões que custariam caro reverter |
+| [docs/ROTEIRO.md](docs/ROTEIRO.md) | Roteiro da conversa mapeado nos estados do código |
 | [docs/MODULOS.md](docs/MODULOS.md) | Quem trabalha em quê, e como não se atropelam |
 | [docs/TELEGRAM.md](docs/TELEGRAM.md) | Criar e configurar o bot no @BotFather, 10 min |
 | [CLAUDE.md](CLAUDE.md) | Regras para qualquer agente neste repositório |

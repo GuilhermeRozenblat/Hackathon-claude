@@ -1,210 +1,320 @@
-"""Backend falso, em memória. Roda ENQUANTO o backend real não existe.
+"""Backend falso, com os dados do roteiro v2. É o que roda hoje.
 
-Serve a dois propósitos, e nenhum é "teste unitário":
-  1. Validar o bot no Telegram com dados que parecem reais;
-  2. Ser o espelho do contrato — quando `BackendHTTP` chegar, os testes que passam aqui
-     devem passar lá sem mudar uma linha.
+Espelha `BackendCreche` por inteiro: quando o `BackendHTTP` do outro time subir, ele
+terá que passar nos mesmos testes. Nenhum dado aqui é real — números, escolas e pessoas
+saíram do roteiro, e os percentuais que aparecem nos comentários vieram da base
+histórica de 2021 a 2025 citada lá.
 
-Por isso os números são plausíveis, não redondos. Dado bonito esconde bug de layout.
+ponytail: dado em tupla literal. São 3 escolas e 12 critérios; um seeder de banco para
+isso seria mais código que os dados.
 """
 
 from __future__ import annotations
 
 import re
 from datetime import date, datetime, timedelta
-from typing import Any
 
 from creche_bot.dominio.tipos import (
-    CadastroExistente,
+    CadastroAnterior,
+    Concorrencia,
+    CriancaConhecida,
+    Criterio,
     DadosExtraidos,
+    Desfecho,
+    Endereco,
     Etapa,
-    Faixa,
     FormaEntrega,
-    NotaCorte,
+    Grupamento,
+    Horario,
     Pendencia,
     PontoEntrega,
     Situacao,
-    Turma,
     VagaSugerida,
 )
 
-MATERNAL_I = Turma("Maternal I")
-ANO = 2027
+# CPF de teste com dígito verificador válido. Qualquer outro CPF válido cai no caminho
+# "não achei cadastro" — 72,1% dos casos em 2025.
+CPF_CONHECIDO = "52998224725"
+NUMERO_CONHECIDO = "2026-0847213"
 
-# CPF que o data lake "conhece" — digite-o no bot para exercitar o caminho do Bloco 1 SIM.
-CPF_CONHECIDO = "11122233344"
+_CURICICA = Endereco(cep="22710560", numero="100", logradouro="Rua Franz Weissmann",
+                     bairro="Curicica", lat=-22.9601, lng=-43.4048)
 
-_CADASTRO = CadastroExistente(
-    cpf=CPF_CONHECIDO,
-    nome_candidato="Sofia Ribeiro Alves",
-    data_nascimento=date(2024, 3, 18),
-    origem_escolar="particular",
-    matricula=None,
-    tem_necessidade=False,
-    nome_mae="Juliana Ribeiro Alves",
-    nome_pai="Marcos Alves",
-    nome_responsavel="Juliana Ribeiro Alves",
-    telefone="(21) 98877-6655",
-    email=None,                       # campo faltando de propósito: o resumo tem que
-)                                     # mostrar "não informado" e deixar preencher
+# CEPs que o mock resolve. Fora daqui devolve None, que é o caminho de CEP inexistente.
+_CEPS: dict[str, tuple[str, str, float, float]] = {
+    "22710560": ("Rua Franz Weissmann", "Curicica", -22.9601, -43.4048),
+    "22775003": ("Avenida Ayrton Senna", "Barra da Tijuca", -22.9946, -43.3654),
+    "20220030": ("Rua do Catete", "Catete", -22.9262, -43.1776),
+}
 
-# (id, nome, bairro, endereço, lat, lng, vagas, nota de corte, km, horário)
-_ESCOLAS = [
-    ("E1", "Creche Municipal Tia Ciata", "Gamboa", "R. Sacadura Cabral, 190",
-     -22.8975, -43.1880, 14, 62.5, 1.1, "8h às 17h"),
-    ("E2", "EDI Nise da Silveira", "Santo Cristo", "R. Equador, 843",
-     -22.8991, -43.1975, 9, 78.0, 2.3, "7h30 às 17h"),
-    ("E3", "Creche Municipal Zilda Arns", "Centro", "Av. Presidente Vargas, 1700",
-     -22.9068, -43.1889, 6, 88.5, 3.0, "8h às 16h"),
-    ("E4", "EDI Paulo Freire", "Saúde", "R. do Livramento, 55",
-     -22.8960, -43.1855, 0, 91.0, 1.4, "8h às 17h"),   # sem vaga: não pode aparecer
-]
+# id, nome, endereço, lat, lng, grupamentos, horários, km, vaga ociosa,
+# (famílias por vaga, ano), referência, polo
+_ESCOLAS: tuple[tuple, ...] = (
+    ("edi-leila-diniz", "EDI Leila Diniz", "Estrada de Curicica, 200", -22.9585, -43.4021,
+     ("bercario", "maternal_1", "maternal_2"), ("integral", "parcial"),
+     0.4, True, None, "", "POLO CURICICA"),
+    ("cm-crianca-do-futuro", "CM Criança do Futuro", "Rua Mapendi, 55", -22.9673, -43.3959,
+     ("bercario", "maternal_1"), ("integral",),
+     1.2, False, (5.0, 2025), "", "POLO CURICICA"),
+    ("cm-maria-conceicao", "CM Maria da Conceição S. de Carvalho",
+     "Av. Salvador Allende, 1200", -22.9750, -43.3901,
+     ("bercario", "maternal_1", "maternal_2"), ("integral", "parcial"),
+     1.8, False, (13.0, 2025), "RIO 2", "POLO JACAREPAGUA"),
+)
 
-_CRAS = [
-    PontoEntrega("CRAS Gamboa", "R. da Gamboa, 120", "8h às 17h, seg a sex",
-                 -22.8968, -43.1902),
-    PontoEntrega("CRAS Centro", "Av. Rio Branco, 277 — sala 4", "9h às 16h, seg a sex",
-                 -22.9060, -43.1760),
-]
+# A régua do processo 195/2025, como ela viria de `ic.pergunta_processo`. Ordem, pesos e
+# texto mudam todo ano — por isso isto é dado, e o bot lê em vez de saber.
+_CRITERIOS: tuple[Criterio, ...] = (
+    Criterio("cadunico", "Família inscrita no CadÚnico", 51, "8.1",
+             documento="Número do NIS"),
+    Criterio("bolsa_familia", "Recebe Bolsa Família ou Cartão Carioca", 2, "8.1",
+             documento="Número do NIS"),
+    Criterio("educacao_especial",
+             "A criança tem deficiência, transtorno do desenvolvimento ou altas habilidades",
+             25, "8.2", sensivel=True, documento="Laudo ou relatório médico"),
+    Criterio("monoparental", "A criança é criada por só uma pessoa responsável", 4, "8.3",
+             documento="Certidão de nascimento"),
+    Criterio("refugiada", "A família está no Brasil como refugiada", 2, "8.3",
+             documento="Protocolo de refúgio ou documento do CONARE"),
+    Criterio("irmao_matriculado", "A criança tem irmão ou irmã já matriculado na rede",
+             0, "8.3"),
+    Criterio("violencia_domestica", "Alguém de casa está em situação de violência doméstica",
+             4, "8.4", sensivel=True,
+             documento="B.O., medida protetiva ou encaminhamento", documento_opcional=True),
+    Criterio("responsavel_deficiencia", "Algum responsável pela criança tem deficiência",
+             3, "8.4", sensivel=True, documento="Laudo"),
+    Criterio("doenca_cronica", "Alguém de casa tem doença crônica grave", 3, "8.4",
+             sensivel=True, documento="Laudo ou relatório médico"),
+    Criterio("uso_substancias", "Alguém de casa faz uso abusivo de álcool ou outras drogas",
+             2, "8.4", sensivel=True,
+             documento="Declaração ou encaminhamento", documento_opcional=True),
+    Criterio("situacao_prisional",
+             "Alguém de casa está preso ou saiu da prisão nos últimos 5 anos", 2, "8.4",
+             sensivel=True, documento="Declaração", documento_opcional=True),
+)
 
-_DOCUMENTOS = [
-    "Certidão de nascimento da criança",
-    "CPF da criança",
-    "Comprovante de residência recente",
-    "Documento de identidade do responsável",
-    "Cartão de vacinação em dia",
-]
+_CRAS: tuple[PontoEntrega, ...] = (
+    PontoEntrega("CRAS Curicica", "Estrada dos Bandeirantes, 4100",
+                 "Segunda a sexta, 9h às 17h", -22.9612, -43.4103),
+    PontoEntrega("CRAS Taquara", "Rua André Rocha, 800", "Segunda a sexta, 9h às 17h",
+                 -22.9280, -43.3812),
+)
 
-# Roteiro de etapas do município. A ordem é o "passo N de 5" que o bot mostra.
-_ROTEIRO: list[dict[str, Any]] = [
-    {"codigo": "inscricao_recebida", "titulo": "Inscrição recebida", "tipo": "aguardando"},
-    {"codigo": "envio_documentos", "titulo": "Envio dos documentos", "tipo": "acao_no_chat",
-     "pendencias": [("comprovante_residencia", "Comprovante de residência", "chat"),
-                    ("cartao_vacina", "Cartão de vacinação", "chat")]},
-    {"codigo": "entrega_na_unidade", "titulo": "Entrega dos originais",
-     "tipo": "acao_presencial"},
-    {"codigo": "aguardando_analise", "titulo": "Análise da secretaria", "tipo": "aguardando"},
-    {"codigo": "resultado", "titulo": "Resultado", "tipo": "concluida"},
-]
+# Desfechos mockados: um por estado possível, para o bloco C ser andável inteiro.
+# A frequência de 2025 está no comentário — é o peso real de cada tela.
+_DESFECHOS: tuple[Desfecho, ...] = (
+    Desfecho(NUMERO_CONHECIDO, "Ana Beatriz da Silva", date(2024, 1, 10),   # 67,7%
+             "vaga_confirmada", ("EDI Leila Diniz", "CM Criança do Futuro"),
+             escola_atendida="EDI Leila Diniz",
+             endereco_escola="Estrada de Curicica, 200", lat=-22.9585, lng=-43.4021,
+             inicio_das_aulas=date(2027, 2, 8)),
+    Desfecho("2026-0847220", "Pedro Henrique da Silva", date(2022, 3, 15),  # 11,2%
+             "lista_de_espera", ("EDI Leila Diniz", "CM Criança do Futuro"),
+             pendencias=("cadunico",)),
+    Desfecho("2026-0847231", "Lucas Andrade", date(2023, 7, 2),            # 9,5%
+             "nao_seguiu", ("CM Criança do Futuro",)),
+    Desfecho("2026-0847244", "Sofia Ribeiro", date(2023, 11, 20),          # 7,7%
+             "perdeu_prazo", ("EDI Leila Diniz",),
+             escola_atendida="EDI Leila Diniz", prazo_confirmacao=date(2027, 1, 29)),
+    Desfecho("2026-0847255", "Miguel Fontes", date(2024, 2, 5),            # 3,8%
+             "cancelada", ("CM Maria da Conceição S. de Carvalho",)),
+    Desfecho("2026-0847266", "Helena Braga", date(2023, 5, 9),             # 0,2%
+             "selecionada", ("EDI Leila Diniz",), escola_atendida="EDI Leila Diniz",
+             endereco_escola="Estrada de Curicica, 200",
+             prazo_confirmacao=date(2027, 1, 29)),
+    Desfecho("2026-0847277", "Théo Nogueira", date(2024, 4, 18),           # 0,0%
+             "ativa", ("CM Criança do Futuro",)),
+)
+
+# Etapas que o mock percorre para alimentar as notificações R1 a R4.
+_ROTEIRO_ETAPAS: tuple[Etapa, ...] = (
+    Etapa("recebida", "Inscrição recebida", "aguardando"),
+    Etapa("falta_documento", "Falta comprovação", "acao_no_chat",
+          pendencias=(Pendencia("educacao_especial", "Laudo da educação especial", "chat"),)),
+    Etapa("classificada", "Classificação divulgada", "aguardando"),
+    Etapa("convocada", "Vaga liberada", "convocacao", prazo=date.today() + timedelta(days=7)),
+    Etapa("confirmada", "Vaga confirmada", "concluida"),
+)
+
+
+# O bot despacha por `TipoEtapa`; a consulta mostra `EstadoInscricao`. Uma tabela liga
+# as duas visões — e o BackendHTTP fará o mesmo a partir do status bruto do banco.
+_ESTADO_POR_ETAPA: dict[str, str] = {
+    "aguardando": "ativa",
+    "acao_no_chat": "ativa",
+    "acao_presencial": "ativa",
+    "convocacao": "selecionada",
+    "concluida": "vaga_confirmada",
+    "encerrada": "nao_seguiu",
+}
 
 
 def so_digitos(v: str) -> str:
     return re.sub(r"\D", "", v or "")
 
 
-def _faixa(nota: float, todas: list[float]) -> Faixa:
-    """Faixa é RELATIVA à lista mostrada. Nota de corte absoluta não diz nada à família,
-    que não conhece a própria pontuação."""
-    if not todas:
-        return "sem_vaga"
-    menor, maior = min(todas), max(todas)
-    if maior == menor:
-        return "media"
-    posicao = (nota - menor) / (maior - menor)
-    return "alta" if posicao <= 0.33 else "media" if posicao <= 0.66 else "baixa"
-
-
 class BackendMock:
-    def __init__(self) -> None:
+    def __init__(self, processo_aberto: bool = True) -> None:
+        self._processo_aberto = processo_aberto
         self._situacoes: dict[str, Situacao] = {}
+        self._por_chave: dict[str, str] = {}
+        self._etapa_de: dict[str, int] = {}
+        self._nascimento: dict[str, date] = {}
         self._mudadas: list[str] = []
         self._seq = 0
 
-    # ------------------------------------------------------------- data lake
-    def buscar_candidato(self, cpf: str, data_nascimento: date) -> CadastroExistente | None:
+    # ------------------------------------------------------------- processo
+    def periodo_de_inscricao(self) -> tuple[date, date]:
+        hoje = date.today()
+        if self._processo_aberto:
+            return hoje - timedelta(days=2), hoje + timedelta(days=10)
+        return date(hoje.year - 1, 12, 9), date(hoje.year - 1, 12, 12)
+
+    def data_do_resultado(self) -> date:
+        return self.periodo_de_inscricao()[1] + timedelta(days=40)
+
+    def data_de_corte(self) -> date:
+        """31/03 do ano letivo seguinte — regra do processo, não constante do bot."""
+        return date(self.periodo_de_inscricao()[1].year + 1, 3, 31)
+
+    def criterios_do_processo(self) -> list[Criterio]:
+        return list(_CRITERIOS)
+
+    # ------------------------------------------------------------ histórico
+    def buscar_por_responsavel(self, cpf: str) -> CadastroAnterior | None:
         if so_digitos(cpf) != CPF_CONHECIDO:
             return None
-        if data_nascimento != _CADASTRO.data_nascimento:
-            return None            # CPF certo + data errada = não é a mesma criança
-        return _CADASTRO
-
-    # ------------------------------------------------------------------ vagas
-    def escolas_proximas(self, cep_ou_bairro: str, data_nascimento: date,
-                         n: int = 3) -> list[VagaSugerida]:
-        abertas = [e for e in _ESCOLAS if e[6] > 0]     # sem vaga não entra no painel
-        notas = [e[7] for e in abertas]
-        sugestoes = [
-            VagaSugerida(
-                id_escola=i, nome=nome, bairro=bairro, endereco=end, lat=lat, lng=lng,
-                turma=MATERNAL_I, vagas_disponiveis=vagas,
-                nota_corte=NotaCorte(nota, ANO - 1), faixa=_faixa(nota, notas),
-                distancia_km=km, horario_atendimento=horario,
-            )
-            for i, nome, bairro, end, lat, lng, vagas, nota, km, horario in abertas
-        ]
-        sugestoes.sort(key=lambda v: (v.nota_corte.pontos, v.distancia_km))
-        return sugestoes[:n]
-
-    # -------------------------------------------------------------- entrega
-    def pontos_de_entrega(self, forma: FormaEntrega, id_escola: str,
-                          cep_ou_bairro: str) -> list[PontoEntrega]:
-        if forma == "cras":
-            return list(_CRAS)
-        if forma == "creche":
-            e = next(x for x in _ESCOLAS if x[0] == id_escola)
-            return [PontoEntrega(e[1], e[3], e[9], e[4], e[5])]
-        return []
-
-    def documentos_exigidos(self, id_escola: str) -> list[str]:
-        return list(_DOCUMENTOS)
-
-    def enviar_documento(self, protocolo: str, arquivo: bytes, mime: str) -> DadosExtraidos:
-        # Arquivo minúsculo = foto ruim. Deixa o caminho de confiança baixa testável.
-        if len(arquivo) < 1024:
-            return DadosExtraidos(confianca="baixa",
-                                  observacao="imagem muito pequena, não deu para ler")
-        return DadosExtraidos(
-            tipo_documento="certidao_nascimento", confianca="alta",
-            nome_candidato="Sofia Ribeiro Alves", data_nascimento=date(2024, 3, 18),
-            nome_responsavel="Juliana Ribeiro Alves", cep="20220-030",
+        return CadastroAnterior(
+            cpf=CPF_CONHECIDO, nome_responsavel="Maria da Silva Santos",
+            data_nascimento=date(1992, 6, 14), telefone="21998877665",
+            endereco=_CURICICA,
+            criancas=(CriancaConhecida("Ana Beatriz da Silva", date(2024, 1, 10)),),
+            esperou_na_fila=True,
         )
 
-    # ------------------------------------------------------------- inscrição
-    def inscrever(self, dados: dict, preferencias: list[str],
-                  forma_entrega: FormaEntrega) -> Situacao:
-        self._seq += 1
-        protocolo = f"RIO-{ANO}-{self._seq:05d}"
-        primeira = next(e for e in _ESCOLAS if e[0] == preferencias[0])
-        # Quem entrega presencialmente já nasce na etapa de entrega; quem manda pelo
-        # WhatsApp começa em "documentos".
-        indice = 2 if forma_entrega in ("creche", "cras") else 1
-        situacao = Situacao(protocolo=protocolo, id_escola=primeira[0],
-                            nome_escola=primeira[1], etapa=self._etapa(indice, primeira),
-                            atualizado_em=datetime.now())
-        self._situacoes[protocolo] = situacao
-        self._mudadas.append(protocolo)
-        return situacao
+    # ------------------------------------------------------------- endereço
+    def resolver_cep(self, cep: str, numero: str) -> Endereco | None:
+        dados = _CEPS.get(so_digitos(cep))
+        if dados is None:
+            return None
+        logradouro, bairro, lat, lng = dados
+        return Endereco(so_digitos(cep), numero, logradouro, bairro, lat, lng)
 
-    def situacao(self, protocolo: str) -> Situacao:
-        return self._situacoes[protocolo]
+    # ---------------------------------------------------------------- oferta
+    def escolas_proximas(self, endereco: Endereco, grupamento: Grupamento,
+                         horario: Horario, n: int = 3) -> list[VagaSugerida]:
+        sugestoes = [
+            VagaSugerida(
+                id_escola=eid, nome=nome, endereco=end, lat=lat, lng=lng,
+                grupamento=grupamento, horario=horario, distancia_km=km,
+                vaga_ociosa=ociosa,
+                concorrencia=Concorrencia(*conc) if conc else None,
+                referencia=ref, polo=polo, horario_atendimento="Segunda a sexta, 8h às 16h",
+            )
+            for eid, nome, end, lat, lng, grupos, horarios, km, ociosa, conc, ref, polo
+            in _ESCOLAS
+            if grupamento in grupos and horario in horarios
+        ]
+        # Vaga aberta agora vem primeiro; depois, a mais perto. Nunca por pontuação.
+        sugestoes.sort(key=lambda v: (not v.vaga_ociosa, v.distancia_km))
+        return sugestoes[:n]
+
+    # ------------------------------------------------------------ inscrição
+    def validar_nis(self, nis: str) -> tuple[bool, tuple[str, ...]]:
+        digitos = so_digitos(nis)
+        if len(digitos) != 11:
+            return False, ()
+        # Com o NIS o servidor consulta as duas bases de uma vez.
+        return True, ("cadunico", "bolsa_familia")
+
+    def inscrever(self, dados: dict, preferencias: list[str]) -> str:
+        # Conversa de WhatsApp cai e recomeça. Sem esta chave, a família que retoma
+        # entra duas vezes no processo e as duas inscrições se anulam.
+        chave = dados.get("chave_idempotencia")
+        if chave and chave in self._por_chave:
+            return self._por_chave[chave]
+
+        self._seq += 1
+        numero = f"{self.data_de_corte().year}-{self._seq:07d}"
+        nome_escola = next((e[1] for e in _ESCOLAS if e[0] in preferencias), "creche")
+        self._situacoes[numero] = Situacao(
+            numero=numero, nome_crianca=dados.get("nome_crianca", "a criança"),
+            nome_escola=nome_escola, etapa=_ROTEIRO_ETAPAS[0], atualizado_em=datetime.now())
+        self._etapa_de[numero] = 0
+        if (nasc := dados.get("nascimento_crianca")):
+            self._nascimento[numero] = date.fromisoformat(nasc)
+        self._mudadas.append(numero)
+        if chave:
+            self._por_chave[chave] = numero
+        return numero
+
+    def enviar_documento(self, numero: str, codigo_criterio: str,
+                         arquivo: bytes, mime: str) -> DadosExtraidos:
+        if len(arquivo) < 1024:
+            return DadosExtraidos(confianca="baixa", observacao="imagem pequena demais")
+        if codigo_criterio in ("cadunico", "bolsa_familia"):
+            return DadosExtraidos("comprovante_nis", "alta", nis="12345678901")
+        return DadosExtraidos("laudo_medico", "alta")
+
+    def pontos_de_entrega(self, forma: FormaEntrega, id_escola: str,
+                          cep: str) -> list[PontoEntrega]:
+        if forma == "cras":
+            return list(_CRAS)
+        escola = next((e for e in _ESCOLAS if e[0] == id_escola), _ESCOLAS[0])
+        return [PontoEntrega(escola[1], escola[2], "Segunda a sexta, 8h às 16h",
+                             escola[3], escola[4])]
+
+    # -------------------------------------------------------------- consulta
+    def _vivas(self) -> list[Desfecho]:
+        """Inscrições feitas nesta sessão também são consultáveis.
+
+        Sem isto, quem acabou de se inscrever pelo bot e manda /status ouve que não tem
+        inscrição — e é justamente quem mais volta para conferir.
+        """
+        return [
+            Desfecho(numero=s.numero, nome_crianca=s.nome_crianca,
+                     data_nascimento=self._nascimento.get(s.numero, date(1900, 1, 1)),
+                     estado=_ESTADO_POR_ETAPA[s.etapa.tipo],
+                     escolas=(s.nome_escola,), escola_atendida=s.nome_escola,
+                     prazo_confirmacao=s.etapa.prazo,
+                     data_resultado=self.data_do_resultado(),
+                     pendencias=tuple(x.codigo for x in s.etapa.pendencias))
+            for s in self._situacoes.values()
+        ]
+
+    def consultar_por_numero(self, numero: str, nascimento: date) -> list[Desfecho]:
+        alvo = numero.strip()
+        return [d for d in (*_DESFECHOS, *self._vivas())
+                if d.numero == alvo and d.data_nascimento == nascimento]
+
+    def consultar_por_nome(self, nome: str, nascimento: date,
+                           filiacao: str) -> list[Desfecho]:
+        alvo = " ".join(nome.lower().split())
+        return [d for d in (*_DESFECHOS, *self._vivas())
+                if d.nome_crianca.lower() == alvo and d.data_nascimento == nascimento]
+
+    def consultar_por_responsavel(self, cpf: str) -> list[Desfecho]:
+        if so_digitos(cpf) != CPF_CONHECIDO:
+            return []
+        return [d for d in _DESFECHOS if d.nome_crianca.endswith("da Silva")]
+
+    # --------------------------------------------------------- notificações
+    def situacao(self, numero: str) -> Situacao:
+        return self._situacoes[numero]
 
     def mudancas_desde(self, marca: str | None) -> tuple[list[Situacao], str]:
         desde = int(marca or 0)
-        return [self._situacoes[p] for p in self._mudadas[desde:]], str(len(self._mudadas))
+        novas = self._mudadas[desde:]
+        return [self._situacoes[n] for n in novas], str(len(self._mudadas))
 
-    # --------------------------------------------- gatilho manual, só para demo
-    def avancar(self, protocolo: str) -> Situacao:
-        """Empurra para a próxima etapa. NÃO faz parte de `BackendCreche` — é o que o
-        comando /avancar usa para exercitar a notificação sem o backend real."""
-        atual = self._situacoes[protocolo]
-        escola = next(e for e in _ESCOLAS if e[0] == atual.id_escola)
-        proxima = min(atual.etapa.ordem, len(_ROTEIRO) - 1)
-        nova = Situacao(protocolo, atual.id_escola, atual.nome_escola,
-                        self._etapa(proxima, escola), datetime.now())
-        self._situacoes[protocolo] = nova
-        self._mudadas.append(protocolo)
-        return nova
-
-    # -------------------------------------------------------------- internos
-    def _etapa(self, indice: int, escola: tuple) -> Etapa:
-        passo = _ROTEIRO[indice]
-        prazo = date.today() + timedelta(days=10)
-        pend = tuple(Pendencia(c, t, e, prazo) for c, t, e in passo.get("pendencias", []))
-        presencial = passo["tipo"] == "acao_presencial"
-        return Etapa(
-            codigo=passo["codigo"], titulo=passo["titulo"], tipo=passo["tipo"],
-            ordem=indice + 1, total=len(_ROTEIRO), pendencias=pend,
-            prazo=prazo if presencial or pend else None,
-            endereco_entrega=escola[3] if presencial else None,
-            lat=escola[4] if presencial else None, lng=escola[5] if presencial else None,
-        )
+    def avancar(self, numero: str) -> Situacao:
+        """Só existe no mock: empurra uma etapa para demonstrar R1 a R4 sem o backend."""
+        indice = min(self._etapa_de[numero] + 1, len(_ROTEIRO_ETAPAS) - 1)
+        self._etapa_de[numero] = indice
+        anterior = self._situacoes[numero]
+        self._situacoes[numero] = Situacao(
+            numero=numero, nome_crianca=anterior.nome_crianca,
+            nome_escola=anterior.nome_escola, etapa=_ROTEIRO_ETAPAS[indice],
+            atualizado_em=datetime.now())
+        self._mudadas.append(numero)
+        return self._situacoes[numero]

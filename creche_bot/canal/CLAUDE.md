@@ -18,8 +18,9 @@ def rodar(nucleo: Nucleo) -> None:      # long polling, loop principal
 def enviar(id_externo: str, msg: MensagemSaida) -> None
 ```
 
-1. Update do Telegram → `MensagemEntrada`. Texto, foto (baixada em bytes) e clique de
-   botão (`callback_query` → `escolha`). `id_mensagem` preenchido sempre.
+1. Update do Telegram → `MensagemEntrada`. Texto, foto (baixada em bytes), áudio de voz,
+   documento e clique de botão (`callback_query` → `escolha`). `id_mensagem` preenchido
+   sempre.
 2. `MensagemSaida` → payload do Telegram, em `render.py`.
 3. `figurinhas.py`: chave (`"comemorando"`, `"pensando"`, `"vamos_la"`, `"festa"`,
    `"atencao"`) → `file_id`. Mapa em dict; `file_id` é estável, então cacheia.
@@ -29,6 +30,9 @@ def enviar(id_externo: str, msg: MensagemSaida) -> None
 - **Long polling (`getUpdates`), não webhook.** É o que faz a V1 rodar em localhost sem
   HTTPS nem ngrok. O WhatsApp exigirá webhook na Fase 3 — problema de outro arquivo.
 - **`getFile` baixa no máximo 20 MB.** Foto maior: peça outra, com mensagem gentil.
+- **Áudio acima de `MAX_SEGUNDOS_AUDIO` não é baixado.** A transcrição roda local e é
+  síncrona: um áudio de cinco minutos travaria o polling para todo mundo. O `mime` vem do
+  cliente e não autoriza nada — serve só para o núcleo saber que é voz.
 - **Rate limit ~1 msg/s por chat.** Fila de envio com backoff. `429` vem com
   `retry_after` — respeite.
 - **Texto puro.** Não gere `MarkdownV2`: o escape do Telegram é fonte clássica de bug e o

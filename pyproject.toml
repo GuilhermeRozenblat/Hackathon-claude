@@ -7,6 +7,9 @@ dependencies = []
 
 [project.optional-dependencies]
 ia = ["anthropic>=0.40"]          # só para a variação de linguagem do Claude
+# Transcrição LOCAL de áudio: a voz da família não sai da máquina. Claude não recebe
+# áudio, e mandar para um serviço de terceiros quebraria a regra de privacidade.
+audio = ["faster-whisper>=1.0"]
 postgres = ["sqlalchemy>=2.0", "psycopg[binary]>=3.2", "alembic>=1.13"]  # Trilha D1
 dev = ["pytest>=8", "ruff>=0.7", "pydantic>=2.9"]
 

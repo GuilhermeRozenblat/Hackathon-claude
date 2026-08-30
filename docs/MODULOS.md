@@ -14,10 +14,31 @@ frente tem pasta própria, `CLAUDE.md` próprio e um teste que falha se alguém 
 As três se encontram em dois arquivos congelados:
 
 - `creche_bot/dados/porta.py` — 16 operações de persistência
-- `creche_bot/backend/porta.py` — 8 operações do município
+- `creche_bot/backend/porta.py` — 16 operações do município
 
 **Mudar um desses dois é PR próprio, revisado por todos os lados.** Enquanto eles não
 mudarem, ninguém quebra ninguém — e `make fronteira` prova.
+
+## A reescrita v2
+
+O roteiro foi reescrito a partir da régua real do processo 195/2025 e da base histórica de
+2021 a 2025 ([`script-chatbot-ze-matricula.md`](script-chatbot-ze-matricula.md)), e o
+código acompanhou: contratos, `BackendMock`, notificação e a conversa inteira estão em v2.
+
+O que a v2 mudou de estrutural, e por quê:
+
+| Mudança | Motivo |
+|---|---|
+| A busca começa pelo CPF do **responsável** | 27,9% das crianças já constavam no ano anterior; e criança de 0 a 3 anos muitas vezes não tem CPF |
+| Endereço só por **CEP + número** | Campo livre gerou 1.608 grafias para ~925 bairros |
+| A régua de prioridade virou **dado do backend** | Entre 2023 e 2024, 3 das 13 perguntas sobreviveram |
+| A consulta mostra um **desfecho calculado** | 77,8% dos "cancelado pelo sistema" são de quem foi atendido |
+| Saiu a nota de corte, entrou **concorrência do ano passado** | Pontuação não é comparável entre anos; concorrência é fato |
+| Entrou o **bloco C**, de acompanhamento | Alcança as ~62 mil famílias que se inscreveram pelo portal |
+| Entrou **voz** e **dúvida solta** | A família fala; e perguntar não pode fazer perder o lugar na fila |
+
+Os estados, um a um, estão em [ROTEIRO.md](ROTEIRO.md); o porquê de cada decisão, em
+[DECISOES.md](DECISOES.md).
 
 ## Por que isso funciona na prática
 
@@ -25,8 +46,8 @@ mudarem, ninguém quebra ninguém — e `make fronteira` prova.
 banco pode quebrar `dados/sqlite.py` à vontade que o chat continua rodando; só não pode
 mexer em `porta.py`.
 
-No sentido inverso: os 43 testes rodam **parametrizados contra as duas implementações**
-de repositório, lado a lado. Se a versão Postgres divergir da de memória em qualquer
+No sentido inverso: os testes rodam **parametrizados contra as duas implementações** de
+repositório, lado a lado. Se a versão Postgres divergir da de memória em qualquer
 comportamento, o teste acusa antes de chegar em produção.
 
 ## Estado de cada módulo
@@ -34,10 +55,10 @@ comportamento, o teste acusa antes de chegar em produção.
 | Módulo | Estado | O que falta |
 |---|---|---|
 | [Canal Telegram](../creche_bot/canal/CLAUDE.md) | ✅ roda | Figurinhas de verdade (hoje é emoji) |
-| [Conversa](../creche_bot/conversa/CLAUDE.md) | ✅ roteiro completo | Mais casos de borda |
+| [Conversa](../creche_bot/conversa/CLAUDE.md) | ✅ roteiro v2 completo | Mais casos de borda |
 | [IA / persona](../creche_bot/ia/CLAUDE.md) | ✅ roda sem chave | `RedatorClaude` não foi testado com chave real |
 | [Persistência](../creche_bot/dados/CLAUDE.md) | ✅ isolada | Postgres, Alembic, cofre — **outra pessoa** |
-| [Backend do município](../creche_bot/backend/CLAUDE.md) | ⏸️ mock completo | `BackendHTTP` quando o outro time publicar |
+| [Backend do município](../creche_bot/backend/CLAUDE.md) | ⏸️ mock v2 completo | `BackendHTTP` quando o outro time publicar |
 | [Notificação](../creche_bot/notificacao/CLAUDE.md) | ✅ roda | Retry com backoff exponencial |
 
 ## Rodar
@@ -54,9 +75,10 @@ Nenhuma dependência é necessária para rodar. `pip install -e ".[dev]"` só pa
 
 | Arquivo | Para quê |
 |---|---|
+| [script-chatbot-ze-matricula.md](script-chatbot-ze-matricula.md) | O roteiro v2 — a fonte de verdade da conversa |
 | [ARQUITETURA.md](ARQUITETURA.md) | O desenho completo e por quê |
-| [docs/DECISOES.md](DECISOES.md) | As 10 decisões que custariam caro reverter |
-| [docs/ROTEIRO.md](ROTEIRO.md) | Mapa entre o roteiro de conversa e o código |
+| [DECISOES.md](DECISOES.md) | As decisões que custariam caro reverter |
+| [ROTEIRO.md](ROTEIRO.md) | Mapa entre o roteiro e os estados do código |
 | [TELEGRAM.md](TELEGRAM.md) | Configurar o bot no @BotFather, 10 minutos |
 | [CLAUDE.md](../CLAUDE.md) | Regras para qualquer agente neste repo |
 

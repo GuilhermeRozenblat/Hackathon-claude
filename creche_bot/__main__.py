@@ -18,6 +18,7 @@ from creche_bot.dados.memoria import RepositorioMemoria
 from creche_bot.dados.porta import Repositorio
 from creche_bot.dados.sqlite import RepositorioSQLite
 from creche_bot.ia.redacao import criar
+from creche_bot.ia.transcricao import Transcritor
 from creche_bot.notificacao.outbox import rodar_worker
 from creche_bot.segredos import carregar_env, configurar_log
 
@@ -50,7 +51,7 @@ def main() -> None:
     backend = BackendMock()          # troque por BackendHTTP quando o backend real subir
     redator = criar(os.environ.get("ANTHROPIC_API_KEY") or None)
     canal = Telegram(token)
-    maquina = Maquina(backend, redator, repo)
+    maquina = Maquina(backend, redator, repo, Transcritor())
 
     for nome, obj in (("repositório", repo), ("backend", backend), ("redator", redator)):
         logging.info("%s: %s", nome, type(obj).__name__)

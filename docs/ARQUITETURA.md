@@ -4,7 +4,8 @@
 >
 > | Também leia | Para quê |
 > |---|---|
-> | [docs/DECISOES.md](DECISOES.md) | As 10 decisões que custariam caro reverter |
+> | [script-chatbot-ze-matricula.md](script-chatbot-ze-matricula.md) | O roteiro v2 — a fonte de verdade da conversa |
+> | [docs/DECISOES.md](DECISOES.md) | As decisões que custariam caro reverter |
 > | [docs/ROTEIRO.md](ROTEIRO.md) | Roteiro da conversa mapeado nos estados |
 > | [MODULOS.md](MODULOS.md) | Quem faz o quê, e como as frentes não se atropelam |
 > | [TELEGRAM.md](TELEGRAM.md) | Configurar o bot no @BotFather |
@@ -32,8 +33,19 @@
 
 Famílias perdem vaga de creche por burocracia: formulário confuso, documento faltando, e
 depois nenhum retorno sobre o andamento. O **Zé Matrícula** substitui isso por uma
-conversa: coleta os dados, consulta o cadastro que já existe, mostra as creches próximas
-com a nota de corte de cada uma, e avisa a cada mudança de etapa.
+conversa: reconhece o cadastro do ano passado, coleta o que falta, faz as perguntas da
+régua de prioridade, mostra as creches próximas, cobra a comprovação e avisa a cada
+mudança de etapa.
+
+Os números que orientam o desenho, da base histórica de 2021 a 2025 (837.179 opções):
+
+| Fato | Consequência no desenho |
+|---|---|
+| 48,9% declaram CadÚnico, 6,8% comprovam — e 93,8% terminam com pontuação validada zero | Capturar o NIS dentro da conversa é a razão de existir do projeto |
+| 7,7% foram convocadas e perderam a vaga, a maior parte sem saber que foi chamada | O canal de contato e as notificações R2/R3 |
+| 27,9% das crianças de 2025 já constavam em 2024 | A busca começa pelo CPF do responsável, e o cadastro anterior preenche tudo |
+| 77,8% das linhas "Cancelado pelo sistema" são de quem **foi atendido** | A consulta mostra um desfecho calculado, nunca o status bruto |
+| Entre 2023 e 2024, 3 das 13 perguntas da régua sobreviveram | A régua é dado do backend, nunca código |
 
 Validação no **Telegram** (grátis, sem aprovação, mensagem proativa livre). Depois flip
 para o **WhatsApp**, que é onde o público está.
@@ -44,10 +56,12 @@ para o **WhatsApp**, que é onde o público está.
 |---|---|
 | Linguagem | Python 3.12, **sem dependência para rodar** |
 | Canal hoje | Telegram, long polling — roda no localhost |
-| Dados do município | `BackendMock`; o backend real é de outro time |
+| Dados do município | `BackendMock` com os dados do roteiro v2; o backend real é de outro time |
 | Persistência | `RepositorioSQLite` por padrão; `RepositorioMemoria` disponível |
 | Escolha da vaga | Lista **ordenada** de preferências, montada em toques |
+| Régua de prioridade | Dado do backend, montada em tempo de execução |
 | Seleção de quem entra | **Não é nossa.** Cadastramos e informamos; quem aloca é o município |
+| Voz | Transcrição **local** (`faster-whisper`), opcional. A voz não sai da máquina |
 | Redação | Textos escritos à mão; Claude é opcional e cai para eles se falhar |
 
 ---
@@ -132,14 +146,14 @@ flowchart TB
     end
 
     subgraph NUCLEO["núcleo — não sabe em que plataforma está"]
-        MAQ["conversa/maquina.py<br/>13 estados"]
-        FORM["conversa/formulario.py<br/>blocos 2-4 como dados"]
+        MAQ["conversa/maquina.py<br/>despacho por estado"]
+        FORM["conversa/formulario.py<br/>cadastro e contato como dados"]
         PERS["ia/persona.py<br/>o tom do Zé"]
     end
 
     subgraph PORTAS[" "]
         PD["dados/porta.py<br/>16 operações"]
-        PB["backend/porta.py<br/>8 operações"]
+        PB["backend/porta.py<br/>16 operações"]
     end
 
     MEM["memoria.py"]
@@ -184,7 +198,7 @@ congelados**, e em mais nenhum.
         └───────┬──────────────────────────┬───────────┘
                 │                          │
       dados/porta.py               backend/porta.py     ← CONGELADOS
-      16 operações                  8 operações
+      16 operações                 16 operações
                 │                          │
     ┌───────────┴────────────┐  ┌──────────┴───────────────────┐
     │ dados/                 │  │ backend/                     │
@@ -199,37 +213,49 @@ congelados**, e em mais nenhum.
 cinco formas de vazamento.
 
 **Consequência prática.** `REPOSITORIO=memoria make bot` roda o bot inteiro sem tocar em
-disco: quem trabalha no chat nunca é bloqueado por uma refatoração no banco. E os 43
-testes rodam parametrizados contra as duas implementações de repositório — se divergirem,
-o teste acusa antes da produção.
+disco: quem trabalha no chat nunca é bloqueado por uma refatoração no banco. E a bateria
+roda parametrizada contra as duas implementações de repositório — se divergirem, o teste
+acusa antes da produção.
 
 ### 4.1 O que o backend do município entrega
 
-| Operação | Devolve |
+Dezesseis operações, em cinco grupos:
+
+| Grupo | Operações |
 |---|---|
-| `buscar_candidato(cpf, nascimento)` | `CadastroExistente \| None` — o Bloco 1 do roteiro |
-| `escolas_proximas(local, nascimento, n)` | top N **já ordenado**, com nota de corte |
-| `pontos_de_entrega(forma, escola, local)` | a creche escolhida, ou os CRAS próximos |
-| `documentos_exigidos(escola)` | lista para a família conferir |
-| `inscrever(dados, preferencias, forma)` | `Situacao` com protocolo e primeira etapa |
-| `enviar_documento(protocolo, arquivo, mime)` | `ResultadoExtracao` |
-| `situacao(protocolo)` | onde a inscrição está |
-| `mudancas_desde(marca)` | `(mudanças, nova marca)` — alimenta a outbox |
+| **Processo** | `periodo_de_inscricao()` · `data_do_resultado()` · `data_de_corte()` · `criterios_do_processo()` |
+| **Histórico** | `buscar_por_responsavel(cpf)` → `CadastroAnterior \| None` |
+| **Endereço** | `resolver_cep(cep, numero)` → `Endereco \| None` |
+| **Oferta** | `escolas_proximas(endereco, grupamento, horario, n)` — top N **já ordenado** |
+| **Inscrição** | `validar_nis()` · `inscrever()` · `enviar_documento()` · `pontos_de_entrega()` |
+| **Consulta** | `consultar_por_numero()` · `consultar_por_nome()` · `consultar_por_responsavel()` |
+| **Notificação** | `situacao(numero)` · `mudancas_desde(marca)` |
 
 O bot **não reordena, não recalcula e não decide**. Ele conversa e narra.
 
-### 4.2 Nota de corte, não probabilidade
+Três dessas operações merecem atenção:
 
-O sistema não seleciona quem entra: quem aloca é o município. Portanto **não existe
-"probabilidade de conseguir a vaga"** em lugar nenhum do código — seria previsão de um
-algoritmo que não conhecemos.
+- **`criterios_do_processo()`** devolve a régua vigente. Entre 2023 e 2024 só 3 das 13
+  perguntas sobreviveram e o teto caiu de 465 para 100 pontos — régua no código quebra na
+  virada do ano, no meio do período de inscrição. Ver [D15](DECISOES.md).
+- **`buscar_por_responsavel(cpf)`** é pelo CPF do **adulto**, nunca da criança. Exigir CPF
+  de criança de 0 a 3 anos no primeiro turno derruba família na porta. Ver [D12](DECISOES.md).
+- **`resolver_cep(cep, numero)`** é o único caminho para bairro, logradouro e coordenadas.
+  Campo livre gerou 1.608 grafias para ~925 bairros. Ver [D13](DECISOES.md).
 
-O painel mostra a **nota de corte**: a pontuação do último aprovado. E `NotaCorte.ano` é
-campo obrigatório do tipo, porque a UI é obrigada a dizer de quando é o número — nota de
-corte sozinha não diz a chance da família, que não conhece a própria pontuação.
+### 4.2 Nem probabilidade, nem pontuação, nem posição na fila
 
-A faixa 💚/💛/🧡 é **relativa à lista mostrada**, nunca absoluta: ordena as três opções
-entre si, não promete nada sobre nenhuma. Detalhes em [D5](DECISOES.md).
+O sistema não seleciona quem entra: quem aloca é o município, por norma (Resolução SME nº
+542/2025), em SQL determinístico que roda **depois do fechamento das inscrições**. No
+momento da conversa a classificação literalmente não existe — então não há o que mostrar,
+nem "probabilidade de conseguir a vaga", nem posição na fila, nem nota de corte.
+
+Sobre uma creche, o bot mostra os três fatos verificáveis: **distância**, **vaga ociosa
+agora** e **concorrência do ano passado** (`Concorrencia.familias_por_vaga`, com `ano`
+obrigatório no tipo, para a UI ser forçada a dizer de quando é o número).
+
+A nota de corte foi cortada de propósito na v2: o teto da régua foi 465 pontos em 2023 e
+100 em 2024, e pontuação não é comparável entre anos. Detalhes em [D5](DECISOES.md).
 
 ---
 
@@ -271,16 +297,23 @@ dialetos incompatíveis, e o escape do Telegram é fonte clássica de bug.
 Carrega os dois padrões que sustentam o sistema:
 
 **Vocabulário aberto, comportamento fechado.** `Etapa.codigo` é `str` livre — o município
-define quais etapas existem. `Etapa.tipo` é `Literal` de cinco valores — nós definimos o
+define quais etapas existem. `Etapa.tipo` é `Literal` de seis valores — nós definimos o
 que fazer com cada uma. Etapa nova que caia num tipo conhecido funciona sem código novo.
 Ver [D4](DECISOES.md).
 
-**Nota de corte, não probabilidade.** `NotaCorte.ano` é obrigatório: a UI é forçada a
-dizer de quando é o número. Ver [D5](DECISOES.md).
+**Régua do processo é dado, não código.** `Criterio` é uma lista que o backend devolve —
+pesos, ordem e texto mudam todo ano. Ver [D15](DECISOES.md).
 
-Uma guarda que vale ouro: `Etapa.__post_init__` recusa etapa `acao_presencial` sem
-endereço. Mandar a família à creche sem dizer onde é o pior erro que este bot pode
-cometer, então virou erro de tipo.
+**Duas visões da inscrição, de propósito.** `Situacao`/`Etapa` é o que MUDA e dispara
+notificação. `Desfecho` é o que a família VÊ ao consultar: um estado só, calculado por
+`desfecho_entre()` como a melhor situação entre as opções dela. Ver [D14](DECISOES.md).
+
+**O que não existe no tipo: pontuação e posição na fila.** Não há campo para elas, então
+não há como uma tela mostrá-las por acidente. Ver [D5](DECISOES.md).
+
+Duas guardas que valem ouro no `__post_init__` de `Etapa`: `acao_presencial` sem endereço
+e `convocacao` sem prazo são erro de tipo. Mandar a família à creche sem dizer onde, ou
+deixar um prazo vencer em silêncio, são os dois piores erros que este bot pode cometer.
 
 ### 5.3 `dados/porta.py` e `backend/porta.py`
 
@@ -289,8 +322,13 @@ estado, a outra busca os dados do **município**.
 
 ### 5.4 `notificacao/chaves.py`
 
-Sete chaves de template — e cada uma vira um template submetido à Meta na Fase 3, com
+Nove chaves de template — e cada uma vira um template submetido à Meta na Fase 3, com
 ~24h de aprovação. **Mudar este enum é grátis agora e caro depois.**
+
+`CONVOCACAO` e `LEMBRETE_CONVOCACAO` são a correção direta do maior vazamento do processo:
+em 2025, 5.519 famílias (7,7%) foram convocadas e perderam a vaga, e a maior parte nunca
+soube que foi chamada. Hoje "não foi avisada" e "foi avisada e desistiu" viram o mesmo
+registro no banco — só a primeira é problema que o bot resolve.
 
 `POR_TIPO_ETAPA` mapeia `TipoEtapa` → `ChaveTemplate` numa tabela, não numa cadeia de
 `if`. Um teste garante que todo tipo de etapa tem template.
@@ -299,25 +337,36 @@ Sete chaves de template — e cada uma vira um template submetido à Meta na Fas
 
 ## 6. O roteiro da conversa
 
-13 estados, mapeados um a um contra o roteiro do Zé Matrícula em
-[`docs/ROTEIRO.md`](ROTEIRO.md) — com diagrama, tabela bloco-a-bloco e como testar
-cada caminho.
+O roteiro é [`script-chatbot-ze-matricula.md`](script-chatbot-ze-matricula.md); o mapa
+dele contra os estados do código está em [`docs/ROTEIRO.md`](ROTEIRO.md) — com diagrama,
+tabela bloco-a-bloco e como testar cada caminho.
 
-Três coisas que valem registrar aqui:
+Quatro coisas que valem registrar aqui:
 
-**Blocos 2, 3 e 4 são dados.** "Uma pergunta por mensagem" é literalmente uma lista de
-perguntas: `conversa/formulario.py` é uma tupla de `Campo`, e a ramificação é uma lambda
-`pular_se`. Como código seriam 12 handlers quase idênticos. Produto edita sem tocar em
-lógica. Ver [D8](DECISOES.md).
+**Os blocos de cadastro são dados.** "Uma pergunta por mensagem" é literalmente uma lista
+de perguntas: `conversa/formulario.py` é uma tupla de `Campo` por lista, e a ramificação é
+uma lambda `pular_se`. Como código seriam 15 handlers quase idênticos. Produto edita sem
+tocar em lógica. Ver [D8](DECISOES.md).
+
+**O bloco de critérios NÃO é dado nosso.** Ele é montado em tempo de execução a partir de
+`backend.criterios_do_processo()`, agrupado por `Criterio.grupo`. `passos/criterios.py`
+define só a **forma** de cada turno, que é estável. Ver [D15](DECISOES.md).
 
 **A ordem de preferência é montada em toques.** O roteiro pede "seleção múltipla
 ordenável" e o WhatsApp não tem esse widget. Cada toque acrescenta uma preferência, o bot
 confirma a posição e mostra o que sobrou — toda tela cabe em 3 botões. Ver
 [D6](DECISOES.md).
 
-**Dado de saúde tem consentimento separado.** Deficiência/TGD/TEA é dado sensível (LGPD
-art. 5º II e art. 11): exige consentimento específico e destacado, e sempre oferece
-"Prefiro não dizer". Ver [D7](DECISOES.md).
+**Dado sensível tem consentimento separado, um turno só, e nunca é ecoado.** Saúde,
+violência doméstica, uso de substâncias e situação prisional são dado sensível (LGPD art.
+5º II e art. 11). Consentimento próprio, opção de pular, nunca bloqueante — e o eco de
+confirmação não vale aqui, porque o histórico fica no aparelho da família. Ver
+[D7](DECISOES.md).
+
+**Fora do roteiro, duas coisas acontecem antes de qualquer passo.** Áudio vira texto por
+transcrição local, para que nenhum passo saiba que existe voz; e pergunta solta é
+respondida sem mexer no estado, com cota por contato e o texto do cidadão tratado como
+dado, nunca como instrução. Ver [D17](DECISOES.md).
 
 ---
 
@@ -334,10 +383,15 @@ Garante entrega e sobrevive a restart.
 
 | `ChaveTemplate` | Telegram | WhatsApp (Fase 3) |
 |---|---|---|
-| `STATUS_EM_ANALISE` | texto animado + figurinha `pensando` | template `status_em_analise_v1` + botão |
-| `STATUS_APROVADO` | texto comemorando + figurinha `festa` | template `status_aprovado_v1` + botão |
-| `STATUS_LISTA_ESPERA` | texto acolhedor + posição na fila | template `status_lista_espera_v1` + botão |
-| `DOCUMENTO_PENDENTE` | texto + figurinha `atencao` | template `doc_pendente_v1` + botão |
+| `INSCRICAO_CONFIRMADA` | texto + figurinha `festa` | template + botão |
+| `ETAPA_AVANCOU` | texto + figurinha `comemorando` | template + botão |
+| `DOCUMENTO_PENDENTE` (R1) | texto + figurinha `atencao` | template + botão |
+| `ACAO_PRESENCIAL` | texto + `sendVenue` com o pino | template + botão |
+| `CONVOCACAO` (R2) | texto + botões `Confirmar vaga` / `Não vou poder` | template + botões |
+| `LEMBRETE_CONVOCACAO` (R3) | reenvio quando o R2 não foi lido em 24h | template + botões |
+| `RESULTADO_CLASSIFICADA` (R4) | texto + figurinha `festa` | template + botão |
+| `RESULTADO_NAO_CLASSIFICADA` | texto acolhedor + `Quero ser avisada` | template + botão |
+| `LEMBRETE_INCOMPLETO` | texto + `Continuar` | template + botão |
 
 **Nunca uma string livre na outbox** — só a chave e as variáveis. É isso que faz o flip
 custar um arquivo.
@@ -363,7 +417,7 @@ porque o despacho é por `etapa.tipo` e não por `codigo`. Ver [D4](DECISOES.md)
 
 ## 8. Privacidade como código
 
-`ia/cliente.py` é o único lugar que fala com a Anthropic, e carrega as regras no topo:
+`ia/redacao.py` é o único lugar que fala com a Anthropic, e carrega as regras no topo:
 
 ```python
 MODELO = "claude-haiku-4-5"   # nunca Fable/Mythos: Covered Models, sem ZDR
@@ -380,8 +434,10 @@ Demais controles:
 
 | Controle | V1 |
 |---|---|
-| Documentos em repouso | Cifrados com `cryptography.Fernet`, chave em env |
-| Retenção | Campo `expira_em` + job de expurgo; documento vive enquanto a inscrição estiver aberta + prazo |
+| Documentos em repouso | **Não persistimos documento.** Extrai, guarda estruturado, descarta os bytes — ver [D9](DECISOES.md) |
+| Voz | Transcrição roda **local** (`faster-whisper`). Áudio não sai da máquina e não vai para nenhuma API |
+| Entrada livre perto de prompt | Delimitada, declarada como dado, e a resposta filtrada antes de entrar na conversa |
+| Retenção | Quando o cofre existir: `expira_em` + job de expurgo. Hoje não há o que expirar |
 | Logs | Só IDs. Nunca conteúdo de mensagem, bytes de arquivo ou CPF. Filtro de redação no logger |
 | Consentimento | Bloqueante, com versão do texto gravada |
 | Direito de eliminação (LGPD) | `apagar_tudo(contato_id)` **desde a V1** — incluir depois é bem mais caro |
@@ -423,7 +479,7 @@ para isso que serve tudo acima.
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"        # só para os testes; rodar não precisa de nada
 
-make test         # 43 testes, contra as duas implementações de repositório
+make test         # tudo, contra as duas implementações de repositório
 make fronteira    # falha se persistência vazar para fora de dados/
 make lint
 make bot          # precisa do token — veja TELEGRAM.md
@@ -433,32 +489,42 @@ make bot          # precisa do token — veja TELEGRAM.md
 
 | Teste | O que quebraria em produção sem ele |
 |---|---|
-| 4 botões falha | O flip para o WhatsApp, três meses depois |
-| Nenhuma tela passa de 3 botões | Idem, varrendo o roteiro inteiro |
+| 4 botões falha; nenhuma tela estoura os limites do WhatsApp | O flip, três meses depois, com o fluxo todo construído por cima |
 | Rótulos abreviados continuam distinguíveis | Família escolhe a creche errada sem saber |
 | Persistência não vaza de `dados/` | Refatoração do banco quebra quem mexe no chat |
-| Fakes satisfazem os Protocols | Divergência só apareceria na integração |
-| Domínio não importa infraestrutura | O flip deixa de ser barato |
+| Domínio não importa infraestrutura; fakes satisfazem os Protocols | Divergência só apareceria na integração |
 | `ia/` não usa API fora de ZDR | Documento de criança retido além do necessário |
-| Etapa presencial exige endereço | Família mandada à creche sem saber onde |
+| Etapa presencial exige endereço; convocação exige prazo | Família mandada à creche sem saber onde; prazo vencendo em silêncio |
 | Todo `TipoEtapa` tem template | Etapa nova do backend fica sem notificação |
-| Bot nunca promete vaga | Expectativa falsa numa família esperando creche |
-| Consentimento negado não avança | LGPD art. 14 |
-| CPF certo + data errada não traz outra criança | Vazamento de dado de outra família |
-| Aviso do trajeto CRAS → creche | Família no escuro depois de entregar documento |
-| Documento ilegível não grava | Dado errado no cadastro |
+| Bot nunca promete vaga nem pontuação; painel nunca mostra nota de corte | Expectativa falsa numa família esperando creche |
+| Painel mostra só fato verificável | Idem, pelo lado do que É mostrado |
+| Sem consentimento nada é alcançável | LGPD art. 14 |
+| Desfecho é a melhor situação entre as opções | Família atendida vendo "cancelado" em 4 das 5 escolhas |
+| Resposta sensível nunca é ecoada | Histórico do chat fica no aparelho da família |
+| Régua do processo é dado, não código | A virada do ano quebra o bot no meio do período de inscrição |
+| Grupamento sai da idade na data de corte; fora da faixa falha cedo | Família descobrindo no resultado que nunca esteve no processo |
+| NIS comprova as duas perguntas; sem o NIS a inscrição segue | O turno que existe para capturar a comprovação virando parede |
+| Aviso do trajeto CRAS → creche, nos dois passos | Família no escuro depois de entregar documento |
+| Documento ilegível não vira comprovação | Dado errado no cadastro |
 | Ordem de preferência = ordem dos toques | Inscrição na creche errada |
+| Dado pessoal não vai junto com a dúvida; pergunta não escapa do bloco de dado | Prompt dobrado por texto de usuário; PII num prompt sem precisar |
+| Cota corta o chat aberto como botão de gastar | Conta da API de quem publicou o bot |
+| Número mexido reprova a reescrita | Claude "melhorando" um CPF ou um protocolo na tela |
+| Áudio longo nem é baixado; sem transcritor o bot avisa | Polling travado para todo mundo por um áudio de cinco minutos |
+| Token não sobrevive ao log nem ao traceback | Quem tem o token controla o bot |
 
 ### Fim a fim, no Telegram real
 
-1. `/start` → aceite o consentimento.
-2. CPF `111.222.333-44` + `18/03/2024` → o cadastro é encontrado e pula para o resumo.
-   Qualquer outro CPF → preenchimento completo.
-3. Confirme o resumo → CEP `20220-030` → três creches com nota de corte.
-4. Toque numa, depois em "Pronto" → confirme → escolha "Levar num CRAS" → protocolo e pino.
-5. `/avancar` algumas vezes → as notificações chegam sozinhas.
-6. Mate o processo no meio e suba de novo → a conversa continua de onde parou.
-7. `/apagar` → tudo some, sem deixar órfão.
+1. `/start` → "Quero inscrever" → aceite o consentimento.
+2. CPF do responsável `529.982.247-25` → o cadastro do ano passado aparece inteiro.
+   Qualquer outro CPF válido → preenchimento completo.
+3. CEP `22710-560` e número → confirme o endereço → integral → a régua de prioridade.
+4. Escolha as creches em toques, depois "Pronto" → resumo → enviar.
+5. Mande a foto do documento que ficou pendente → protocolo.
+6. `/avancar` algumas vezes → as notificações R1 a R4 chegam sozinhas.
+7. Mate o processo no meio e suba de novo → a conversa continua de onde parou.
+8. `/status` → o bloco C, com o desfecho calculado.
+9. `/apagar` → tudo some, sem deixar órfão.
 
 ---
 
@@ -472,7 +538,7 @@ make bot          # precisa do token — veja TELEGRAM.md
 | Fila (Redis/Celery) | Quando o loop da outbox não der conta |
 | Figurinhas próprias | Quando houver pack no @Stickers; hoje é emoji |
 | Painel admin | Quando alguém que não é dev precisar mudar status |
-| Previsão de admissão | Nunca, enquanto não formos o alocador |
+| Previsão de admissão, pontuação, posição na fila | Nunca. Não somos o alocador, e a classificação nem existe durante a conversa |
 | Retorno CRAS → creche | Depende de processo, não de código — ver [D10](DECISOES.md) |
 
 ---

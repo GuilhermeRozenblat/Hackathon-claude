@@ -42,16 +42,18 @@ def variaveis_de(sit: Situacao, nome_crianca: str) -> tuple[ChaveTemplate, dict[
     base: dict[str, Any] = {
         "nome_crianca": nome_crianca.split()[0] if nome_crianca else "sua criança",
         "nome_escola": sit.nome_escola,
-        "protocolo": sit.protocolo,
+        "numero": sit.numero,
+        "nome_responsavel": "",
     }
 
     if chave is ChaveTemplate.ETAPA_AVANCOU:
-        base |= {"titulo_etapa": e.titulo, "ordem": e.ordem, "total": e.total}
-    elif chave is ChaveTemplate.PENDENCIA_NO_CHAT:
-        base |= {"pendencias": "\n".join(f"• {p.titulo}" for p in e.pendencias),
-                 "prazo": prazo}
+        base |= {"titulo_etapa": e.titulo}
+    elif chave is ChaveTemplate.DOCUMENTO_PENDENTE:
+        base |= {"pendencias": "\n".join(f"📄 {p.titulo}" for p in e.pendencias)}
     elif chave is ChaveTemplate.ACAO_PRESENCIAL:
         base |= {"endereco": e.endereco_entrega, "prazo": prazo, "lat": e.lat, "lng": e.lng}
+    elif chave in (ChaveTemplate.CONVOCACAO, ChaveTemplate.LEMBRETE_CONVOCACAO):
+        base |= {"prazo": prazo}
     return chave, base
 
 
@@ -65,14 +67,14 @@ def sincronizar(backend: BackendCreche, repo: Repositorio) -> int:
 
     enfileirados = 0
     for sit in mudancas:
-        registro = repo.inscricao(sit.protocolo)
+        registro = repo.inscricao(sit.numero)
         if registro is None:
             continue                                   # inscrição de outra instalação
         if registro.etapa_codigo == sit.etapa.codigo:
             continue                                   # nada mudou de fato
         chave, variaveis = variaveis_de(sit, registro.nome_crianca)
-        repo.enfileirar(sit.protocolo, chave.value, variaveis)
-        repo.atualizar_etapa(sit.protocolo, sit.etapa.codigo)
+        repo.enfileirar(sit.numero, chave.value, variaveis)
+        repo.atualizar_etapa(sit.numero, sit.etapa.codigo)
         enfileirados += 1
 
     repo.gravar_marca(MARCA, nova_marca)

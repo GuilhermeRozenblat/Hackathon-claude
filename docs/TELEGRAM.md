@@ -95,12 +95,14 @@ verdade já existe e é o que `make bot` usa.
 make bot
 ```
 
-O roteiro completo já está implementado. Para testar os dois caminhos do Bloco 1:
+Para testar os dois caminhos do bloco 2, com o `BackendMock`:
 
-| Caminho | CPF | Nascimento |
-|---|---|---|
-| Cadastro **encontrado** no data lake | `111.222.333-44` | `18/03/2024` |
-| Cadastro **não encontrado** | qualquer outro | qualquer |
+| Caminho | CPF do responsável |
+|---|---|
+| Cadastro do ano passado **encontrado** | `529.982.247-25` |
+| Cadastro **não encontrado** | qualquer outro CPF válido |
+
+Os CEPs que o mock resolve: `22710-560`, `22775-003` e `20220-030` — sempre com o número.
 
 Depois de concluir a inscrição, `/avancar` empurra uma etapa e a notificação chega
 sozinha. Roteiro completo em [ROTEIRO.md](ROTEIRO.md).

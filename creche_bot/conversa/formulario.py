@@ -1,9 +1,12 @@
-"""Os blocos 2, 3 e 4 do roteiro como DADOS, não como código.
+"""Os blocos 3, 4, 5 e 9 do roteiro como DADOS, não como código.
 
 "Uma pergunta por mensagem" é literalmente uma lista de perguntas. Um handler por campo
-seria 12 funções quase idênticas — a máquina caminha esta lista e produz a mesma coisa.
+seria 15 funções quase idênticas — a máquina caminha estas listas e produz a mesma coisa.
 
 Produto edita este arquivo sem tocar em lógica nenhuma.
+
+Note o que NÃO está aqui: grupamento, bairro, distância e pontuação. São derivados, e
+perguntar à família o que o sistema já sabe é o desenho errado.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from typing import Any, Literal
 
 from creche_bot.canal.tipos import MAX_BOTOES
 
-Tipo = Literal["texto", "cpf", "data", "telefone", "email", "botoes"]
+Tipo = Literal["texto", "cpf", "data", "telefone", "email", "numero", "botoes"]
 
 
 @dataclass(frozen=True)
@@ -27,10 +30,10 @@ class Campo:
     opcoes: tuple[tuple[str, str], ...] = ()      # (id, rótulo) — máx. 3, limite WhatsApp
     eco: bool = False                             # "Recebido: Fulano ✅"
     erro: str = "Não entendi 🤔 Pode mandar de novo?"
-    escape: tuple[str, str] | None = None         # (id, rótulo) de fuga em campo de texto
+    escape: tuple[str, str] | None = None         # (id, rótulo) de fuga em campo aberto
+    digitos: tuple[int, int] = (1, 40)            # faixa de tamanho para tipo "numero"
     pular_se: Callable[[dict[str, Any]], bool] | None = field(default=None, compare=False)
     pergunta_alt: Callable[[dict[str, Any]], str] | None = field(default=None, compare=False)
-    aviso: str | None = None                      # texto que precede a pergunta
 
     def __post_init__(self) -> None:
         assert len(self.opcoes) <= MAX_BOTOES, (
@@ -47,8 +50,21 @@ class Campo:
 
 
 # ----------------------------------------------------------------- validação
-def _digitos(v: str) -> str:
+def digitos_de(v: str) -> str:
     return re.sub(r"\D", "", v or "")
+
+
+def cpf_valido(bruto: str) -> bool:
+    """Dígito verificador. Sem isso, erro de digitação vira busca vazia no histórico e a
+    família ouve "não achei seu cadastro" quando o cadastro existe."""
+    d = digitos_de(bruto)
+    if len(d) != 11 or len(set(d)) == 1:
+        return False
+    for corte in (9, 10):
+        soma = sum(int(d[i]) * (corte + 1 - i) for i in range(corte))
+        if (soma * 10) % 11 % 10 != int(d[corte]):
+            return False
+    return True
 
 
 def validar(campo: Campo, bruto: str) -> tuple[bool, Any]:
@@ -56,8 +72,7 @@ def validar(campo: Campo, bruto: str) -> tuple[bool, Any]:
     texto = (bruto or "").strip()
 
     if campo.tipo == "cpf":
-        d = _digitos(texto)
-        return (len(d) == 11, d)
+        return (cpf_valido(texto), digitos_de(texto))
 
     if campo.tipo == "data":
         m = re.search(r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})", texto)
@@ -67,106 +82,25 @@ def validar(campo: Campo, bruto: str) -> tuple[bool, Any]:
             valor = date(int(m[3]), int(m[2]), int(m[1]))
         except ValueError:
             return False, None
-        return (valor <= date.today(), valor.isoformat())
+        return (date(1900, 1, 1) <= valor <= date.today(), valor.isoformat())
 
     if campo.tipo == "telefone":
-        d = _digitos(texto)
+        d = digitos_de(texto)
         return (10 <= len(d) <= 11, d)
+
+    if campo.tipo == "numero":
+        d = digitos_de(texto)
+        return (campo.digitos[0] <= len(d) <= campo.digitos[1], d)
 
     if campo.tipo == "email":
         return (bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", texto)), texto.lower())
 
+    # Nome exige duas palavras: nome abreviado é a primeira causa de não achar a
+    # inscrição depois, na consulta. Por isso o roteiro pede "sem abreviar".
+    if campo.chave.startswith(("nome", "filiacao", "busca_nome", "busca_filiacao", "irmao")):
+        return (len(texto.split()) >= 2 and len(texto) >= 5, " ".join(texto.split()))
+
     return (len(texto) >= 3, texto)
-
-
-# ------------------------------------------------------------- o formulário
-# Bloco 2 — sobre a vaga
-# Bloco 3 — dados pessoais
-# Bloco 4 — contato
-FORMULARIO: tuple[Campo, ...] = (
-    Campo(
-        "origem_escolar", "O candidato já estuda em alguma escola?", "botoes",
-        (("rede_municipal", "Rede municipal"), ("particular", "Escola particular"),
-         ("nunca_estudou", "Nunca estudou")),
-    ),
-    # 4ª opção não cabe nos 3 botões do WhatsApp — vira pergunta própria.
-    Campo(
-        "outra_rede", "É em outra rede ou em outra cidade?", "botoes",
-        (("outra_rede", "Sim, outra rede"), ("nunca_estudou", "Não, nunca estudou")),
-        pular_se=lambda d: d.get("origem_escolar") != "nunca_estudou",
-    ),
-    Campo(
-        "matricula", "Você tem o número de matrícula dele ou dela em mãos?", "texto",
-        escape=("nao_sei", "Não sei agora"),
-        pular_se=lambda d: d.get("origem_escolar") != "rede_municipal",
-        erro="Não peguei o número 🤔 Se não tiver em mãos, toca em 'Não sei agora'.",
-    ),
-    Campo(
-        "tem_necessidade",
-        "O candidato possui deficiência, TGD/TEA ou altas habilidades?", "botoes",
-        (("sim", "Sim"), ("nao", "Não"), ("nao_informar", "Prefiro não dizer")),
-        aviso="sensivel",          # dispara o consentimento específico da LGPD art. 11
-    ),
-    Campo(
-        "tipo_necessidade", "Qual dessas descreve melhor a situação?", "botoes",
-        (("deficiencia_fisica", "Deficiência física"),
-         ("deficiencia_intelectual", "Def. intelectual"), ("tgd_tea", "TGD/TEA")),
-        pular_se=lambda d: d.get("tem_necessidade") != "sim",
-    ),
-    Campo(
-        "tipo_necessidade_2", "É alguma dessas?", "botoes",
-        (("altas_habilidades", "Altas habilidades"), ("outra", "Outra"),
-         ("ja_respondi", "Já respondi acima")),
-        pular_se=lambda d: d.get("tipo_necessidade") in
-        (None, "deficiencia_fisica", "deficiencia_intelectual", "tgd_tea"),
-    ),
-    Campo("nome_candidato", "Qual é o nome completo do candidato?", eco=True,
-          erro="Preciso do nome completo 🙂"),
-    Campo(
-        "filiacao_na_certidao",
-        "A filiação (nome da mãe e/ou pai) consta na certidão de nascimento?", "botoes",
-        (("sim", "Sim"), ("nao", "Não")),
-    ),
-    Campo(
-        "filiacao", "Pode me passar o nome completo da mãe e/ou do pai, "
-                    "como consta na certidão?", eco=True,
-        pergunta_alt=lambda d: ("Pode me passar o nome do responsável legal "
-                                "pela criança?") if d.get("filiacao_na_certidao") == "nao"
-        else None,
-    ),
-    Campo("nome_responsavel",
-          "E qual é o nome do responsável que vai acompanhar essa matrícula?", eco=True),
-    # A idade responde sozinha dois critérios legais de prioridade. Perguntar
-    # "você tem 60 anos ou mais?" ou "você é menor de 18?" é constrangedor e
-    # desnecessário: a data já diz. Ver `criterios_prioridade()`.
-    Campo("data_nascimento_responsavel",
-          "Qual é a data de nascimento do responsável? (dia/mês/ano)", "data", eco=True,
-          erro="Não peguei a data 🤔 Escreve assim: 07/11/1990"),
-    Campo(
-        "deficiencia_responsavel",
-        "O candidato tem pai, mãe ou responsável com alguma deficiência?", "botoes",
-        (("sim", "Sim"), ("nao", "Não"), ("nao_informar", "Prefiro não dizer")),
-        aviso="sensivel",
-    ),
-    Campo("telefone", "Show! Agora preciso do telefone do responsável, "
-                      "para mantermos contato sobre a inscrição.", "telefone", eco=True,
-          erro="Esse telefone não parece completo 🤔 Manda com DDD."),
-    Campo(
-        "tem_outro_contato",
-        "Tem algum outro celular, de uma segunda pessoa, para o caso de eu não "
-        "conseguir falar com você?", "botoes",
-        (("sim", "Sim, tenho outro"), ("nao", "Não tenho outro")),
-    ),
-    Campo("outro_contato", "Pode me passar esse outro número, por favor?",
-          "telefone", eco=True,
-          pular_se=lambda d: d.get("tem_outro_contato") != "sim",
-          erro="Esse telefone não parece completo 🤔 Manda com DDD."),
-    Campo("tem_email", "O responsável tem e-mail?", "botoes",
-          (("sim", "Sim"), ("nao", "Não"))),
-    Campo("email", "Pode me passar o e-mail, por favor?", "email", eco=True,
-          pular_se=lambda d: d.get("tem_email") != "sim",
-          erro="Esse e-mail parece incompleto 🤔 Manda de novo?"),
-)
 
 
 def formatar(campo: Campo, valor: Any) -> str:
@@ -184,39 +118,121 @@ def formatar(campo: Campo, valor: Any) -> str:
     return v
 
 
-PRIORIDADES = {
-    "responsavel_60_mais": "responsável com 60 anos ou mais",
-    "responsavel_menor_18": "responsável com menos de 18 anos",
+# ---------------------------------------------- blocos 3, 4 e 5 — o cadastro
+CADASTRO: tuple[Campo, ...] = (
+    # ---- Bloco 3: o responsável, que é a âncora da conta
+    Campo("nome_responsavel", "Qual é o seu nome completo? (sem abreviar)", eco=True,
+          erro="Preciso do nome completo, com sobrenome 🙂"),
+    # Responde sozinha o critério de desempate "responsável menor de 18 anos". Os
+    # critérios "60 anos ou mais" e "mãe adolescente" existiram só de 2021 a 2023 e não
+    # existem mais na régua — não derive esses.
+    Campo("nascimento_responsavel", "E qual a sua data de nascimento? (dia/mês/ano)",
+          "data", eco=True, erro="Não peguei a data 🤔 Escreve assim: 07/11/1990"),
+    Campo("relacao", "Qual a sua relação com a criança?", "botoes",
+          (("mae", "Mãe"), ("pai", "Pai"), ("outra", "Outra"))),
+    # 5 opções não cabem em 3 botões: a 3ª abre a segunda pergunta.
+    Campo("relacao_outra", "Qual delas?", "botoes",
+          (("avo", "Avó ou avô"), ("responsavel_legal", "Responsável legal"),
+           ("outro", "Outro")),
+          pular_se=lambda d: d.get("relacao") != "outra"),
+
+    # ---- Bloco 4: a criança
+    Campo("nome_crianca", "Agora a criança. Qual o nome completo dela? (sem abreviar)",
+          eco=True, erro="Preciso do nome completo, com sobrenome 🙂"),
+    Campo("nascimento_crianca", "E a data de nascimento? (dia/mês/ano)", "data", eco=True,
+          erro="Não peguei a data 🤔 Escreve assim: 10/01/2024"),
+    Campo("sexo", "A criança é menino ou menina?", "botoes",
+          (("menino", "Menino"), ("menina", "Menina"))),
+    # O portal trata isso nas duas telas de consulta: é a chave alternativa de busca, e
+    # existe justamente para criança sem filiação registrada.
+    Campo("filiacao_consta",
+          "A filiação (nome da mãe e/ou pai) consta na certidão de nascimento dela?",
+          "botoes", (("consta", "Consta"), ("nao_consta", "Não consta"))),
+    Campo("filiacao",
+          "Pode me passar o nome completo da mãe e/ou do pai, como está na certidão?",
+          eco=True,
+          pergunta_alt=lambda d: ("Pode me passar o nome do responsável legal pela "
+                                  "criança?") if d.get("filiacao_consta") == "nao_consta"
+          else None),
+
+    # ---- Bloco 5: chave natural da criança, precedência CPF > DNV > NIS
+    Campo("documento_crianca", "Você tem o CPF da criança?", "botoes",
+          (("cpf", "Tenho o CPF"), ("dnv", "Tenho a DNV"),
+           ("nenhum", "Não tenho os dois"))),
+    Campo("cpf_crianca", "Pode mandar? (só os números)", "cpf", eco=True,
+          pular_se=lambda d: d.get("documento_crianca") != "cpf",
+          erro="Esse CPF não confere 🤔 Pode conferir os números?"),
+    Campo("dnv", "Manda o número da Declaração de Nascido Vivo — é aquele papel da "
+                 "maternidade.", "numero", eco=True, digitos=(9, 13),
+          pular_se=lambda d: d.get("documento_crianca") != "dnv",
+          erro="Não peguei o número 🤔 Manda só os dígitos."),
+    # Sem nenhuma das três a inscrição SEGUE — só fica marcada para conferência.
+    Campo("nis_crianca",
+          "Sem problema. Você sabe o NIS da criança? Se não souber, seguimos assim mesmo "
+          "e a equipe confere depois.", "numero", eco=True, digitos=(11, 11),
+          escape=("nao_sei", "Não sei o NIS"),
+          pular_se=lambda d: d.get("documento_crianca") != "nenhum",
+          erro="O NIS tem 11 dígitos 🤔 Se não estiver achando, toca em 'Não sei o NIS'."),
+)
+
+
+# ----------------------------------------------------------- bloco 9 — contato
+CONTATO: tuple[Campo, ...] = (
+    Campo("numero_de_contato",
+          "Esse número que você está usando serve para eu te avisar sobre a vaga?",
+          "botoes", (("este", "Pode ser esse"), ("outro", "Prefiro outro"))),
+    Campo("telefone", "Qual número? (com DDD)", "telefone", eco=True,
+          pular_se=lambda d: d.get("numero_de_contato") != "outro",
+          erro="Esse telefone não parece completo 🤔 Manda com DDD."),
+    Campo("tem_outro_contato",
+          "Tem outro contato de alguém da família, caso eu não consiga falar com você?",
+          "botoes", (("sim", "Tenho outro"), ("nao", "Não tenho"))),
+    Campo("outro_contato", "Qual o número? (com DDD)", "telefone", eco=True,
+          pular_se=lambda d: d.get("tem_outro_contato") != "sim",
+          erro="Esse telefone não parece completo 🤔 Manda com DDD."),
+    Campo("quer_email", "Quer me passar um e-mail também? É opcional.", "botoes",
+          (("sim", "Passar e-mail"), ("nao", "Pular"))),
+    Campo("email", "Pode mandar o e-mail?", "email", eco=True,
+          pular_se=lambda d: d.get("quer_email") != "sim",
+          erro="Esse e-mail parece incompleto 🤔 Manda de novo?"),
+)
+
+
+# ------------------------------------- bloco C.1 — achar inscrição pelo nome
+CONSULTA: tuple[Campo, ...] = (
+    Campo("busca_nome", "Sem problema, dá pra achar assim também. Qual o nome completo "
+                        "da criança? (sem abreviar)",
+          erro="Preciso do nome completo, com sobrenome 🙂"),
+    Campo("busca_nascimento", "E a data de nascimento dela?", "data",
+          erro="Não peguei a data 🤔 Escreve assim: 10/01/2024"),
+    Campo("busca_filiacao_consta",
+          "A filiação (nome da mãe e/ou pai) consta na certidão de nascimento?", "botoes",
+          (("consta", "Consta"), ("nao_consta", "Não consta"))),
+    Campo("busca_filiacao",
+          "Pode me passar o nome completo da mãe ou do pai, como está na certidão?",
+          pergunta_alt=lambda d: "Pode me passar o nome do responsável legal?"
+          if d.get("busca_filiacao_consta") == "nao_consta" else None),
+)
+
+LISTAS: dict[str, tuple[Campo, ...]] = {
+    "CADASTRO": CADASTRO, "CONTATO": CONTATO, "CONSULTA": CONSULTA,
 }
 
 
-def _idade(nascimento: date, hoje: date | None = None) -> int:
-    hoje = hoje or date.today()
-    return hoje.year - nascimento.year - (
-        (hoje.month, hoje.day) < (nascimento.month, nascimento.day))
-
-
-def criterios_prioridade(dados: dict[str, Any]) -> tuple[str, ...]:
-    """Critérios legais que saem da idade do responsável, sem perguntar nada a mais.
-
-    MARCAR o critério não é DECIDIR a vaga: quem aloca é o município. Aqui só sai a
-    etiqueta que vai junto da inscrição.
-    """
-    bruto = dados.get("data_nascimento_responsavel")
-    if not bruto:
-        return ()
-    idade = _idade(date.fromisoformat(bruto))
-    return tuple(chave for chave, corta in
-                 (("responsavel_60_mais", idade >= 60),
-                  ("responsavel_menor_18", idade < 18)) if corta)
-
-
-def proximo_campo(dados: dict[str, Any]) -> Campo | None:
-    """Primeiro campo ainda não preenchido e não pulado. `None` = formulário completo."""
-    for campo in FORMULARIO:
+def proximo_campo(dados: dict[str, Any], campos: tuple[Campo, ...]) -> Campo | None:
+    """Primeiro campo ainda não preenchido e não pulado. `None` = lista completa."""
+    for campo in campos:
         if campo.chave in dados:
             continue
         if campo.pular_se is not None and campo.pular_se(dados):
             continue
         return campo
+    return None
+
+
+def campo_de(chave: str) -> Campo | None:
+    for lista in LISTAS.values():
+        for campo in lista:
+            if campo.chave == chave:
+                return campo
     return None

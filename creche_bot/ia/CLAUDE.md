@@ -9,7 +9,7 @@ o fluxo**: recebe entrada, devolve string ou schema.
 
 ## Seus arquivos
 
-`redacao.py` · `persona.py` · `tests/ia/`
+`redacao.py` · `persona.py` · `transcricao.py` · `tests/ia/`
 
 **Não toque** em `conversa/`, `canal/`, `dados/`, `backend/`, `dominio/`.
 
@@ -20,7 +20,11 @@ o fluxo**: recebe entrada, devolve string ou schema.
 ```python
 def texto(self, chave: str, **vars) -> str
 def classificar(self, mensagem: str, estado: str) -> Classificacao
+def responder_duvida(self, pergunta: str, etapa: str) -> str | None   # None = sem IA
 ```
+
+`responder_duvida` recebe **só o nome da etapa** — nada de CPF, nome ou endereço. Para
+responder "como funciona a fila" o modelo não precisa saber quem está perguntando.
 
 Duas implementações, e a escolha é config:
 
@@ -36,6 +40,29 @@ o bot.
 
 Produto mexe nele toda semana. Por isso é só texto, sem lógica: `TEXTOS` é um dict,
 `SISTEMA` é o system prompt, e os dois consentimentos são constantes.
+
+## Guardrails: o prompt pede, o filtro cobra
+
+Do outro lado tem um campo de texto aberto. Nada que o modelo devolve entra na conversa
+sem passar por `_limpo` (tira markdown) e `_promete` (barra "garantido", "com certeza",
+"sua pontuação"). Além disso:
+
+| Onde | Trava | Por quê |
+|---|---|---|
+| `texto()` | `_numeros(novo) == _numeros(base)` | número mexido é CPF, protocolo ou nota errada na tela |
+| `responder_duvida()` | descarta `\d{5,}` e link | CPF, CEP, telefone e protocolo inventados; link leva a golpe |
+| `responder_duvida()` | pergunta truncada em 500 chars, sem `<` nem `>` | sem eles ninguém fecha a tag e escapa do bloco de dado |
+| `conversa/maquina.py` | `LIMITE_DUVIDAS` por contato/hora | chat aberto é um botão de gastar dinheiro dos outros |
+
+Reprovou, cai para o texto estático. Um filtro que barra não pode emudecer o bot.
+
+## Áudio: `transcricao.py`
+
+Claude **não recebe áudio** — a API aceita texto, imagem e PDF. E mandar a voz de uma
+família para um serviço de terceiros quebraria a regra de privacidade. Então o
+`faster-whisper` roda local (`pip install -e ".[audio]"`), o modelo carrega na primeira
+voz que chega, e o `canal/` recusa áudio acima de 120s porque a transcrição é síncrona.
+Sem a dependência instalada o bot pede para a pessoa escrever — não quebra.
 
 ## Regras de privacidade (elegibilidade a ZDR)
 
@@ -54,8 +81,10 @@ Técnica: sem `effort` e sem `thinking` — Haiku 4.5 não aceita nenhum dos doi
 
 - Uma pergunta por mensagem.
 - Máximo 4 linhas.
-- **Nunca prometa vaga.** Nota de corte é referência do ano passado, e a família não
-  conhece a própria pontuação. Proibido "garantido", "com certeza", "vai conseguir".
+- **Nunca prometa vaga, pontuação nem posição na fila.** A classificação roda depois do
+  fechamento das inscrições e não existe durante a conversa. Proibido "garantido", "com
+  certeza", "vai conseguir". Sobre creche, só distância, vaga aberta agora e concorrência
+  do ano passado, rotulada como passado.
 - Nunca invente número, nome de escola, endereço ou prazo.
 - Sem markdown.
 

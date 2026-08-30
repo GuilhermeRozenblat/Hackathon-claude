@@ -115,41 +115,103 @@ def test_etapa_presencial_exige_endereco():
     from creche_bot.dominio.tipos import Etapa
 
     with pytest.raises(AssertionError, match="não tem endereço"):
-        Etapa("entrega", "Entrega", "acao_presencial", 3, 5)
+        Etapa("entrega", "Entrega", "acao_presencial")
 
-    Etapa("entrega", "Entrega", "acao_presencial", 3, 5, endereco_entrega="R. X, 10")
+    Etapa("entrega", "Entrega", "acao_presencial", endereco_entrega="R. X, 10")
+
+
+def test_convocacao_exige_prazo():
+    """Prazo vencendo em silêncio é o que faz 7,7% perder a vaga já convocada."""
+    from datetime import date
+
+    from creche_bot.dominio.tipos import Etapa
+
+    with pytest.raises(AssertionError, match="não tem prazo"):
+        Etapa("convocada", "Vaga liberada", "convocacao")
+
+    Etapa("convocada", "Vaga liberada", "convocacao", prazo=date(2027, 1, 29))
+
+
+def test_grupamento_sai_da_idade_na_data_de_corte():
+    """Bandas medidas na base de 2025. Creche vai até 3 anos e 11 meses; daí para cima
+    é pré-escola, e a família precisa saber disso ANTES do resultado."""
+    from datetime import date
+
+    from creche_bot.dominio.tipos import grupamento_de
+
+    corte = date(2026, 3, 31)
+    assert grupamento_de(date(2025, 6, 1), corte) == "bercario"       # 9 meses
+    assert grupamento_de(date(2024, 3, 30), corte) == "maternal_1"    # 24 meses
+    assert grupamento_de(date(2023, 3, 30), corte) == "maternal_2"    # 36 meses
+    assert grupamento_de(date(2022, 3, 30), corte) == "fora_da_faixa"  # 48 meses
+
+
+def test_desfecho_e_a_melhor_situacao_entre_as_opcoes():
+    """77,8% das linhas "Cancelado pelo sistema" pertencem a inscrição ATENDIDA: é o
+    cancelamento automático das outras opções. Mostrar isso cru quebra a confiança."""
+    from creche_bot.dominio.tipos import desfecho_entre
+
+    assert desfecho_entre(["nao_seguiu", "vaga_confirmada", "cancelada"]) == "vaga_confirmada"
+    assert desfecho_entre(["cancelada", "lista_de_espera"]) == "lista_de_espera"
+    assert desfecho_entre(["selecionada", "lista_de_espera"]) == "selecionada"
+    assert desfecho_entre([]) == "nao_seguiu"
 
 
 def test_mock_honra_a_porta_inteira():
     """O mock é o espelho do contrato: BackendHTTP terá que passar nos mesmos testes."""
-    from datetime import date
-
-    from creche_bot.backend.mock import BackendMock
+    from creche_bot.backend.mock import CPF_CONHECIDO, BackendMock
 
     b = BackendMock()
-    vagas = b.escolas_proximas("20220-030", date(2024, 3, 18))
-    assert len(vagas) == 3
-    assert all(v.vagas_disponiveis > 0 for v in vagas), "escola sem vaga vazou para o painel"
-    assert vagas == sorted(vagas, key=lambda v: (v.nota_corte.pontos, v.distancia_km))
-    assert all(v.nota_corte.ano for v in vagas), "nota de corte sem ano vira previsão"
+    endereco = b.resolver_cep("22710-560", "100")
+    assert endereco is not None and endereco.bairro == "Curicica"
+    assert b.resolver_cep("00000000", "1") is None, "CEP inexistente tem que devolver None"
 
-    s = b.inscrever({}, [vagas[0].id_escola], "whatsapp")
-    inicial = s.etapa.ordem
-    while s.etapa.ordem < s.etapa.total:
-        s = b.avancar(s.protocolo)
-    assert s.etapa.ordem == s.etapa.total
+    vagas = b.escolas_proximas(endereco, "bercario", "integral")
+    assert vagas, "endereço conhecido tem que sugerir creche"
+    assert all(v.grupamento == "bercario" and v.horario == "integral" for v in vagas)
+    # Vaga aberta agora primeiro; depois, a mais perto. Nunca por pontuação.
+    assert vagas == sorted(vagas, key=lambda v: (not v.vaga_ociosa, v.distancia_km))
+    assert all(c is None or c.ano for v in vagas if (c := v.concorrencia) or True)
+
+    cadastro = b.buscar_por_responsavel(CPF_CONHECIDO)
+    assert cadastro is not None and cadastro.criancas
+    assert b.buscar_por_responsavel("11144477735") is None
+
+    numero = b.inscrever({"nome_crianca": "Ana", "chave_idempotencia": "k"},
+                         [vagas[0].id_escola])
+    assert b.inscrever({"chave_idempotencia": "k"}, []) == numero, (
+        "chave de idempotência não pode gerar inscrição duplicada")
+
+    for _ in range(6):
+        b.avancar(numero)
+    assert b.situacao(numero).etapa.tipo == "concluida"
 
     mudancas, marca = b.mudancas_desde(None)
-    assert len(mudancas) == s.etapa.total - inicial + 1
-    assert b.mudancas_desde(marca)[0] == [], "marca d\'água não avançou: outbox duplicaria"
+    assert mudancas and b.mudancas_desde(marca)[0] == [], (
+        "marca d\'água não avançou: a outbox duplicaria")
+
+
+def test_regua_do_processo_e_dado_nao_codigo():
+    """Entre 2023 e 2024 só 3 das 13 perguntas sobreviveram e o teto caiu de 465 para
+    100 pontos. Régua no código quebra na virada do ano."""
+    from creche_bot.backend.mock import BackendMock
+
+    criterios = BackendMock().criterios_do_processo()
+    assert criterios, "sem régua o bloco 8 não existe"
+    assert {c.grupo for c in criterios} >= {"8.1", "8.2", "8.3", "8.4"}
+    assert all(c.sensivel for c in criterios if c.grupo == "8.4"), (
+        "situação sensível sem a marca não dispara o consentimento do art. 11")
+    # Os critérios opcionais são exatamente os que seria violento exigir.
+    opcionais = {c.codigo for c in criterios if c.documento_opcional}
+    assert opcionais == {"violencia_domestica", "uso_substancias", "situacao_prisional"}
 
 
 def test_extracao_de_foto_ruim_nao_inventa_dado():
     from creche_bot.backend.mock import BackendMock
 
-    r = BackendMock().enviar_documento("RIO-1", b"x" * 10, "image/jpeg")
+    r = BackendMock().enviar_documento("2026-1", "educacao_especial", b"x" * 10, "image/jpeg")
     assert r.confianca == "baixa"
-    assert r.nome_candidato is None and r.data_nascimento is None
+    assert r.nis is None and r.nome is None
 
 
 def test_abreviacao_cabe_e_distingue():

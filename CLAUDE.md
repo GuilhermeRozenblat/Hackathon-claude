@@ -5,6 +5,7 @@ rede municipal. Telegram primeiro (validação), WhatsApp depois.
 
 | Onde olhar | Para quê |
 |---|---|
+| `docs/script-chatbot-ze-matricula.md` | O roteiro v2 — fonte de verdade da conversa |
 | `docs/MODULOS.md` | Quem faz o quê e como as frentes não se atropelam |
 | `docs/ROTEIRO.md` | Mapa entre o roteiro de conversa e os estados do código |
 | `docs/DECISOES.md` | As decisões que custariam caro reverter, com o porquê |
@@ -55,20 +56,31 @@ markdown**. O `MensagemSaida.__post_init__` cobra isso.
 injetado no construtor. Há teste que varre o pacote e falha se vazar. Essa pasta tem dono
 próprio e é trabalhada em paralelo — não mexa nela.
 
-**Fronteira com o backend.** Candidato/vaga, escolas próximas e situação da inscrição vêm
-do **backend externo**, via `creche_bot/backend/porta.py`. Não recalcule nada disso aqui.
-Hoje roda `BackendMock`; amanhã, `BackendHTTP`. Nada do JSON dele sai de `backend/`.
+**Fronteira com o backend.** Histórico do responsável, **régua do processo vigente**,
+endereço a partir do CEP, escolas próximas e situação da inscrição vêm do **backend
+externo**, via `creche_bot/backend/porta.py` (16 operações). Não recalcule nada disso
+aqui. Hoje roda `BackendMock`; amanhã, `BackendHTTP`. Nada do JSON dele sai de `backend/`.
 
 **Honestidade.** O sistema **não decide quem entra** — só cadastra e informa status.
 Nunca gere "probabilidade de conseguir a vaga", "garantido", "certeza", "vai conseguir".
-A **nota de corte** é a pontuação do último aprovado no ano passado: referência, não
-previsão — e sempre acompanhada do ano. Há teste que varre o roteiro inteiro.
+**Nem pontuação, nem posição na fila, nem nota de corte**: a classificação é norma
+(Resolução SME nº 542/2025), roda em SQL determinístico depois do fechamento das
+inscrições, e no momento da conversa não existe. Sobre uma creche, só o que é fato
+verificável: distância, vaga ociosa agora e concorrência do ano passado, rotulada como
+passado. Há teste que varre o roteiro inteiro.
 
-**Dado sensível.** Deficiência, TGD/TEA e altas habilidades são dado de saúde (LGPD art.
-5º II e art. 11): consentimento **específico e destacado**, separado do consentimento
-geral, e sempre com a opção de não responder.
+**Dado sensível.** Deficiência, TGD/TEA e altas habilidades são dado de saúde; violência
+doméstica, doença crônica, uso de substâncias e situação prisional também são sensíveis
+(LGPD art. 5º II e art. 11). Consentimento **específico e destacado**, separado do
+consentimento geral, sempre com a opção de não responder, **nunca bloqueante** e a
+resposta **nunca é ecoada de volta** — o histórico fica no aparelho da família.
 
-**Uma pergunta por mensagem.** Nunca empilhe duas no mesmo balão.
+**Uma pergunta por mensagem.** Nunca empilhe duas no mesmo balão. Única exceção: os
+checklists dos blocos 8.3 e 8.4, que são deliberados — ver `docs/DECISOES.md` D7.
+
+**Texto do cidadão é dado, nunca instrução.** Toda entrada livre que chega perto de um
+prompt vai delimitada, e o system prompt diz explicitamente para ignorar ordem escrita ali
+dentro. Resposta do modelo passa por filtro antes de entrar na conversa.
 
 **Log.** Só IDs. Nunca conteúdo de mensagem, bytes de arquivo, CPF ou nome.
 `creche_bot/segredos.py` instala um formatador que redige token e chave de log e de
@@ -94,7 +106,6 @@ elaborada.
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-make up          # postgres
 make contratos   # testes dos contratos congelados — devem passar sempre
 make <trilha>    # canal | conversa | ia | dados | backend | notificacao
 make fronteira   # falha se persistência vazar para fora de dados/

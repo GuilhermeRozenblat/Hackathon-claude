@@ -28,6 +28,10 @@ API = "https://api.telegram.org/bot{token}/{metodo}"
 ARQUIVO = "https://api.telegram.org/file/bot{token}/{caminho}"
 LIMITE_DOWNLOAD = 20 * 1024 * 1024   # getFile não baixa mais que isso
 
+# A transcrição roda local, em CPU, na mesma thread do polling: um áudio de dez minutos
+# congelaria o bot para todo mundo. Acima disso o áudio nem é baixado.
+MAX_SEGUNDOS_AUDIO = 120
+
 
 def _debug() -> bool:
     """Espelha a conversa no console. Depuração local só: por aqui passam CPF, nome de
@@ -125,6 +129,9 @@ class Telegram:
         anexo = None
         if (fotos := m.get("photo")):
             anexo = self._baixar(fotos[-1]["file_id"])       # a última é a maior
+        elif (som := m.get("voice") or m.get("audio")):
+            if som.get("duration", 0) <= MAX_SEGUNDOS_AUDIO:
+                anexo = self._baixar(som["file_id"], som.get("mime_type") or "audio/ogg")
         elif (doc := m.get("document")):
             # O mime vem do cliente, não é confiável para autorizar nada — serve só para
             # o extrator saber se abre como imagem ou como PDF.
