@@ -60,9 +60,13 @@ Reprovou, cai para o texto estático. Um filtro que barra não pode emudecer o b
 
 Claude **não recebe áudio** — a API aceita texto, imagem e PDF. E mandar a voz de uma
 família para um serviço de terceiros quebraria a regra de privacidade. Então o
-`faster-whisper` roda local (`pip install -e ".[audio]"`), o modelo carrega na primeira
-voz que chega, e o `canal/` recusa áudio acima de 120s porque a transcrição é síncrona.
-Sem a dependência instalada o bot pede para a pessoa escrever — não quebra.
+`faster-whisper` roda local (`pip install -e ".[audio]"`) e o `canal/` recusa áudio acima
+de 120s porque a transcrição é síncrona. Sem a dependência instalada o bot pede para a
+pessoa escrever — não quebra.
+
+O `__main__` chama `Transcritor.carregar()` numa thread no boot. Em disco frio o modelo
+baixa ~460 MB (medimos 159s) e o polling do Telegram é síncrono: carregar na primeira voz
+emudeceria o bot para todo mundo esse tempo todo.
 
 ## Regras de privacidade (elegibilidade a ZDR)
 

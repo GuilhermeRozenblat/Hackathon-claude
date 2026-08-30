@@ -4,6 +4,8 @@ Version: 0.1.0
 Requires-Python: >=3.12
 Provides-Extra: ia
 Requires-Dist: anthropic>=0.40; extra == "ia"
+Provides-Extra: audio
+Requires-Dist: faster-whisper>=1.0; extra == "audio"
 Provides-Extra: postgres
 Requires-Dist: sqlalchemy>=2.0; extra == "postgres"
 Requires-Dist: psycopg[binary]>=3.2; extra == "postgres"
