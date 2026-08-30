@@ -1,8 +1,11 @@
 # Zé Matrícula
 
 
-VIDEO DEMO:
+VIDEO DEMO DASHBOARD:
 https://we.tl/t-NQe0Oh3YHuLMU0o8
+
+VIDEO DEMO CHAT BOT
+https://we.tl/t-1XhV4i8Dj0LxMJSC
 
 Assistente da **Matrícula Rio**: uma conversa no lugar do formulário de inscrição em creche
 municipal. Reconhece o cadastro do ano passado, preenche o que falta, faz as perguntas da
