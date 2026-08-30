@@ -66,7 +66,7 @@ def _garantir_grupamento(p: Passo) -> None:
 
 def horario(p: Passo) -> MensagemSaida:
     if p.msg.escolha not in ("integral", "parcial"):
-        return MensagemSaida(p.txt("nao_entendi"), botoes=BOTOES_HORARIO)
+        return p.diz("nao_entendi", botoes=BOTOES_HORARIO)
     p.dados["horario"] = p.msg.escolha
 
     from creche_bot.conversa.passos.criterios import comecar
@@ -104,11 +104,11 @@ def sugerir(p: Passo) -> MensagemSaida:
         sugestoes = p.backend.escolas_proximas(
             endereco_de(p.dados), p.dados["grupamento"], p.dados["horario"], n=3)
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if not sugestoes:
         p.ir("ESCOLAS")
-        return MensagemSaida(p.txt("sem_escolas"))
+        return p.diz("sem_escolas")
 
     p.dados["escolas"] = [_achatar(v) for v in sugestoes]
     p.dados["preferencias"] = []
@@ -119,11 +119,10 @@ def sugerir(p: Passo) -> MensagemSaida:
 def _painel(p: Passo) -> MensagemSaida:
     escolas = p.dados["escolas"]
     corpo = "\n\n".join(_linha(e, i) for i, e in enumerate(escolas, 1))
-    return MensagemSaida(
-        p.txt("achei_creches",
-              grupamento=GRUPAMENTO_LEGIVEL[p.dados["grupamento"]],
-              horario=HORARIO_LEGIVEL[p.dados["horario"]], creches=corpo),
-        botoes=botoes_nomeados([(f"esc:{e['id']}", e["nome"]) for e in escolas]))
+    return p.diz("achei_creches",
+                 grupamento=GRUPAMENTO_LEGIVEL[p.dados["grupamento"]],
+                 horario=HORARIO_LEGIVEL[p.dados["horario"]], creches=corpo,
+                 botoes=botoes_nomeados([(f"esc:{e['id']}", e["nome"]) for e in escolas]))
 
 
 def _restantes(p: Passo) -> list[dict]:
@@ -148,9 +147,8 @@ def _mais_uma(p: Passo) -> MensagemSaida:
                   if e["id"] == p.dados["preferencias"][-1])
     # 2 restantes + "Pronto" = 3 botões. Sempre cabe.
     botoes = botoes_nomeados([(f"esc:{e['id']}", e["nome"]) for e in _restantes(p)[:2]])
-    return MensagemSaida(
-        p.txt("mais_uma", posicao=f"{ORDINAL[posicao]} {ultima['nome']}"),
-        botoes=(*botoes, Botao("pronto", "Pronto, é só isso")))
+    return p.diz("mais_uma", posicao=f"{ORDINAL[posicao]} {ultima['nome']}",
+                 botoes=(*botoes, Botao("pronto", "Pronto, é só isso")))
 
 
 def _confirmar(p: Passo) -> MensagemSaida:

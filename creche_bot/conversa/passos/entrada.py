@@ -54,7 +54,7 @@ def sessao_expirada(dados: dict) -> bool:
 
 def inicio(p: Passo) -> MensagemSaida:
     p.ir("PORTA")
-    return MensagemSaida(p.txt("saudacao"), botoes=BOTOES_INICIO)
+    return p.diz("saudacao", botoes=BOTOES_INICIO)
 
 
 def retomada(p: Passo, estado_salvo: str) -> MensagemSaida:
@@ -78,21 +78,20 @@ def porta(p: Passo) -> MensagemSaida:
         return MensagemSaida(p.txt("duvidas"), botoes=BOTOES_INICIO)
 
     if p.msg.escolha != "inscrever":
-        return MensagemSaida(p.txt("nao_entendi"), botoes=BOTOES_INICIO)
+        return p.diz("nao_entendi", botoes=BOTOES_INICIO)
 
     # Fora do período, inscrever não é uma opção — e prometer que é seria mentira.
     try:
         abertura, fechamento = p.backend.periodo_de_inscricao()
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if not abertura <= date.today() <= fechamento:
         p.ir("FORA_DO_PERIODO")
-        return MensagemSaida(
-            p.txt("fora_do_periodo", abertura=abertura.strftime("%d/%m"),
-                  fechamento=fechamento.strftime("%d/%m/%Y")),
-            botoes=(Botao("avisar", "Quero ser avisada"),
-                    Botao("acompanhar", "Acompanhar inscrição")))
+        return p.diz("fora_do_periodo", abertura=abertura.strftime("%d/%m"),
+                     fechamento=fechamento.strftime("%d/%m/%Y"),
+                     botoes=(Botao("avisar", "Quero ser avisada"),
+                             Botao("acompanhar", "Acompanhar inscrição")))
 
     p.ir("CONSENTIMENTO")
     return MensagemSaida(CONSENTIMENTO, botoes=BOTOES_CONSENTIMENTO)
@@ -106,7 +105,7 @@ def fora_do_periodo(p: Passo) -> MensagemSaida:
     p.repo.registrar_consentimento(p.contato_id, f"comunicacao/{CONSENTIMENTO_VERSAO}",
                                    p.msg.canal, p.msg.id_externo)
     p.ir("PORTA")
-    return MensagemSaida(p.txt("aviso_ligado"), botoes=BOTOES_INICIO)
+    return p.diz("aviso_ligado", botoes=BOTOES_INICIO)
 
 
 def consentimento(p: Passo) -> MensagemSaida:
@@ -141,6 +140,6 @@ def retomar(p: Passo) -> MensagemSaida:
         p.dados.clear()
         return inicio(p)
 
-    return MensagemSaida(p.txt("nao_entendi"),
-                         botoes=(Botao("continuar", "Continuar"),
-                                 Botao("recomecar", "Começar de novo")))
+    return p.diz("nao_entendi",
+                 botoes=(Botao("continuar", "Continuar"),
+                         Botao("recomecar", "Começar de novo")))

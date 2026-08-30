@@ -38,7 +38,7 @@ def enviar(p: Passo) -> MensagemSaida:
     try:
         numero = p.backend.inscrever(dict(p.dados), list(p.dados["preferencias"]))
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     p.dados["numero"] = numero
     nomes = {x["id"]: x["nome"] for x in p.dados.get("escolas", ())}
@@ -69,14 +69,14 @@ def como_entregar(p: Passo) -> MensagemSaida:
     p.dados["forma_entrega"] = forma
     if forma == "whatsapp":
         p.ir("RECEBER_DOC")
-        return MensagemSaida(p.txt("mandar_foto_aqui"),
-                             botoes=(Botao("depois", "Mando depois"),))
+        return p.diz("mandar_foto_aqui",
+                     botoes=(Botao("depois", "Mando depois"),))
 
     try:
         pontos = p.backend.pontos_de_entrega(
             forma, p.dados["preferencias"][0], p.dados["endereco"]["cep"])
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     lugares = "\n\n".join(f"📍 {x.nome}\n{x.endereco}\n🕐 {x.horario}" for x in pontos)
     aviso = f"\n\n{p.txt('aviso_cras')}" if forma == "cras" else ""
@@ -87,7 +87,8 @@ def como_entregar(p: Passo) -> MensagemSaida:
                if ponto.lat is not None else None))
     seguinte = protocolo(p)
     return MensagemSaida(f"{resposta.texto}\n\n{seguinte.texto}",
-                         botoes=seguinte.botoes, local=resposta.local)
+                         botoes=seguinte.botoes, local=resposta.local,
+                         figurinha=seguinte.figurinha)
 
 
 def receber_documento(p: Passo) -> MensagemSaida:
@@ -96,19 +97,19 @@ def receber_documento(p: Passo) -> MensagemSaida:
         return protocolo(p, prefixo=f"{p.txt('documento_depois')}\n\n")
 
     if p.msg.anexo is None:
-        return MensagemSaida(p.txt("pedir_foto"),
-                             botoes=(Botao("depois", "Mando depois"),))
+        return p.diz("pedir_foto",
+                     botoes=(Botao("depois", "Mando depois"),))
 
     falta = pendentes(p.dados)
     try:
         lido = p.backend.enviar_documento(p.dados["numero"], falta[0],
                                           p.msg.anexo.conteudo, p.msg.anexo.mime)
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if lido.confianca == "baixa":
-        return MensagemSaida(p.txt("documento_ilegivel"),
-                             botoes=(Botao("depois", "Mando depois"),))
+        return p.diz("documento_ilegivel",
+                     botoes=(Botao("depois", "Mando depois"),))
 
     p.dados.setdefault("comprovados", []).append(falta[0])
     if pendentes(p.dados):
@@ -121,10 +122,9 @@ def receber_documento(p: Passo) -> MensagemSaida:
 def protocolo(p: Passo, prefixo: str = "") -> MensagemSaida:
     """Bloco 13."""
     p.ir("PROTOCOLO")
-    return MensagemSaida(
-        prefixo + p.txt("protocolo", numero=p.dados["numero"],
-                        resultado=p.backend.data_do_resultado().strftime("%d/%m/%Y")),
-        botoes=BOTOES_OUTRA)
+    return p.diz("protocolo", prefixo=prefixo, numero=p.dados["numero"],
+                 resultado=p.backend.data_do_resultado().strftime("%d/%m/%Y"),
+                 botoes=BOTOES_OUTRA)
 
 
 def depois_do_protocolo(p: Passo) -> MensagemSaida:
@@ -142,4 +142,4 @@ def depois_do_protocolo(p: Passo) -> MensagemSaida:
         return perguntar(p, "CADASTRO", pedir_cep, prefixo=f"{p.txt('outra_crianca')}\n\n")
 
     p.ir("ACOMPANHAR")
-    return MensagemSaida(p.txt("terminei"))
+    return p.diz("terminei")

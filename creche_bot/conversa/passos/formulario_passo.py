@@ -92,7 +92,7 @@ def _fora_da_faixa(p: Passo) -> MensagemSaida | None:
     try:
         corte = p.backend.data_de_corte()
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     nascimento = date.fromisoformat(p.dados["nascimento_crianca"])
     p.dados["grupamento"] = grupamento_de(nascimento, corte)
@@ -102,10 +102,11 @@ def _fora_da_faixa(p: Passo) -> MensagemSaida | None:
     anos, meses = divmod((corte.year - nascimento.year) * 12
                          + corte.month - nascimento.month, 12)
     p.ir("FORA_DA_FAIXA")
-    return MensagemSaida(
-        p.txt("fora_da_faixa", nome=p.dados.get("nome_crianca", "a criança").split()[0],
-              idade=f"{anos} anos e {meses} meses", mes=f"{corte:%m/%Y}"),
-        botoes=(Botao("pre_escola", "Como faço?"), Botao("outra", "Outra criança")))
+    return p.diz("fora_da_faixa",
+                 nome=p.dados.get("nome_crianca", "a criança").split()[0],
+                 idade=f"{anos} anos e {meses} meses", mes=f"{corte:%m/%Y}",
+                 botoes=(Botao("pre_escola", "Como faço?"),
+                         Botao("outra", "Outra criança")))
 
 
 def _errar(p: Passo, campo: Campo) -> MensagemSaida:
@@ -117,5 +118,5 @@ def _errar(p: Passo, campo: Campo) -> MensagemSaida:
     p.dados[chave] = p.dados.get(chave, 0) + 1
     if p.dados[chave] < 3:
         return MensagemSaida(campo.erro, botoes=_botoes(campo))
-    return MensagemSaida(p.txt("atendente"), botoes=(Botao("atendente", "Falar com a CRE"),
-                                                     Botao("tentar", "Tentar de novo")))
+    return p.diz("atendente", botoes=(Botao("atendente", "Falar com a CRE"),
+                                      Botao("tentar", "Tentar de novo")))

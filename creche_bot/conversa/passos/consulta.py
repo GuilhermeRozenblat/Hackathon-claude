@@ -55,7 +55,7 @@ def como(p: Passo) -> MensagemSaida:
         p.ir("CONSULTA_NOME")
         return perguntar(p, "CONSULTA", _buscar_por_nome)
 
-    return MensagemSaida(p.txt("nao_entendi"), botoes=BOTOES_COMO)
+    return p.diz("nao_entendi", botoes=BOTOES_COMO)
 
 
 # ------------------------------------------------------ C.1 os dois caminhos
@@ -76,7 +76,7 @@ def por_numero(p: Passo) -> MensagemSaida:
         achados = p.backend.consultar_por_numero(
             re.sub(r"\s", "", numero[0]), data)
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
     return _apresentar(p, achados)
 
 
@@ -88,7 +88,7 @@ def _buscar_por_nome(p: Passo) -> MensagemSaida:
             p.dados["busca_nome"], date.fromisoformat(p.dados["busca_nascimento"]),
             p.dados.get("busca_filiacao", ""))
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     for chave in ("busca_nome", "busca_nascimento", "busca_filiacao_consta",
                   "busca_filiacao"):
@@ -129,7 +129,7 @@ def escolher(p: Passo) -> MensagemSaida:
         return _situacao(p, achados[0], prefixo=_resumo_das_outras(achados[1:]))
     alvo = next((d for d in achados if d["numero"] == p.msg.escolha), None)
     if alvo is None:
-        return MensagemSaida(p.txt("nao_entendi"))
+        return p.diz("nao_entendi")
     return _situacao(p, alvo)
 
 
@@ -172,54 +172,50 @@ def _situacao(p: Passo, d: dict, prefixo: str = "") -> MensagemSaida:
     if estado == "selecionada":
         # Se a inscrição está nesse estado, este é o PRIMEIRO balão da conversa.
         p.ir("CONSULTA_CONFIRMAR")
-        return MensagemSaida(
-            prefixo + p.txt("c3f_selecionada", nome=nome, escola=d["escola"],
-                            prazo=_br(d["prazo"])),
-            botoes=(Botao("confirmar", "Confirmar a vaga"),
-                    Botao("nao_posso", "Não vou poder")))
+        return p.diz("c3f_selecionada", prefixo=prefixo, nome=nome,
+                     escola=d["escola"], prazo=_br(d["prazo"]),
+                     botoes=(Botao("confirmar", "Confirmar a vaga"),
+                             Botao("nao_posso", "Não vou poder")))
 
     if estado == "vaga_confirmada":
-        return MensagemSaida(
-            prefixo + p.txt("c3a_confirmada", nome=nome, escola=d["escola"],
-                            endereco=d["endereco"] or "", aulas=_br(d["aulas"])),
-            botoes=(Botao("acoes", "Preciso de mais nada"),),
-            local=(Local(d["lat"], d["lng"], d["escola"], d["endereco"])
-                   if d["lat"] is not None else None))
+        return p.diz("c3a_confirmada", prefixo=prefixo, nome=nome, escola=d["escola"],
+                     endereco=d["endereco"] or "", aulas=_br(d["aulas"]),
+                     botoes=(Botao("acoes", "Preciso de mais nada"),),
+                     local=(Local(d["lat"], d["lng"], d["escola"], d["endereco"])
+                            if d["lat"] is not None else None))
 
     if estado == "lista_de_espera":
         escolas = " e ".join(d["escolas"])
-        texto = prefixo + p.txt("c3b_espera", nome=nome, escolas=escolas)
         if d["pendencias"]:
             # É aqui que a consulta deixa de ser passiva: quem está na fila com critério
             # pendente é exatamente quem perdeu pontuação por não comprovar.
             p.ir("CONSULTA_PENDENCIA")
-            return MensagemSaida(
-                f"{texto}\n\n{p.txt('c3b_pendencia')}",
-                botoes=(Botao("mandar_nis", "Mandar o NIS"), Botao("depois", "Depois")))
-        return MensagemSaida(texto, botoes=(Botao("acoes", "Preciso de mais nada"),))
+            espera = prefixo + p.txt("c3b_espera", nome=nome, escolas=escolas)
+            return p.diz("c3b_pendencia", prefixo=f"{espera}\n\n",
+                         botoes=(Botao("mandar_nis", "Mandar o NIS"),
+                                 Botao("depois", "Depois")))
+        return p.diz("c3b_espera", prefixo=prefixo, nome=nome, escolas=escolas,
+                     botoes=(Botao("acoes", "Preciso de mais nada"),))
 
     if estado == "nao_seguiu":
         # Estado ambíguo no banco. Não invente o motivo — encaminhe.
-        return MensagemSaida(
-            prefixo + p.txt("c3c_nao_seguiu", nome=nome),
-            botoes=(Botao("inscrever", "Nova inscrição"),
-                    Botao("atendente", "Falar com a CRE")))
+        return p.diz("c3c_nao_seguiu", prefixo=prefixo, nome=nome,
+                     botoes=(Botao("inscrever", "Nova inscrição"),
+                             Botao("atendente", "Falar com a CRE")))
 
     if estado == "perdeu_prazo":
-        return MensagemSaida(
-            prefixo + p.txt("c3d_perdeu_prazo", nome=nome, escola=d["escola"] or "creche",
-                            prazo=_br(d["prazo"])),
-            botoes=(Botao("avisar", "Quero ser avisada"),
-                    Botao("atendente", "Falar com a CRE")))
+        return p.diz("c3d_perdeu_prazo", prefixo=prefixo, nome=nome,
+                     escola=d["escola"] or "creche", prazo=_br(d["prazo"]),
+                     botoes=(Botao("avisar", "Quero ser avisada"),
+                             Botao("atendente", "Falar com a CRE")))
 
     if estado == "cancelada":
-        return MensagemSaida(prefixo + p.txt("c3e_cancelada", nome=nome),
-                             botoes=(Botao("atendente", "Falar com a CRE"),))
+        return p.diz("c3e_cancelada", prefixo=prefixo, nome=nome,
+                     botoes=(Botao("atendente", "Falar com a CRE"),))
 
-    return MensagemSaida(
-        prefixo + p.txt("c3g_ativa", nome=nome,
-                        resultado=p.backend.data_do_resultado().strftime("%d/%m/%Y")),
-        botoes=(Botao("acoes", "Preciso de mais nada"),))
+    return p.diz("c3g_ativa", prefixo=prefixo, nome=nome,
+                 resultado=p.backend.data_do_resultado().strftime("%d/%m/%Y"),
+                 botoes=(Botao("acoes", "Preciso de mais nada"),))
 
 
 def confirmar_vaga(p: Passo) -> MensagemSaida:
@@ -228,9 +224,9 @@ def confirmar_vaga(p: Passo) -> MensagemSaida:
         return _avisos(p, prefixo=f"{p.txt('vaga_confirmada', escola=d['escola'])}\n\n")
     if p.msg.escolha == "nao_posso":
         return _avisos(p, prefixo=f"{p.txt('vaga_recusada')}\n\n")
-    return MensagemSaida(p.txt("nao_entendi"),
-                         botoes=(Botao("confirmar", "Confirmar a vaga"),
-                                 Botao("nao_posso", "Não vou poder")))
+    return p.diz("nao_entendi",
+                 botoes=(Botao("confirmar", "Confirmar a vaga"),
+                         Botao("nao_posso", "Não vou poder")))
 
 
 def pendencia(p: Passo) -> MensagemSaida:
@@ -245,7 +241,7 @@ def nis(p: Passo) -> MensagemSaida:
 
     valido, _ = p.backend.validar_nis(digitos_de(p.texto))
     if not valido:
-        return MensagemSaida(p.txt("nis_invalido"))
+        return p.diz("nis_invalido")
     return _avisos(p, prefixo=f"{p.txt('nis_ok')}\n\n")
 
 
@@ -284,7 +280,7 @@ def escolher_acao(p: Passo) -> MensagemSaida:
     escolha = p.msg.escolha
     if escolha == "doc":
         p.ir("CONSULTA_DOC")
-        return MensagemSaida(p.txt("consulta_pedir_doc"))
+        return p.diz("consulta_pedir_doc")
     if escolha == "telefone":
         p.ir("CONSULTA_TELEFONE")
         return MensagemSaida(p.txt("consulta_novo_telefone"))
@@ -315,23 +311,23 @@ def novo_telefone(p: Passo) -> MensagemSaida:
 
 def receber_doc(p: Passo) -> MensagemSaida:
     if p.msg.anexo is None:
-        return MensagemSaida(p.txt("pedir_foto"))
+        return p.diz("pedir_foto")
     d = p.dados.get("consultada", {})
     codigo = (d.get("pendencias") or ["documento"])[0]
     try:
         lido = p.backend.enviar_documento(d.get("numero", ""), codigo,
                                           p.msg.anexo.conteudo, p.msg.anexo.mime)
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
     if lido.confianca == "baixa":
-        return MensagemSaida(p.txt("documento_ilegivel"))
+        return p.diz("documento_ilegivel")
     return acoes(p, prefixo=f"{p.txt('documento_recebido')}\n\n")
 
 
 # --------------------------------------------------------- C.6 não encontrou
 def _nao_achou(p: Passo) -> MensagemSaida:
     p.ir("CONSULTA_NAO_ACHOU")
-    return MensagemSaida(p.txt("consulta_nao_achou"), botoes=BOTOES_NAO_ACHOU)
+    return p.diz("consulta_nao_achou", botoes=BOTOES_NAO_ACHOU)
 
 
 def nao_achou(p: Passo) -> MensagemSaida:
@@ -342,7 +338,7 @@ def nao_achou(p: Passo) -> MensagemSaida:
         return comecar(p)
     if p.msg.escolha == "inscrever":
         return inicio(p)
-    return MensagemSaida(p.txt("atendente"))
+    return p.diz("atendente")
 
 
 def acompanhar(p: Passo) -> MensagemSaida:

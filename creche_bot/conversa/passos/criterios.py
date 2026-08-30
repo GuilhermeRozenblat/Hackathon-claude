@@ -59,7 +59,7 @@ def comecar(p: Passo) -> MensagemSaida:
     try:
         criterios = p.backend.criterios_do_processo()
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     p.dados["criterios"] = [
         {"codigo": c.codigo, "rotulo": c.rotulo, "grupo": c.grupo,
@@ -97,11 +97,11 @@ def nis(p: Passo) -> MensagemSaida:
     try:
         valido, comprova = p.backend.validar_nis(digitos_de(p.texto))
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if not valido:
-        return MensagemSaida(p.txt("nis_invalido"),
-                             botoes=(Botao("nao_acho", "Não estou achando"),))
+        return p.diz("nis_invalido",
+                     botoes=(Botao("nao_acho", "Não estou achando"),))
 
     p.dados["nis"] = digitos_de(p.texto)
     for c in _do_grupo(p, "8.1"):
@@ -248,8 +248,8 @@ def _pedir_anexo(p: Passo, criterio: dict, seguinte: str,
     p.dados["anexo_generico"] = generico
     p.ir("CRIT_ANEXO")
     chave = "pedir_documento_sensivel" if generico else "pedir_documento"
-    return MensagemSaida(p.txt(chave, documento=criterio["documento"] or "o documento"),
-                         botoes=(Botao("depois", "Não tenho agora"),))
+    return p.diz(chave, documento=criterio["documento"] or "o documento",
+                 botoes=(Botao("depois", "Não tenho agora"),))
 
 
 def anexo(p: Passo) -> MensagemSaida:
@@ -259,20 +259,20 @@ def anexo(p: Passo) -> MensagemSaida:
         return _seguir(p, seguinte, prefixo=f"{p.txt('documento_depois')}\n\n")
 
     if p.msg.anexo is None:
-        return MensagemSaida(p.txt("pedir_foto"),
-                             botoes=(Botao("depois", "Não tenho agora"),))
+        return p.diz("pedir_foto",
+                     botoes=(Botao("depois", "Não tenho agora"),))
 
     codigo = p.dados["anexo_de"]
     try:
         lido = p.backend.enviar_documento(p.dados.get("numero", "rascunho"), codigo,
                                           p.msg.anexo.conteudo, p.msg.anexo.mime)
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if lido.confianca == "baixa":
         # Documento ilegível não vira comprovação falsa.
-        return MensagemSaida(p.txt("documento_ilegivel"),
-                             botoes=(Botao("depois", "Não tenho agora"),))
+        return p.diz("documento_ilegivel",
+                     botoes=(Botao("depois", "Não tenho agora"),))
 
     p.dados.setdefault("comprovados", []).append(codigo)
     if lido.nis:

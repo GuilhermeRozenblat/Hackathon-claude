@@ -17,6 +17,7 @@ Só lê: `canal/tipos.py`, `backend/porta.py`, `dados/porta.py`, `ia/redacao.py`
 | Quero mudar | Edito |
 |---|---|
 | O texto de uma mensagem | `ia/persona.py` |
+| O emoji que acompanha uma mensagem | `ia/persona.py` — mapa `FIGURINHAS` |
 | Uma pergunta do cadastro ou do contato, ou a ordem delas | `formulario.py` — é uma tupla de `Campo` |
 | A ramificação de uma pergunta | `Campo.pular_se`, uma lambda |
 | A forma de um turno da régua de prioridade | `passos/criterios.py` |

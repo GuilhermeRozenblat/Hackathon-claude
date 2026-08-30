@@ -22,8 +22,9 @@ def enviar(id_externo: str, msg: MensagemSaida) -> None
    documento e clique de botão (`callback_query` → `escolha`). `id_mensagem` preenchido
    sempre.
 2. `MensagemSaida` → payload do Telegram, em `render.py`.
-3. `figurinhas.py`: chave (`"comemorando"`, `"pensando"`, `"vamos_la"`, `"festa"`,
-   `"atencao"`) → `file_id`. Mapa em dict; `file_id` é estável, então cacheia.
+3. `figurinhas.py`: chave (`"comemorando"`, `"pensando"`, `"festa"`, `"abraco"`,
+   `"atencao"`…) → `file_id`. Mapa em dict; `file_id` é estável, então cacheia. Quem
+   escolhe a chave de cada mensagem é `ia/persona.py` (mapa `FIGURINHAS`), não você.
 
 ## Regras específicas
 

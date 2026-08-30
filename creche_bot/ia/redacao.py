@@ -120,6 +120,10 @@ class RedatorClaude:
             return None
         return resposta
 
+    # Classificar é regra de string, não trabalho de modelo: uma chamada por mensagem
+    # digitada para decidir "isto é pergunta?" custa dinheiro e latência à toa.
+    classificar = RedatorEstatico.classificar
+
     def texto(self, chave: str, **vars: Any) -> str:
         base = self._reserva.texto(chave, **vars)
         novo = self._pedir(SISTEMA, REESCRITA.format(base=base))

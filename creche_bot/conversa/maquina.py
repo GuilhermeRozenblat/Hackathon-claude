@@ -29,7 +29,7 @@ from creche_bot.conversa.passos import (
     responsavel,
     resumo,
 )
-from creche_bot.conversa.sessao import Passo
+from creche_bot.conversa.sessao import Passo, dizer
 from creche_bot.dados.porta import Repositorio
 from creche_bot.ia.redacao import Redator
 
@@ -155,7 +155,7 @@ INSCRICAO_EM_ANDAMENTO = ("numero", "nome_crianca", "nascimento_crianca")
 LIMITE_DUVIDAS = 8
 JANELA_DUVIDAS = 3600.0
 
-AJUDA = ("Sou o Zé Matrícula, da Matrícula Carioca 💙\n\n"
+AJUDA = ("Sou o Zé Matrícula, da Matrícula Carioca\n\n"
          "/start para começar\n"
          "/status para ver sua inscrição\n"
          "/apagar para apagar seus dados\n\n"
@@ -181,7 +181,7 @@ class Maquina:
         if msg.anexo is not None and msg.anexo.mime.startswith("audio/"):
             ouvido = self._transcritor(msg.anexo.conteudo) if self._transcritor else None
             if not ouvido:
-                return MensagemSaida(self._redator.texto("audio_sem_texto"))
+                return dizer(self._redator, "audio_sem_texto")
             msg = replace(msg, texto=ouvido, anexo=None)
 
         contato_id = self._repo.contato_de(msg.canal, msg.id_externo)
@@ -190,7 +190,7 @@ class Maquina:
 
         if comando == "/apagar":
             self._repo.apagar_tudo(contato_id)
-            return MensagemSaida(self._redator.texto("apagado"))
+            return dizer(self._redator, "apagado")
 
         # Sessão de 72h. Passou disso, a conversa recomeça limpa — mas a inscrição que
         # já existe sobrevive, senão o /status responde que ela não existe.
@@ -206,7 +206,7 @@ class Maquina:
             else:
                 estado, dados = "INICIO", _guardar_inscricao(dados)
         elif comando == "/ajuda":
-            return MensagemSaida(AJUDA)
+            return MensagemSaida(AJUDA, figurinha="coracao")
         elif comando == "/status":
             estado = "ACOMPANHAR"
         elif comando == "/avancar":
@@ -226,7 +226,7 @@ class Maquina:
                         else self._executar(passo, estado))
         except Exception:
             log.exception("passo %s falhou para o contato %s", estado, contato_id)
-            return MensagemSaida(self._redator.texto("backend_fora"))
+            return dizer(self._redator, "backend_fora")
 
         self._repo.salvar_sessao(contato_id, passo.proximo or estado, passo.dados)
         return resposta

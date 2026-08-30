@@ -35,10 +35,10 @@ def cpf_responsavel(p: Passo) -> MensagemSaida:
         tentativas = p.dados.get("erros_cpf", 0) + 1
         p.dados["erros_cpf"] = tentativas
         if tentativas >= 3:
-            return MensagemSaida(p.txt("atendente"),
-                                 botoes=(Botao("atendente", "Falar com a CRE"),
-                                         Botao("tentar", "Tentar de novo")))
-        return MensagemSaida(p.txt("cpf_invalido"))
+            return p.diz("atendente",
+                         botoes=(Botao("atendente", "Falar com a CRE"),
+                                 Botao("tentar", "Tentar de novo")))
+        return p.diz("cpf_invalido")
 
     p.dados.pop("erros_cpf", None)
     p.dados["cpf_responsavel"] = digitos_de(p.texto)
@@ -46,7 +46,7 @@ def cpf_responsavel(p: Passo) -> MensagemSaida:
     try:
         cadastro = p.backend.buscar_por_responsavel(p.dados["cpf_responsavel"])
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if cadastro is None or not cadastro.criancas:
         return _preencher_do_zero(p)
@@ -81,11 +81,10 @@ def _mostrar_cadastro(p: Passo, cadastro: CadastroAnterior) -> MensagemSaida:
 
     p.ir("CADASTRO_ANTERIOR")
     endereco = cadastro.endereco
-    return MensagemSaida(
-        p.txt("achou_cadastro", nome=crianca.nome,
-              nascimento=crianca.data_nascimento.strftime("%d/%m/%Y"),
-              endereco=str(endereco) if endereco else "endereço não informado"),
-        botoes=BOTOES_CADASTRO)
+    return p.diz("achou_cadastro", nome=crianca.nome,
+                 nascimento=crianca.data_nascimento.strftime("%d/%m/%Y"),
+                 endereco=str(endereco) if endereco else "endereço não informado",
+                 botoes=BOTOES_CADASTRO)
 
 
 def _achatar(cadastro: CadastroAnterior) -> dict | None:
@@ -120,4 +119,4 @@ def cadastro_anterior(p: Passo) -> MensagemSaida:
         p.ir("CADASTRO")
         return perguntar(p, "CADASTRO", pedir_cep)
 
-    return MensagemSaida(p.txt("nao_entendi"), botoes=BOTOES_CADASTRO)
+    return p.diz("nao_entendi", botoes=BOTOES_CADASTRO)

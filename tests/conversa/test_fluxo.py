@@ -331,6 +331,7 @@ def test_fluxo_completo_ate_o_protocolo(bot):
 
     r = bot.processar(msg(escolha="enviar"))
     assert "inscrição é a" in r.texto, "sem pendência, vai direto ao protocolo"
+    assert r.figurinha == "festa", "inscrição feita é fato: aqui pode comemorar"
     assert "resultado sai em" in r.texto
     assert {b.id for b in r.botoes} == {"outra_crianca", "terminei"}
 

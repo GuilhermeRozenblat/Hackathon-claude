@@ -76,7 +76,7 @@ def test_nunca_informa_posicao_na_fila_nem_pontuacao(bot):
 def test_selecionada_e_o_primeiro_balao(bot):
     """Prazo vencendo em silêncio é o que faz 7,7% perder a vaga já convocada."""
     r = consultar(bot, "2026-0847266", "09/05/2023")
-    assert r.texto.startswith("🎉")
+    assert r.figurinha == "festa", "convocação é fato consumado: pode comemorar"
     assert "confirmar até" in r.texto
     assert {b.id for b in r.botoes} == {"confirmar", "nao_posso"}
 

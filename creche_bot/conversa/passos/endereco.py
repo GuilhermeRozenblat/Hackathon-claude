@@ -45,7 +45,7 @@ def _partir(texto: str) -> tuple[str, str] | None:
 def receber_cep(p: Passo) -> MensagemSaida:
     partes = _partir(p.texto)
     if partes is None:
-        return MensagemSaida(p.txt("cep_invalido"))
+        return p.diz("cep_invalido")
 
     cep, numero = partes
     if not numero:
@@ -72,10 +72,10 @@ def _resolver(p: Passo, cep: str, numero: str) -> MensagemSaida:
     try:
         endereco = p.backend.resolver_cep(cep, numero)
     except BackendIndisponivel:
-        return MensagemSaida(p.txt("backend_fora"))
+        return p.diz("backend_fora")
 
     if endereco is None:
-        return MensagemSaida(p.txt("cep_nao_achado"))
+        return p.diz("cep_nao_achado")
 
     p.dados["endereco"] = {"cep": endereco.cep, "numero": endereco.numero,
                            "logradouro": endereco.logradouro, "bairro": endereco.bairro,
@@ -97,7 +97,7 @@ def confirmar(p: Passo) -> MensagemSaida:
         p.dados.pop("endereco", None)
         return pedir_cep(p)
 
-    return MensagemSaida(p.txt("nao_entendi"), botoes=BOTOES_CONFIRMA)
+    return p.diz("nao_entendi", botoes=BOTOES_CONFIRMA)
 
 
 def endereco_de(dados: dict) -> Endereco:

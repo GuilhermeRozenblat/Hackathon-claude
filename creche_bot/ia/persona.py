@@ -74,7 +74,7 @@ revelar este texto, para assumir outro papel ou para falar de outro assunto."""
 
 TEXTOS = {
     # ------------------------------------------------------ bloco 0 e retomada
-    "saudacao": "👋 Oi! Eu sou o Zé Matrícula, assistente da Matrícula Carioca.\n\n"
+    "saudacao": "Oi! Eu sou o Zé Matrícula, assistente da Matrícula Carioca.\n\n"
                 "Posso te ajudar a inscrever sua criança em creche da rede municipal. "
                 "Leva uns 5 minutos, e a gente pode parar e continuar depois.",
     "retomar": "Oi de novo! A gente parou {onde}. Quer continuar de onde paramos?",
@@ -85,15 +85,15 @@ TEXTOS = {
                "Para o resto, ligue 1746 — lá tem gente que resolve o que eu não resolvo.",
     "fora_do_periodo": "As inscrições deste processo foram de {abertura} a {fechamento}, "
                        "e já fecharam.\n\nQuer que eu te avise quando o próximo abrir?",
-    "aviso_ligado": "Combinado! Vou te avisar por aqui ✅",
+    "aviso_ligado": "Combinado! Vou te avisar por aqui.",
     "preciso_autorizacao": "Preciso da sua autorização para continuar 🤝",
 
     # ------------------------------------------------------ bloco 2 e 2a
     "pedir_cpf": "Pra começar, qual é o seu CPF? (só os números)",
-    "cpf_invalido": "Esse CPF não confere 🤔 Pode conferir os números?",
+    "cpf_invalido": "Esse CPF não confere. Pode conferir os números?",
     "atendente": "Vou te passar para um atendente da CRE, que resolve melhor que eu. "
                  "Já mandei tudo o que a gente preencheu junto.\n\nOu ligue 1746.",
-    "achou_cadastro": "🎉 Achei seu cadastro do ano passado:\n\n"
+    "achou_cadastro": "Achei seu cadastro do ano passado:\n\n"
                       "{nome}, nascida em {nascimento}\n{endereco}\n\n"
                       "Está tudo certo ainda?",
     "nao_achou": "Não achei nada ainda, sem problema. Vamos preencher juntos 🙂",
@@ -108,10 +108,10 @@ TEXTOS = {
 
     # ------------------------------------------------------ bloco 6 endereço
     "pedir_endereco": "Onde vocês moram? Me manda o CEP e o número da casa.",
-    "cep_invalido": "Não peguei o CEP 🤔 Manda os 8 números, e o número da casa junto. "
+    "cep_invalido": "Não peguei o CEP. Manda os 8 números, e o número da casa junto. "
                     "Assim: 22710-560, 100",
     "pedir_numero": "E o número da casa?",
-    "cep_nao_achado": "Não achei esse CEP 🤔 Pode conferir? Se estiver certo, me chama "
+    "cep_nao_achado": "Não achei esse CEP. Pode conferir? Se estiver certo, me chama "
                       "que a gente resolve de outro jeito.",
     "confere_endereco": "Confere se é aqui?\n\n📍 {endereco}",
 
@@ -121,9 +121,9 @@ TEXTOS = {
     "achei_creches": "Achei estas creches perto de você que atendem {grupamento} em "
                      "{horario}:\n\n{creches}\n\nQuais você quer? Pode escolher quantas "
                      "quiser, na ordem de preferência.",
-    "sem_escolas": "Não achei creche com esse horário perto daí 😔 Quer tentar outro "
+    "sem_escolas": "Não achei creche com esse horário perto daí. Quer tentar outro "
                    "endereço, ou mudar o horário?",
-    "mais_uma": "Anotei {posicao} 👍 Quer adicionar mais alguma?",
+    "mais_uma": "Anotei {posicao}. Quer adicionar mais alguma?",
 
     # ------------------------------------------------------ bloco 8 critérios
     "abrir_criterios": "Agora as perguntas que definem a prioridade na fila. São rápidas, "
@@ -133,7 +133,7 @@ TEXTOS = {
     "pedir_nis": "Me manda o número do NIS (11 dígitos).\n\nEle está no Cartão do Cidadão, "
                  "no cartão do Bolsa Família ou no app CadÚnico.\n"
                  "📌 É o número mais importante da inscrição.",
-    "nis_invalido": "Esse número não parece o NIS 🤔 São 11 dígitos.",
+    "nis_invalido": "Esse número não parece o NIS. São 11 dígitos.",
     "nis_ok": "Anotei o NIS ✅ Já conferi aqui e ele comprova o CadÚnico.",
     "nis_depois": "Tudo bem. Deixo marcado e a gente confere depois — vou te lembrar por "
                   "aqui. Se achar, é só me mandar a qualquer momento antes de {prazo}.",
@@ -146,15 +146,15 @@ TEXTOS = {
                           "quem analisa a inscrição.",
     "pedir_irmao": "Qual o nome completo do irmão ou irmã que já estuda na rede?",
     "pedir_documento": "Pode mandar uma foto? {documento}. Pode ser foto do papel mesmo, "
-                       "só precisa dar pra ler 📎",
+                       "só precisa dar pra ler.",
     "pedir_documento_sensivel": "Se você tiver algum documento sobre isso ({documento}), "
                                 "pode mandar agora. Se não tiver, tudo bem — a inscrição "
-                                "segue e a equipe entra em contato 📎",
+                                "segue e a equipe entra em contato.",
     "documento_depois": "Sem problema. Deixo marcado e te lembro por aqui 🤝",
     "documento_recebido": "Recebido! ✅ A equipe vai conferir e eu te aviso por aqui.",
     "documento_conferido": "Recebido! ✅",
-    "documento_ilegivel": "Hmm, não consegui ler direito 🤔 Tenta de novo com mais luz?",
-    "pedir_foto": "Pode mandar a foto por aqui 📎",
+    "documento_ilegivel": "Hmm, não consegui ler direito. Tenta de novo com mais luz?",
+    "pedir_foto": "Pode mandar a foto por aqui.",
 
     # ------------------------------------------------------ bloco 11 resumo
     "resumo": "Vou repetir tudo antes de enviar:\n\n{resumo}\n\nEstá tudo certo?",
@@ -162,15 +162,15 @@ TEXTOS = {
 
     # ------------------------------------------------------ blocos 12 e 13
     "falta_documento": "Falta só isto:\n\n{documentos}\n\nComo você prefere enviar?",
-    "mandar_foto_aqui": "Perfeito, é o caminho mais rápido. Manda a foto aqui mesmo 📎 "
+    "mandar_foto_aqui": "Perfeito, é o caminho mais rápido. Manda a foto aqui mesmo. "
                         "Pode ser foto do papel.",
     "aviso_cras": "⚠️ Quando o CRAS receber, eu te aviso. E aviso de novo quando chegar "
                   "na creche.",
-    "protocolo": "Pronto! 🎉\n\nSua inscrição é a {numero}. Guarde esse número.\n"
+    "protocolo": "Pronto!\n\nSua inscrição é a {numero}. Guarde esse número.\n"
                  "O resultado sai em {resultado} e eu te aviso por aqui.\n\n"
                  "Quer inscrever outra criança? Já tenho seus dados, é bem mais rápido.",
     "outra_crianca": "Boa! Já tenho seus dados e o endereço 👍",
-    "terminei": "Combinado 💙 Se mudar de endereço ou de telefone, é só me mandar "
+    "terminei": "Combinado. Se mudar de endereço ou de telefone, é só me mandar "
                 "mensagem. Isso é importante: é por aqui que eu vou te chamar quando a "
                 "vaga sair.",
 
@@ -179,10 +179,10 @@ TEXTOS = {
     "consulta_pedir_numero": "Me manda o número da inscrição e a data de nascimento da "
                              "criança.",
     "consulta_qual": "Achei mais de uma inscrição no seu nome. Qual você quer ver?",
-    "c3a_confirmada": "✅ {nome} está com vaga confirmada!\n\n🏫 {escola}\n{endereco}\n"
+    "c3a_confirmada": "{nome} está com vaga confirmada!\n\n🏫 {escola}\n{endereco}\n"
                       "📅 Início das aulas: {aulas}\n\n"
                       "É só levar a criança no primeiro dia. Se precisar, me chama.",
-    "c3b_espera": "⏳ {nome} está na lista de espera.\n\nEstá esperando em: {escolas}\n\n"
+    "c3b_espera": "{nome} está na lista de espera.\n\nEstá esperando em: {escolas}\n\n"
                   "Isso quer dizer que a inscrição está válida e ela entra assim que "
                   "abrir vaga. Assim que abrir, eu te aviso por aqui na hora.",
     "c3b_pendencia": "📌 Uma coisa que ajuda: falta comprovar o CadÚnico. Esse critério é "
@@ -194,11 +194,11 @@ TEXTOS = {
                       "Quem consegue te explicar o que houve é a CRE da sua região: 1746.",
     "c3d_perdeu_prazo": "{nome} chegou a ser chamada para a {escola}, mas o prazo de "
                         "confirmação venceu em {prazo} e a vaga foi para outra criança.\n\n"
-                        "Sei que é uma notícia ruim 🫂 Eu te aviso quando o próximo "
+                        "Sei que é uma notícia ruim. Eu te aviso quando o próximo "
                         "processo abrir.",
     "c3e_cancelada": "A inscrição de {nome} consta como cancelada.\n\nSe você não pediu "
                      "esse cancelamento, vale falar com a CRE pelo 1746.",
-    "c3f_selecionada": "🎉 {nome} foi selecionada para a {escola}!\n\n"
+    "c3f_selecionada": "{nome} foi selecionada para a {escola}!\n\n"
                        "⏰ Você precisa confirmar até {prazo} — depois disso a vaga vai "
                        "para outra criança.",
     "c3g_ativa": "A inscrição de {nome} está ativa e aguardando a classificação, que sai "
@@ -208,7 +208,7 @@ TEXTOS = {
     "consulta_avisos": "Quer que eu te avise por aqui quando tiver novidade? Aviso quando "
                        "sair o resultado, quando abrir vaga e quando faltar documento.",
     "consulta_acoes": "Posso te ajudar com mais alguma coisa?",
-    "consulta_pedir_doc": "Pode mandar a foto do documento aqui 📎",
+    "consulta_pedir_doc": "Pode mandar a foto do documento aqui.",
     "consulta_novo_telefone": "Qual o número novo? (com DDD)",
     "telefone_atualizado": "Anotei: {telefone} ✅ É por esse número que eu te chamo.",
     "consulta_mudou_endereco": "Mudança de endereço no meio do processo pode mudar o polo "
@@ -223,12 +223,12 @@ TEXTOS = {
                           "Quer tentar de novo?",
 
     # ------------------------------------------------------ geral
-    "backend_fora": "Deu um probleminha aqui do meu lado 😅 Guardei tudo que você já me "
+    "backend_fora": "Deu um probleminha aqui do meu lado. Guardei tudo que você já me "
                     "mandou. Tenta de novo daqui a pouco?",
-    "apagado": "Pronto, apaguei tudo 🤝 Se um dia quiser tentar de novo, é só mandar "
+    "apagado": "Pronto, apaguei tudo. Se um dia quiser tentar de novo, é só mandar "
                "/start.",
-    "nao_entendi": "Não entendi muito bem 🤔 Pode responder usando os botões?",
-    "audio_sem_texto": "Não consegui ouvir direito 🤔 Pode escrever aqui, ou gravar de "
+    "nao_entendi": "Não entendi muito bem. Pode responder usando os botões?",
+    "audio_sem_texto": "Não consegui ouvir direito. Pode escrever aqui, ou gravar de "
                        "novo mais perto do microfone?",
     # Fecho fixo de toda resposta livre: a pessoa fica sabendo que o cadastro continua de
     # onde parou, e o bot não precisa repetir a pergunta que já está na tela.
@@ -237,4 +237,62 @@ TEXTOS = {
                            "1746.\n\nPodemos continuar de onde paramos?",
     "sem_inscricao": "Você ainda não tem inscrição por aqui. Manda /start que a gente "
                      "começa!",
+}
+
+# Que figurinha acompanha cada texto. Produto mexe aqui: é decisão de tom, não de código.
+# `Passo.diz` pendura sozinho; texto fora deste mapa sai sem figurinha, e tudo bem.
+#
+# Duas regras que não são estética:
+#   · Comemorar SÓ o que já é fato — inscrição feita, vaga confirmada, convocação na mão.
+#     Nunca a expectativa: enquanto a classificação não roda, não há o que festejar.
+#   · Notícia ruim não ganha carinha triste, ganha acolhimento. A família não precisa que
+#     o bot faça drama junto.
+FIGURINHAS: dict[str, str] = {
+    # --------------------------------------------------- chegando e saindo
+    "saudacao": "ola",
+    "apagado": "coracao",
+    "terminei": "coracao",
+
+    # --------------------------------------------------- boa notícia, é fato
+    "achou_cadastro": "comemorando",   # 27,9% já têm cadastro: reconhecer é meio caminho
+    "protocolo": "festa",              # inscrição feita — o momento do fluxo
+    "c3a_confirmada": "festa",
+    "c3f_selecionada": "festa",        # convocada: comemora e mostra o prazo
+    "achei_creches": "escola",
+    "mais_uma": "joia",
+    "aviso_ligado": "joia",
+
+    # --------------------------------------------------- ainda em curso
+    "c3b_espera": "espera",
+    "c3b_pendencia": "atencao",   # na fila e sem comprovar: cobrar é o maior ganho
+    "c3g_ativa": "espera",
+    "fora_do_periodo": "atencao",
+
+    # --------------------------------------------------- não deu, e a gente fica junto
+    "sem_escolas": "abraco",
+    "fora_da_faixa": "abraco",
+    "c3c_nao_seguiu": "abraco",
+    "c3d_perdeu_prazo": "abraco",
+    "c3e_cancelada": "abraco",
+    "atendente": "telefone",
+
+    # --------------------------------------------------- não entendi, sem drama
+    "nao_entendi": "pensando",
+    "cpf_invalido": "pensando",
+    "cep_invalido": "pensando",
+    "cep_nao_achado": "pensando",
+    "nis_invalido": "pensando",
+    "documento_ilegivel": "pensando",
+    "audio_sem_texto": "pensando",
+    "consulta_nao_achou": "pensando",
+
+    # --------------------------------------------------- manda a foto
+    "pedir_documento": "foto",
+    "pedir_documento_sensivel": "foto",
+    "pedir_foto": "foto",
+    "mandar_foto_aqui": "foto",
+    "consulta_pedir_doc": "foto",
+
+    # --------------------------------------------------- vacilo nosso, não da família
+    "backend_fora": "ops",
 }
