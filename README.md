@@ -26,23 +26,25 @@ Capturar a comprovação dentro da conversa e ter um canal para avisar é o prod
 ```bash
 python -m venv .venv && source .venv/bin/activate
 cp .env.example .env      # cole o token do @BotFather — passo a passo em TELEGRAM.md
-make bot                  # sqlite: a conversa sobrevive ao restart
+make banco                # aplica o schema no Postgres — passo a passo em docs/BANCO.md
+make bot                  # a conversa sobrevive ao restart
 ```
 
-Subir o bot **não exige nenhuma dependência**: canal, banco e conversa usam só a stdlib.
-`pip install -e ".[dev]"` só para rodar os testes.
+A única dependência de runtime é o driver do Postgres (`pip install -e .`); canal e
+conversa são stdlib pura. `make memoria` roda o bot inteiro sem banco nenhum.
 
 | Comando | O que faz |
 |---|---|
-| `make bot` | Sobe o bot com sqlite (`creche.db`) e backend mockado |
-| `make memoria` | Mesmo bot, sem tocar em disco (`REPOSITORIO=memoria`) |
+| `make bot` | Sobe o bot com Postgres e backend mockado |
+| `make memoria` | Mesmo bot, sem banco nenhum (`REPOSITORIO=memoria`) |
+| `make banco` | Aplica o schema e prova a porta contra o Postgres |
 | `make verificar` | Checa o token e as configurações do @BotFather |
 | `make eco` | Bot de eco, para provar que o polling chega |
 | `make test` | Tudo |
 | `make contratos` | Só os contratos congelados — devem passar sempre |
 | `make fronteira` | Falha se a persistência vazar para fora de `dados/` |
 | `make lint` | ruff |
-| `make limpar` | Apaga o `creche.db` |
+| `make limpar` | Derruba o schema `creche` inteiro (pede confirmação) |
 
 `ANTHROPIC_API_KEY` é opcional: sem ela o bot usa os textos escritos à mão em
 `creche_bot/ia/persona.py` e funciona igual. Com ela, o Claude varia a linguagem e responde
@@ -52,8 +54,8 @@ dúvidas soltas no meio do cadastro.
 (`faster-whisper`) — a voz da família não sai da máquina. Sem a dependência, o bot pede
 para a pessoa escrever.
 
-O `docker-compose.yml` sobe um Postgres para quem está migrando a persistência; o bot do
-dia a dia não precisa dele.
+O `DATABASE_URL` aponta para o Supabase — veja [docs/BANCO.md](docs/BANCO.md). O
+`docker-compose.yml` sobe um Postgres local, alternativa para teste offline.
 
 ## Como está montado
 
@@ -164,8 +166,9 @@ system prompt manda ignorar ordem escrita ali dentro, e a resposta passa por fil
 de entrar na conversa.
 
 **Log.** Só IDs. Nunca conteúdo de mensagem, bytes de arquivo, CPF ou nome.
-`creche_bot/segredos.py` redige token e chave de log e de traceback, e o `creche.db` nasce
-com permissão `600` porque guarda CPF, nome de criança e telefone.
+`creche_bot/segredos.py` redige token, chave e `DATABASE_URL` de log e de traceback. O
+banco guarda CPF, nome de criança e telefone: fica num schema fora do alcance da Data API
+do Supabase, com RLS ligada e TLS obrigatório — ver [docs/BANCO.md](docs/BANCO.md).
 
 ## Estado
 

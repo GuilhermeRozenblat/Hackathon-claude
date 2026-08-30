@@ -57,7 +57,7 @@ para o **WhatsApp**, que é onde o público está.
 | Linguagem | Python 3.12, **sem dependência para rodar** |
 | Canal hoje | Telegram, long polling — roda no localhost |
 | Dados do município | `BackendMock` com os dados do roteiro v2; o backend real é de outro time |
-| Persistência | `RepositorioSQLite` por padrão; `RepositorioMemoria` disponível |
+| Persistência | `RepositorioPostgres` (Supabase) por padrão; `RepositorioMemoria` disponível |
 | Escolha da vaga | Lista **ordenada** de preferências, montada em toques |
 | Régua de prioridade | Dado do backend, montada em tempo de execução |
 | Seleção de quem entra | **Não é nossa.** Cadastramos e informamos; quem aloca é o município |
@@ -157,7 +157,7 @@ flowchart TB
     end
 
     MEM["memoria.py"]
-    SQL["sqlite.py"]
+    SQL["postgres.py"]
     MOCK["mock.py"]
     HTTP["http.py<br/>(quando existir)"]
 
@@ -202,7 +202,7 @@ congelados**, e em mais nenhum.
                 │                          │
     ┌───────────┴────────────┐  ┌──────────┴───────────────────┐
     │ dados/                 │  │ backend/                     │
-    │ memoria.py · sqlite.py │  │ mock.py · http.py            │
+    │ memoria.py·postgres.py │  │ mock.py · http.py            │
     │ estado NOSSO           │  │ dados do MUNICÍPIO           │
     │ outra pessoa           │  │ outro time, outra máquina    │
     └────────────────────────┘  └──────────────────────────────┘
