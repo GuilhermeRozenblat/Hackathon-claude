@@ -43,7 +43,7 @@ Os estados, um a um, estão em [ROTEIRO.md](ROTEIRO.md); o porquê de cada decis
 ## Por que isso funciona na prática
 
 `REPOSITORIO=memoria make bot` sobe o bot inteiro sem tocar em disco. Quem trabalha no
-banco pode quebrar `dados/sqlite.py` à vontade que o chat continua rodando; só não pode
+banco pode quebrar `dados/postgres.py` à vontade que o chat continua rodando; só não pode
 mexer em `porta.py`.
 
 No sentido inverso: os testes rodam **parametrizados contra as duas implementações** de
@@ -65,7 +65,7 @@ comportamento, o teste acusa antes de chegar em produção.
 
 ```bash
 cp .env.example .env      # cole o token do @BotFather — veja TELEGRAM.md
-make bot                  # sqlite: a conversa sobrevive ao restart
+make bot                  # Postgres: a conversa sobrevive ao restart
 make memoria              # sem tocar em disco: não depende de dados/
 ```
 
@@ -85,7 +85,7 @@ Nenhuma dependência é necessária para rodar. `pip install -e ".[dev]"` só pa
 ## Como despachar um agente
 
 ```
-Leia creche_bot/dados/CLAUDE.md e troque o sqlite por Postgres, mantendo a porta.
+Leia creche_bot/dados/CLAUDE.md e docs/BANCO.md: o Postgres do Supabase já está atrás da porta.
 ```
 
 O `CLAUDE.md` da pasta diz o que é dela, o que não é, e como verificar. Não é preciso

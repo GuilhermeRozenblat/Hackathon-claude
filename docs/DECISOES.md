@@ -50,8 +50,9 @@ de lugar, e vale conversar antes.
 ## D3 · A persistência fica atrás de outra porta, com dono próprio
 
 **Decisão.** `creche_bot/dados/porta.py`, 16 operações, duas implementações
-(`RepositorioMemoria` e `RepositorioSQLite`). Fora dessa pasta não existe `sqlite3`,
-`SELECT`, `cursor` nem `session` — e há teste que varre o pacote e falha se aparecer.
+(`RepositorioMemoria` e `RepositorioPostgres` — ver [D18](#d18--postgres-no-supabase-em-schema-próprio-sem-orm)).
+Fora dessa pasta não existe `sqlite3`, `psycopg`, `SELECT`, `cursor` nem `session` — e há
+teste que varre o pacote e falha se aparecer.
 
 **Por quê.** Essa pasta é trabalhada em paralelo por outra pessoa, que vai conectar o
 Postgres. Sem a fronteira, uma refatoração no banco bloqueia quem mexe no chat.
@@ -344,3 +345,45 @@ funciona a fila.
 
 **ponytail assumido.** O contador é um dicionário em memória, de um processo só —
 marcado no código, com o `clear` que impede virar vazamento no dia do pico.
+
+---
+
+## D18 · Postgres no Supabase, em schema próprio, sem ORM
+
+**Decisão.** `creche_bot/dados/postgres.py` com psycopg 3 e `ConnectionPool`, contra o
+Postgres do Supabase pelo pooler em modo transação. As tabelas ficam no schema **`creche`**,
+não no `public`. O `sqlite.py` da validação foi removido: sobraram as duas implementações
+que o contrato prevê — `RepositorioMemoria` e `RepositorioPostgres`.
+
+**Por que schema próprio.** No Supabase o `public` é servido pela Data API (PostgREST) a
+quem tiver a chave anônima, e essa chave costuma acabar no front. Estas tabelas guardam
+nome de criança e CPF. Um schema fora da lista de exposição não é alcançável pela API,
+ponto — e isso não depende de ninguém lembrar de manter RLS restritiva numa tabela nova.
+RLS fica ligada mesmo assim, sem política, e `anon`, `authenticated` e `service_role`
+perdem acesso ao schema: segunda linha, não a primeira.
+
+**Por que sem SQLAlchemy e sem Alembic.** São 16 métodos de uma tabela cada, num arquivo
+só, com uma implementação. Um ORM aqui é exatamente a abstração especulativa que o
+`CLAUDE.md` proíbe, e migração versionada só paga quando o schema para de mudar toda
+semana — até lá, DDL idempotente no boot custa menos. O `pyproject` deixou de listar os
+dois.
+
+**Consequência prática.** O bot passou a ter uma dependência de runtime (`psycopg`), o que
+D9 evitava. `REPOSITORIO=memoria` continua rodando o bot inteiro sem banco, então a válvula
+de escape de D3 sobrevive; o que se perdeu foi o `python -m creche_bot` funcionando logo
+depois do `git clone`, sem `pip install`.
+
+**Detalhes que custaram teste.** `prepare_threshold=None`, porque o pooler em modo
+transação troca a conexão de servidor embaixo do processo e o prepared statement some;
+`check=check_connection`, porque o pooler derruba conexão ociosa e o worker de outbox
+pegaria uma morta; nome de tabela qualificado em toda query, porque um `SET search_path`
+não sobrevive à troca de sessão; e savepoint em `contato_de()`, porque duas threads
+escrevem e um contato duplicado faz a pessoa perder a conversa no meio.
+
+**Recusado.** Deixar as tabelas em `public` com RLS restritiva. Funciona até alguém
+adicionar uma política permissiva para destravar um dashboard — e aí o vazamento é de nome
+de criança.
+
+**Mudaria se.** O schema estabilizar (aí entra Alembic), ou alguém precisar ler estes dados
+pela API — nesse caso, uma view em `public` com `security_invoker = true` expondo só as
+colunas necessárias, nunca o schema inteiro.

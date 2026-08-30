@@ -261,6 +261,10 @@ def test_as_duas_implementacoes_satisfazem_a_porta():
 
     assert isinstance(RepositorioMemoria(), Repositorio)
 
-    from creche_bot.dados.sqlite import RepositorioSQLite
+    # O Postgres não é instanciável sem banco, e este teste roda sem nenhum: compare a
+    # superfície da classe. O comportamento é cobrado em tests/dados, contra o banco.
+    from creche_bot.dados.postgres import RepositorioPostgres
 
-    assert isinstance(RepositorioSQLite(":memory:"), Repositorio)
+    metodos = {m for m in vars(Repositorio) if not m.startswith("_")}
+    assert metodos <= set(dir(RepositorioPostgres)), (
+        f"faltam na implementação Postgres: {metodos - set(dir(RepositorioPostgres))}")

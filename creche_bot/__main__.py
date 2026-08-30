@@ -16,7 +16,7 @@ from creche_bot.canal.telegram import Telegram
 from creche_bot.conversa.maquina import Maquina
 from creche_bot.dados.memoria import RepositorioMemoria
 from creche_bot.dados.porta import Repositorio
-from creche_bot.dados.sqlite import RepositorioSQLite
+from creche_bot.dados.postgres import RepositorioPostgres
 from creche_bot.ia.redacao import criar
 from creche_bot.ia.transcricao import Transcritor
 from creche_bot.notificacao.outbox import rodar_worker
@@ -26,18 +26,19 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 
 def escolher_repositorio() -> Repositorio:
-    """REPOSITORIO=memoria roda o bot sem tocar em disco.
+    """REPOSITORIO=memoria roda o bot sem banco nenhum.
 
-    É a válvula de escape: se `dados/sqlite.py` estiver no meio de uma refatoração para
-    Postgres, o trabalho de canal e conversa continua rodando.
+    É a válvula de escape: quem trabalha em canal e conversa continua rodando mesmo com o
+    Postgres fora do ar ou no meio de uma migração.
     """
     if os.environ.get("REPOSITORIO", "").lower() == "memoria":
         return RepositorioMemoria()
 
-    caminho = RAIZ / "creche.db"
-    repo = RepositorioSQLite(caminho)
-    caminho.chmod(0o600)   # o arquivo guarda CPF, nome de criança e telefone
-    return repo
+    dsn = os.environ.get("DATABASE_URL", "")
+    if not dsn or dsn.startswith("coloque"):
+        sys.exit("DATABASE_URL não configurado no .env — veja docs/BANCO.md "
+                 "(ou rode com REPOSITORIO=memoria)")
+    return RepositorioPostgres(dsn)
 
 
 def main() -> None:

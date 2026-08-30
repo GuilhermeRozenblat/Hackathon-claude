@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
 
 # Segredos. `.env.*` pega .env.local, .env.prod e afins; só o exemplo escapa.
 .env

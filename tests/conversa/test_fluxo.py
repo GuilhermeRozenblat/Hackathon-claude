@@ -6,15 +6,15 @@ Cada teste roda contra as DUAS implementações de repositório. Se divergirem, 
 from __future__ import annotations
 
 import itertools
-import tempfile
 
 import pytest
 
 from creche_bot.backend.mock import CPF_CONHECIDO, BackendMock
 from creche_bot.canal.tipos import Anexo, MensagemEntrada, MensagemSaida
 from creche_bot.conversa.maquina import Maquina
+# Os testes que montam a própria Maquina (processo fechado, por ex.) usam este direto —
+# não passam pela fixture `repo`, porque precisam inspecionar o repositório depois.
 from creche_bot.dados.memoria import RepositorioMemoria
-from creche_bot.dados.sqlite import RepositorioSQLite
 from creche_bot.ia.redacao import RedatorEstatico
 
 _seq = itertools.count(1)
@@ -23,10 +23,9 @@ _seq = itertools.count(1)
 CPF_NOVO = "111.444.777-35"
 
 
-@pytest.fixture(params=["memoria", "sqlite"])
-def bot(request):
-    repo = (RepositorioMemoria() if request.param == "memoria"
-            else RepositorioSQLite(tempfile.mktemp(suffix=".db")))
+@pytest.fixture
+def bot(repo):
+    """`repo` vem de tests/conftest.py já parametrizado: memória e Postgres."""
     return Maquina(BackendMock(), RedatorEstatico(), repo)
 
 

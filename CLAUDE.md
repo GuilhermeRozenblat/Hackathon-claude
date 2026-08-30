@@ -10,6 +10,8 @@ rede municipal. Telegram primeiro (validação), WhatsApp depois.
 | `docs/ROTEIRO.md` | Mapa entre o roteiro de conversa e os estados do código |
 | `docs/DECISOES.md` | As decisões que custariam caro reverter, com o porquê |
 | `docs/ARQUITETURA.md` | O desenho completo |
+| `docs/MODELO_DADOS.md` | As 7 tabelas, o ER e o que deliberadamente não está no banco |
+| `docs/BANCO.md` | Configurar o Postgres do Supabase |
 | `docs/TELEGRAM.md` | Configurar o bot no @BotFather |
 
 ## A regra que organiza o trabalho paralelo
