@@ -141,7 +141,7 @@ def test_se_perder_nao_consome_a_resposta_nem_conta_erro():
     bot.processar(texto("não sei o que você quer", "4"))
 
     # O CPF continua sendo o que o bot espera: a mensagem anterior não foi consumida.
-    assert "nome completo" in bot.processar(texto(CPF_NOVO, "5")).texto
+    assert "data de nascimento" in bot.processar(texto(CPF_NOVO, "5")).texto
 
 
 def test_o_classificador_ve_a_pergunta_no_ar_mas_nao_o_que_a_familia_respondeu():
@@ -149,11 +149,11 @@ def test_o_classificador_ve_a_pergunta_no_ar_mas_nao_o_que_a_familia_respondeu()
     redator = RedatorEspiao()
     bot = montar(redator)
     ate_o_cpf(bot)
-    for i, t in enumerate((CPF_NOVO, "Maria da Silva Santos", "07/11/1990"), start=4):
+    for i, t in enumerate((CPF_NOVO, "10/01/2024"), start=4):
         bot.processar(texto(t, str(i)))
 
-    assert any("Qual é o seu nome completo?" in e for e in redator.etapas)
-    assert not any("Maria da Silva Santos" in e or CPF_NOVO in e for e in redator.etapas)
+    assert any("data de nascimento dela" in e for e in redator.etapas)
+    assert not any(CPF_NOVO in e or "10/01/2024" in e for e in redator.etapas)
 
 
 def test_comando_nao_gasta_chamada_de_classificacao():

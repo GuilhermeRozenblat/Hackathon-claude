@@ -1,7 +1,7 @@
 # Roteiro do Zé Matrícula — estados e telas
 
-Mapa entre [`script-chatbot-ze-matricula.md`](script-chatbot-ze-matricula.md) (roteiro v2,
-processo 195/2025) e os estados do código.
+Mapa entre [`script-chatbot-ze-matricula.md`](script-chatbot-ze-matricula.md) e os
+estados do código.
 
 Quem mexe no **texto** edita `creche_bot/ia/persona.py` e `creche_bot/conversa/formulario.py`.
 Quem mexe no **fluxo** edita `creche_bot/conversa/passos/`.
@@ -18,35 +18,35 @@ stateDiagram-v2
     PORTA --> FORA_DO_PERIODO: processo fechado
     PORTA --> CONSENTIMENTO: inscrever
     RETOMADA --> INICIO: começar de novo
-    CONSENTIMENTO --> CPF_RESPONSAVEL: autorizo
-    CPF_RESPONSAVEL --> CADASTRO_ANTERIOR: achou histórico
-    CPF_RESPONSAVEL --> CADASTRO: não achou
-    CADASTRO_ANTERIOR --> HORARIO: tudo certo
-    CADASTRO_ANTERIOR --> ENDERECO_CEP: mudei de endereço
-    CADASTRO_ANTERIOR --> CADASTRO: é outra criança
+    CONSENTIMENTO --> CADASTRO: autorizo
     CADASTRO --> FORA_DA_FAIXA: 4 anos ou mais
-    CADASTRO --> ENDERECO_CEP
+    CADASTRO --> CRIT_GATE: 1ª pergunta de saúde
+    CRIT_GATE --> CADASTRO
+    CADASTRO --> CADASTRO_ANTERIOR: CPF do responsável no histórico
+    CADASTRO_ANTERIOR --> CADASTRO
+    CADASTRO --> CONTATO
+    CONTATO --> RESUMO
+    RESUMO --> CORRECAO: quero corrigir
+    CORRECAO --> CADASTRO
+    RESUMO --> ENDERECO_CEP: está tudo certo
+    RESUMO --> HORARIO: endereço veio do histórico
     ENDERECO_CEP --> ENDERECO_CONFIRMA
     ENDERECO_CONFIRMA --> ENDERECO_CEP: não é esse
     ENDERECO_CONFIRMA --> HORARIO: é isso
-    HORARIO --> CRIT_CADUNICO
+    HORARIO --> ESCOLAS
+    ESCOLAS --> ESCOLAS: mais uma preferência
+    ESCOLAS --> CONFIRMA_ESCOLAS: pronto
+    CONFIRMA_ESCOLAS --> ESCOLAS: quero alterar
+    CONFIRMA_ESCOLAS --> CRIT_CADUNICO: confirmar
     CRIT_CADUNICO --> CRIT_NIS: sim ou não sei
     CRIT_NIS --> CRIT_ESPECIAL
     CRIT_CADUNICO --> CRIT_ESPECIAL: não
     CRIT_ESPECIAL --> CRIT_FAMILIA
     CRIT_FAMILIA --> CRIT_IRMAO: marcou irmão
-    CRIT_IRMAO --> CRIT_GATE
-    CRIT_FAMILIA --> CRIT_GATE
-    CRIT_GATE --> CRIT_SENSIVEL: pode perguntar
-    CRIT_GATE --> CONTATO: prefiro pular
+    CRIT_IRMAO --> CRIT_SENSIVEL
+    CRIT_FAMILIA --> CRIT_SENSIVEL
     CRIT_SENSIVEL --> CRIT_ANEXO
-    CRIT_ANEXO --> CONTATO
-    CONTATO --> ESCOLAS
-    ESCOLAS --> ESCOLAS: mais uma preferência
-    ESCOLAS --> RESUMO: pronto
-    RESUMO --> CORRECAO: quero corrigir
-    CORRECAO --> CADASTRO
-    RESUMO --> PENDENCIAS: enviar inscrição
+    CRIT_ANEXO --> PENDENCIAS
     PENDENCIAS --> RECEBER_DOC: mandar foto aqui
     RECEBER_DOC --> PROTOCOLO
     PENDENCIAS --> PROTOCOLO: creche ou CRAS
@@ -61,24 +61,33 @@ stateDiagram-v2
 | 0 · Boas-vindas | `INICIO`, `PORTA` | `passos/entrada.py` | Três portas: inscrever, acompanhar, dúvida. A do meio serve inclusive para quem se inscreveu pelo site |
 | 0.1 · Retomada | `RETOMADA` | `passos/entrada.py` | Sessão viva por 72h não recomeça — diz onde parou e oferece continuar |
 | — · Fora do período | `FORA_DO_PERIODO` | `passos/entrada.py` | Fora da janela, inscrever não é opção. Oferece o aviso de abertura |
-| 1 · Consentimento | `CONSENTIMENTO` | `passos/entrada.py` | Gate. LGPD art. 14, e o bloco 8.4 trata de saúde e violência |
-| 2 · CPF do responsável | `CPF_RESPONSAVEL` | `passos/responsavel.py` | A âncora é o **adulto**, nunca a criança — ver [D12](DECISOES.md) |
-| 2a · Cadastro anterior | `CADASTRO_ANTERIOR` | `passos/responsavel.py` | Dispara em 27,9%. Preenche tudo e auto-valida "esperou na fila" |
-| 3, 4, 5 · Responsável, criança, documento | `CADASTRO` | `formulario.py::CADASTRO` | Lista de `Campo`. CPF > DNV > NIS, e **nenhum é obrigatório** |
+| — · Consentimento | `CONSENTIMENTO` | `passos/entrada.py` | Gate. LGPD art. 14. Não está no roteiro; sem ele nada pode ser gravado |
+| 1 · Pesquisa inicial | `CADASTRO` | `formulario.py::CADASTRO` | CPF e nascimento da criança. Nenhum dos dois é obrigatório |
+| 2 · Sobre a vaga | `CADASTRO` | `formulario.py::CADASTRO` | Origem escolar, matrícula e a pergunta de saúde |
+| 3 · Dados pessoais | `CADASTRO` | `formulario.py::CADASTRO` | Criança, filiação e responsável. Lista de `Campo`, uma pergunta por mensagem |
+| — · Cadastro anterior | `CADASTRO_ANTERIOR` | `passos/responsavel.py` | Dispara em 27,9% no CPF do responsável. Aproveita endereço e auto-valida "esperou na fila" |
+| — · Dado sensível | `CRIT_GATE` | `passos/criterios.py` | Consentimento do art. 11, pedido uma vez e válido para o resto da conversa |
 | — · Fora da faixa | `FORA_DA_FAIXA` | `passos/formulario_passo.py` | Creche vai até 3 anos e 11 meses. Único bloqueio além do consentimento |
-| 6 · Endereço | `ENDERECO_CEP`, `ENDERECO_CONFIRMA` | `passos/endereco.py` | CEP + número. Bairro nunca é digitado — ver [D13](DECISOES.md) |
-| 7 · Horário | `HORARIO` | `passos/escolas.py` | Integral ou parcial. Sem isso a oferta não filtra |
-| 8.1 · CadÚnico e NIS | `CRIT_CADUNICO`, `CRIT_NIS` | `passos/criterios.py` | **O turno mais importante do bot.** Duas perguntas da régua, uma chave só |
-| 8.2 · Educação especial | `CRIT_ESPECIAL` | `passos/criterios.py` | Sensível: pede o consentimento do 8.4 antes, se ainda não pediu |
-| 8.3 · Composição familiar | `CRIT_FAMILIA`, `CRIT_IRMAO` | `passos/criterios.py` | Checklist. Irmão é verificável no SGA pelo nome, sem documento |
-| 8.4 · Situações sensíveis | `CRIT_GATE`, `CRIT_SENSIVEL`, `CRIT_ANEXO` | `passos/criterios.py` | Consentimento próprio, checklist único, **nunca ecoado** — ver [D7](DECISOES.md) |
-| 9 · Contato | `CONTATO` | `formulario.py::CONTATO` | O canal de convocação. É a correção direta dos 7,7% que perdem a vaga |
-| 10 · Escolha das creches | `ESCOLAS` | `passos/escolas.py` | Ordem montada em toques — ver [D6](DECISOES.md) |
-| 11 · Resumo | `RESUMO`, `CORRECAO` | `passos/resumo.py` | Mostra o que **falta comprovar**. Nunca pontuação nem posição |
-| 12 · Documentação pendente | `PENDENCIAS`, `RECEBER_DOC` | `passos/pendencias.py` | Lista de documentos condicional ao que foi declarado |
-| 13 · Protocolo | `PROTOCOLO` | `passos/pendencias.py` | Oferece a segunda criança: 1.738 responsáveis fizeram isso em 2025 |
+| 4 · Contato | `CONTATO` | `formulario.py::CONTATO` | O canal de convocação. É a correção direta dos 7,7% que perdem a vaga |
+| 5 · Resumo | `RESUMO`, `CORRECAO` | `passos/resumo.py` | Repete o declarado. Nunca pontuação, nunca resposta sensível |
+| 6 · Escolas | `ENDERECO_CEP`, `ENDERECO_CONFIRMA`, `HORARIO`, `ESCOLAS` | `passos/endereco.py`, `passos/escolas.py` | CEP + número, nunca bairro digitado. Ordem montada em toques |
+| 7 · Confirmação | `CONFIRMA_ESCOLAS` | `passos/escolas.py` | A lista final, na ordem, antes de valer |
+| — · Régua de prioridade | `CRIT_*` | `passos/criterios.py` | Não está no roteiro v1, e é o que captura o NIS. Roda depois do bloco 7, porque é ela que gera a pendência do bloco 8 |
+| 8 · Documentação | `PENDENCIAS`, `RECEBER_DOC` | `passos/pendencias.py` | Lista condicional ao que foi declarado. WhatsApp, creche ou CRAS |
+| 8 · Protocolo | `PROTOCOLO` | `passos/pendencias.py` | Oferece a segunda criança: 1.738 responsáveis fizeram isso em 2025 |
 | C · Acompanhar | `CONSULTA_*` | `passos/consulta.py` | Ver abaixo |
 | — · Pós-inscrição | `ACOMPANHAR` | `passos/consulta.py` | Entrada do `/status`. Comportamento vem de `etapa.tipo`, nunca do `codigo` |
+
+## Onde o código não segue o roteiro, e por quê
+
+| Roteiro pede | O que o bot faz | Por quê |
+|---|---|---|
+| Bloco 1 busca cadastro pelo CPF da **criança** | Busca pelo CPF do **responsável**, perguntado no bloco 3 | `backend/porta.py` é contrato congelado e só tem `buscar_por_responsavel` |
+| Bloco 6 aceita "CEP **ou bairro**" | Só CEP + número | Bairro digitado gerou 1.608 grafias para ~925 bairros. Ver [D13](DECISOES.md) |
+| Bloco 6 mostra "nota de corte: X pontos" | Distância, vaga ociosa e concorrência do ano passado | A classificação só roda depois do fechamento: no momento da conversa esse número não existe. Ver [D5](DECISOES.md) |
+| Bloco 5 exibe "necessidades especiais" no resumo | Guarda, mas não repete | Dado de saúde ecoado num histórico que fica no aparelho da família. LGPD art. 11 |
+| Bloco 8 sempre pergunta como entregar os documentos | Só quando há documento pendente | Sem pendência, mandar a família procurar papel é fazê-la voltar para casa sem resolver |
+| — | Pergunta o horário da vaga | `escolas_proximas()` filtra por horário; sem ele a oferta não sai |
 
 ## O bloco C — acompanhar
 
@@ -102,13 +111,16 @@ porque há criança sem filiação registrada na certidão.
 **A regra crítica:** o que aparece é o `Desfecho` — a melhor situação entre as opções —
 nunca o status bruto por opção. Ver [D14](DECISOES.md).
 
-## O bloco 8 é montado em tempo de execução
+## A régua é montada em tempo de execução
 
 A régua muda todo ano: entre 2023 e 2024 só 3 das 13 perguntas sobreviveram e o teto caiu
-de 465 para 100 pontos. Por isso o bloco 8 **não** é uma tupla de `Campo` como os blocos 3
-a 5 — o conteúdo vem de `backend.criterios_do_processo()`, agrupado por `Criterio.grupo`
+de 465 para 100 pontos. Por isso ela **não** é uma tupla de `Campo` como os blocos 1 a 4 —
+o conteúdo vem de `backend.criterios_do_processo()`, agrupado por `Criterio.grupo`
 (`8.1` a `8.4`), e `criterios.py` só define a **forma** de cada turno. Ver
 [D15](DECISOES.md).
+
+A pergunta de educação especial do grupo `8.2` **não é refeita**: o bloco 2 do roteiro já
+perguntou isso, e o resultado alimenta a régua direto.
 
 ## As duas perguntas que o bot não faz
 

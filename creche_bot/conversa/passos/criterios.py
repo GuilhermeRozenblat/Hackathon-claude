@@ -24,6 +24,8 @@ para inscrever a criança, é violento.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from creche_bot.backend.porta import BackendIndisponivel
 from creche_bot.canal.tipos import Botao, ItemLista, MensagemSaida
 from creche_bot.conversa.formulario import digitos_de
@@ -110,31 +112,56 @@ def nis(p: Passo) -> MensagemSaida:
 
 
 # --------------------------------------------------- 8.2 educação especial
-def _abrir_educacao_especial(p: Passo, prefixo: str = "") -> MensagemSaida:
-    """Primeira pergunta sensível: o consentimento específico da LGPD art. 11 vem antes.
+def pedir_gate(p: Passo, prefixo: str = "") -> MensagemSaida:
+    """O consentimento específico da LGPD art. 11, pedido uma vez só na conversa.
 
-    Recusar aqui pula TODAS as perguntas sensíveis, as do 8.2 e as do 8.4.
+    Vale para as perguntas de saúde do bloco 2 do roteiro e para as do bloco 8 — quem
+    recusa não vê nenhuma delas, e a recusa nunca interrompe o cadastro.
     """
-    if not p.dados.get("consentimento_sensivel"):
-        p.ir("CRIT_GATE")
-        return MensagemSaida(prefixo + CONSENTIMENTO_SENSIVEL, botoes=BOTOES_GATE)
+    p.ir("CRIT_GATE")
+    return MensagemSaida(prefixo + CONSENTIMENTO_SENSIVEL, botoes=BOTOES_GATE)
+
+
+def _abrir_educacao_especial(p: Passo, prefixo: str = "") -> MensagemSaida:
+    if p.dados.get("consentimento_sensivel") is None:
+        return pedir_gate(p, prefixo)
+    if not p.dados["consentimento_sensivel"]:
+        return _abrir_familia(p, prefixo)
+
+    # O roteiro já perguntou isso no bloco 2. Perguntar de novo aqui seria a mesma
+    # pergunta invasiva duas vezes na mesma conversa.
+    if "tem_especial" in p.dados:
+        if p.dados["tem_especial"] != "sim":
+            return _abrir_familia(p, prefixo)
+        criterio = _do_grupo(p, "8.2")[0]
+        _marcar(p, criterio["codigo"])
+        pedido = _pedir_anexo(p, criterio, seguinte="CRIT_FAMILIA")
+        return replace(pedido, texto=prefixo + pedido.texto)
 
     p.ir("CRIT_ESPECIAL")
     return MensagemSaida(prefixo + p.txt("perguntar_especial"), botoes=SIM_NAO)
 
 
 def gate_sensivel(p: Passo) -> MensagemSaida:
-    if p.msg.escolha == "pular":
-        p.dados["consentimento_sensivel"] = False
-        return _abrir_familia(p, prefixo=f"{p.txt('sensivel_pulado')}\n\n")
-
-    if p.msg.escolha != "pode":
+    """Resposta do gate. Volta para quem pediu: o formulário, ou o próprio bloco 8."""
+    if p.msg.escolha not in ("pode", "pular"):
         return MensagemSaida(CONSENTIMENTO_SENSIVEL, botoes=BOTOES_GATE)
 
-    p.dados["consentimento_sensivel"] = True
-    p.repo.registrar_consentimento(p.contato_id, "dado_sensivel/8.4",
-                                   p.msg.canal, p.msg.id_externo)
-    return _abrir_educacao_especial(p)
+    autorizou = p.msg.escolha == "pode"
+    p.dados["consentimento_sensivel"] = autorizou
+    if autorizou:
+        p.repo.registrar_consentimento(p.contato_id, "dado_sensivel/8.4",
+                                       p.msg.canal, p.msg.id_externo)
+    prefixo = "" if autorizou else f"{p.txt('sensivel_pulado')}\n\n"
+
+    if (volta := p.dados.pop("gate_volta", None)):
+        from creche_bot.conversa.maquina import entrar
+
+        p.ir(volta)
+        tela = entrar(p, volta)
+        return replace(tela, texto=prefixo + tela.texto)
+
+    return _abrir_educacao_especial(p) if autorizou else _abrir_familia(p, prefixo)
 
 
 def educacao_especial(p: Passo) -> MensagemSaida:
@@ -297,9 +324,8 @@ def _falta_doc_familia(p: Passo) -> bool:
 
 
 def _fechar(p: Passo, prefixo: str = "") -> MensagemSaida:
-    """Bloco 8 terminado — segue para o contato."""
-    from creche_bot.conversa.passos.escolas import sugerir
-    from creche_bot.conversa.passos.formulario_passo import perguntar
+    """Régua terminada — a inscrição é efetivada e o roteiro entra no bloco 8."""
+    from creche_bot.conversa.passos.pendencias import enviar
 
-    p.ir("CONTATO")
-    return perguntar(p, "CONTATO", sugerir, prefixo=prefixo)
+    envio = enviar(p)
+    return replace(envio, texto=prefixo + envio.texto)

@@ -48,12 +48,18 @@ def _etapa(estado: str, dados: dict) -> str:
     return f"{estado} — {campo.pergunta}" if campo else estado
 
 
+def abrir_contato(p: Passo) -> MensagemSaida:
+    """Fim do bloco 3, começo do bloco 4."""
+    p.ir("CONTATO")
+    return formulario_passo.perguntar(p, "CONTATO", resumo.resumo)
+
+
 def _cadastro(p: Passo) -> MensagemSaida:
-    return formulario_passo.responder(p, "CADASTRO", endereco.pedir_cep)
+    return formulario_passo.responder(p, "CADASTRO", abrir_contato)
 
 
 def _contato(p: Passo) -> MensagemSaida:
-    return formulario_passo.responder(p, "CONTATO", escolas.sugerir)
+    return formulario_passo.responder(p, "CONTATO", resumo.resumo)
 
 
 def _consulta_nome(p: Passo) -> MensagemSaida:
@@ -63,11 +69,13 @@ def _consulta_nome(p: Passo) -> MensagemSaida:
 def _fora_da_faixa(p: Passo) -> MensagemSaida:
     """Saída de exceção do bloco 4. Não deixe a família descobrir isso no resultado."""
     if p.msg.escolha == "outra":
-        for chave in ("nome_crianca", "nascimento_crianca", "grupamento", "sexo",
-                      "filiacao_consta", "filiacao", "documento_crianca", "perguntou"):
+        for chave in ("cpf_crianca", "nome_crianca", "nascimento_crianca", "grupamento",
+                      "filiacao_consta", "filiacao", "origem", "origem_outra",
+                      "matricula", "tem_especial", "tipo_especial", "tipo_especial_outro",
+                      "perguntou"):
             p.dados.pop(chave, None)
         p.ir("CADASTRO")
-        return formulario_passo.perguntar(p, "CADASTRO", endereco.pedir_cep)
+        return formulario_passo.perguntar(p, "CADASTRO", abrir_contato)
     return MensagemSaida(p.txt("pre_escola"))
 
 
@@ -78,18 +86,23 @@ PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
     "RETOMADA": entrada.retomar,
     "FORA_DO_PERIODO": entrada.fora_do_periodo,
     "CONSENTIMENTO": entrada.consentimento,
-    # blocos 2 e 2a — o responsável é a âncora
-    "CPF_RESPONSAVEL": responsavel.cpf_responsavel,
-    "CADASTRO_ANTERIOR": responsavel.cadastro_anterior,
-    # blocos 3, 4 e 5 — cadastro declarativo
+    # blocos 1, 2 e 3 — pesquisa inicial, sobre a vaga e dados pessoais
     "CADASTRO": _cadastro,
+    "CADASTRO_ANTERIOR": responsavel.cadastro_anterior,
     "FORA_DA_FAIXA": _fora_da_faixa,
-    # bloco 6 — endereço por CEP e número
+    # bloco 4 — contato
+    "CONTATO": _contato,
+    # bloco 5 — resumo e correção
+    "RESUMO": resumo.confirmacao,
+    "CORRECAO": resumo.correcao,
+    # bloco 6 — endereço, horário e o painel de creches
     "ENDERECO_CEP": endereco.receber,
     "ENDERECO_CONFIRMA": endereco.confirmar,
-    # bloco 7 — horário
     "HORARIO": escolas.horario,
-    # bloco 8 — a régua do processo vigente
+    "ESCOLAS": escolas.escolher,
+    # bloco 7 — confirmação da escolha
+    "CONFIRMA_ESCOLAS": escolas.escolhas_confirmadas,
+    # a régua do processo vigente, antes da documentação que ela mesma pede
     "CRIT_CADUNICO": criterios.cadunico,
     "CRIT_NIS": criterios.nis,
     "CRIT_GATE": criterios.gate_sensivel,
@@ -98,14 +111,7 @@ PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
     "CRIT_IRMAO": criterios.irmao,
     "CRIT_SENSIVEL": criterios.sensivel,
     "CRIT_ANEXO": criterios.anexo,
-    # bloco 9 — contato
-    "CONTATO": _contato,
-    # bloco 10 — escolha das creches
-    "ESCOLAS": escolas.escolher,
-    # bloco 11 — resumo e correção
-    "RESUMO": resumo.confirmacao,
-    "CORRECAO": resumo.correcao,
-    # blocos 12 e 13 — comprovação e protocolo
+    # bloco 8 — documentação e protocolo
     "PENDENCIAS": pendencias.como_entregar,
     "RECEBER_DOC": pendencias.receber_documento,
     "PROTOCOLO": pendencias.depois_do_protocolo,
@@ -127,14 +133,14 @@ PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
 
 # Como REENTRAR num bloco: correção (bloco 11) e retomada (bloco 0.1) usam isto.
 ENTRADAS: dict[str, Callable[[Passo], MensagemSaida]] = {
-    "CADASTRO": lambda p: formulario_passo.perguntar(p, "CADASTRO", endereco.pedir_cep),
-    "CONTATO": lambda p: formulario_passo.perguntar(p, "CONTATO", escolas.sugerir),
+    "CADASTRO": lambda p: formulario_passo.perguntar(p, "CADASTRO", abrir_contato),
+    "CONTATO": lambda p: formulario_passo.perguntar(p, "CONTATO", resumo.resumo),
     "ENDERECO_CEP": endereco.pedir_cep,
     "HORARIO": escolas.pedir_horario,
     "CRIT_CADUNICO": criterios.comecar,
     "ESCOLAS": escolas.sugerir,
+    "CONFIRMA_ESCOLAS": escolas.confirmar_escolhas,
     "RESUMO": resumo.resumo,
-    "CPF_RESPONSAVEL": responsavel.pedir_cpf,
     "INICIO": entrada.inicio,
 }
 

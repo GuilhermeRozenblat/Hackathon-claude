@@ -1,4 +1,4 @@
-"""Blocos 7 e 10 — horário da vaga e escolha das creches.
+"""Bloco 6 — horário da vaga, painel de creches e a confirmação da escolha (bloco 7).
 
 ## O que este painel PODE mostrar
 
@@ -6,8 +6,9 @@ Distância, vaga aberta agora e concorrência do ano passado. São fatos verific
 
 ## O que ele NUNCA mostra: nota de corte
 
-A classificação do processo vigente só roda depois do fechamento das inscrições — no
-momento da conversa ela não existe. E o teto da régua foi 465 pontos em 2023 e 100 em
+O roteiro pede "nota de corte: X pontos" em cada creche. Esse número não existe no
+momento da conversa: a classificação do processo vigente só roda depois do fechamento
+das inscrições. E o teto da régua foi 465 pontos em 2023 e 100 em
 2024, então histórico de pontuação não é comparável entre anos. Prometer isso sobre
 alocação de vaga pública é passivo.
 
@@ -46,7 +47,7 @@ def distancia(km: float, minutos: int) -> str:
     return f"{num(km)} km"
 
 
-# ------------------------------------------------------------- bloco 7
+# ---------------------------------------------------- bloco 6, antes do painel
 def pedir_horario(p: Passo) -> MensagemSaida:
     _garantir_grupamento(p)
     p.ir("HORARIO")
@@ -68,13 +69,10 @@ def horario(p: Passo) -> MensagemSaida:
     if p.msg.escolha not in ("integral", "parcial"):
         return p.diz("nao_entendi", botoes=BOTOES_HORARIO)
     p.dados["horario"] = p.msg.escolha
-
-    from creche_bot.conversa.passos.criterios import comecar
-
-    return comecar(p)
+    return sugerir(p)
 
 
-# ------------------------------------------------------------ bloco 10
+# ------------------------------------------------------- bloco 6, o painel
 def _achatar(v: VagaSugerida) -> dict:
     return {"id": v.id_escola, "nome": v.nome, "endereco": v.endereco,
             "lat": v.lat, "lng": v.lng, "km": v.distancia_km,
@@ -151,9 +149,35 @@ def _mais_uma(p: Passo) -> MensagemSaida:
                  botoes=(*botoes, Botao("pronto", "Pronto, é só isso")))
 
 
+# ------------------------------------------------------------------ bloco 7
 def _confirmar(p: Passo) -> MensagemSaida:
-    from creche_bot.conversa.passos.resumo import resumo
-
     if not p.dados["preferencias"]:
         return _painel(p)
-    return resumo(p)
+    return confirmar_escolhas(p)
+
+
+def _escolhidas(p: Passo) -> str:
+    nomes = {e["id"]: e["nome"] for e in p.dados["escolas"]}
+    return "\n".join(f"{ORDINAL[i]} {nomes.get(x, x)}"
+                     for i, x in enumerate(p.dados["preferencias"], 1))
+
+
+def confirmar_escolhas(p: Passo) -> MensagemSaida:
+    p.ir("CONFIRMA_ESCOLAS")
+    return p.diz("confirmar_escolhas", escolhas=_escolhidas(p),
+                 botoes=(Botao("confirmar", "Confirmar"),
+                         Botao("alterar", "Quero alterar")))
+
+
+def escolhas_confirmadas(p: Passo) -> MensagemSaida:
+    from creche_bot.conversa.passos.criterios import comecar
+
+    if p.msg.escolha == "confirmar":
+        return comecar(p)
+
+    if p.msg.escolha == "alterar":
+        p.dados["preferencias"] = []
+        p.ir("ESCOLAS")
+        return _painel(p)
+
+    return confirmar_escolhas(p)

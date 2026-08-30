@@ -124,17 +124,13 @@ TEXTOS = {
     "aviso_ligado": "Combinado! Vou te avisar por aqui.",
     "preciso_autorizacao": "Preciso da sua autorização para continuar 🤝",
 
-    # ------------------------------------------------------ bloco 2 e 2a
-    "pedir_cpf": "Pra começar, qual é o seu CPF? (só os números)",
-    "cpf_invalido": "Esse CPF não confere. Pode conferir os números?",
+    # ------------------------------------------------------ blocos 1 a 3
     "atendente": "Vou te passar para um atendente da CRE, que resolve melhor que eu. "
                  "Já mandei tudo o que a gente preencheu junto.\n\nOu ligue 1746.",
-    "achou_cadastro": "Achei seu cadastro do ano passado:\n\n"
-                      "{nome}, nascida em {nascimento}\n{endereco}\n\n"
-                      "Está tudo certo ainda?",
-    "nao_achou": "Não achei nada ainda, sem problema. Vamos preencher juntos 🙂",
+    "achou_cadastro": "Achei seu cadastro do ano passado! Já aproveito o que está lá:"
+                      "\n\n📍 {endereco}\n\nO endereço continua esse?",
 
-    # ------------------------------------------------------ bloco 4 exceção
+    # ------------------------------------------------------ bloco 1, exceção
     "fora_da_faixa": "Pela data de nascimento, {nome} vai ter {idade} em {mes} — já está "
                      "fora da faixa da creche, que vai até 3 anos e 11 meses. O caminho "
                      "é a pré-escola.\n\nQuer que eu te explique como fazer?",
@@ -142,7 +138,7 @@ TEXTOS = {
                   "processo, e costuma abrir em outra data.\n\nO 1746 te diz a data exata "
                   "e a CRE da sua região faz a inscrição presencial se você preferir.",
 
-    # ------------------------------------------------------ bloco 6 endereço
+    # ------------------------------------------------------ bloco 6
     "pedir_endereco": "Onde vocês moram? Me manda o CEP e o número da casa.",
     "cep_invalido": "Não peguei o CEP. Manda os 8 números, e o número da casa junto. "
                     "Assim: 22710-560, 100",
@@ -161,7 +157,11 @@ TEXTOS = {
                    "endereço, ou mudar o horário?",
     "mais_uma": "Anotei {posicao}. Quer adicionar mais alguma?",
 
-    # ------------------------------------------------------ bloco 8 critérios
+    # ------------------------------------------------------ bloco 7
+    "confirmar_escolhas": "Esta é sua lista final, na ordem de preferência:\n\n"
+                          "{escolhas}\n\nPosso confirmar?",
+
+    # ------------------------------------------------- perguntas de prioridade
     "abrir_criterios": "Agora as perguntas que definem a prioridade na fila. São rápidas, "
                        "e cada sim comprovado conta pontos.",
     "perguntar_cadunico": "Sua família está inscrita no CadÚnico, ou recebe Bolsa Família "
@@ -192,11 +192,11 @@ TEXTOS = {
     "documento_ilegivel": "Hmm, não consegui ler direito. Tenta de novo com mais luz?",
     "pedir_foto": "Pode mandar a foto por aqui.",
 
-    # ------------------------------------------------------ bloco 11 resumo
-    "resumo": "Vou repetir tudo antes de enviar:\n\n{resumo}\n\nEstá tudo certo?",
+    # ------------------------------------------------------ bloco 5 resumo
+    "resumo": "Aqui está o resumo do que já tenho:\n\n{resumo}\n\nEstá tudo certo?",
     "qual_corrigir": "O que você quer corrigir?",
 
-    # ------------------------------------------------------ blocos 12 e 13
+    # ------------------------------------------------------ bloco 8
     "falta_documento": "Falta só isto:\n\n{documentos}\n\nComo você prefere enviar?",
     "mandar_foto_aqui": "Perfeito, é o caminho mais rápido. Manda a foto aqui mesmo. "
                         "Pode ser foto do papel.",
@@ -294,6 +294,7 @@ FIGURINHAS: dict[str, str] = {
 
     # --------------------------------------------------- boa notícia, é fato
     "achou_cadastro": "comemorando",   # 27,9% já têm cadastro: reconhecer é meio caminho
+    "confirmar_escolhas": "escola",
     "protocolo": "festa",              # inscrição feita — o momento do fluxo
     "c3a_confirmada": "festa",
     "c3f_selecionada": "festa",        # convocada: comemora e mostra o prazo
@@ -318,7 +319,6 @@ FIGURINHAS: dict[str, str] = {
     # --------------------------------------------------- não entendi, sem drama
     "nao_entendi": "pensando",
     "me_perdi": "pensando",
-    "cpf_invalido": "pensando",
     "cep_invalido": "pensando",
     "cep_nao_achado": "pensando",
     "nis_invalido": "pensando",
