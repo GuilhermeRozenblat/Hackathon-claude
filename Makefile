@@ -1,7 +1,8 @@
-.PHONY: bot memoria debug fronteira test contratos seguranca conversa canal ia dados backend notificacao lint limpar banco esquema up
+.PHONY: bot memoria roteiro debug fronteira test contratos seguranca conversa canal ia dados backend notificacao lint limpar banco esquema up
 
 bot:          ; python -m creche_bot
 memoria:      ; REPOSITORIO=memoria python -m creche_bot   # roda sem banco nenhum
+roteiro:      ; BACKEND=mock python -m creche_bot          # as 3 escolas fixas do roteiro
 debug:        ; DEBUG_CONTEUDO=1 python -m creche_bot      # espelha a conversa no console
 verificar:    ; python scripts/verificar_telegram.py
 eco:          ; python scripts/verificar_telegram.py --eco

@@ -152,8 +152,8 @@ flowchart TB
     end
 
     subgraph PORTAS[" "]
-        PD["dados/porta.py<br/>16 operações"]
-        PB["backend/porta.py<br/>16 operações"]
+        PD["dados/porta.py<br/>21 operações"]
+        PB["backend/porta.py<br/>17 operações"]
     end
 
     MEM["memoria.py"]
@@ -198,7 +198,7 @@ congelados**, e em mais nenhum.
         └───────┬──────────────────────────┬───────────┘
                 │                          │
       dados/porta.py               backend/porta.py     ← CONGELADOS
-      16 operações                 16 operações
+      21 operações                 17 operações
                 │                          │
     ┌───────────┴────────────┐  ┌──────────┴───────────────────┐
     │ dados/                 │  │ backend/                     │

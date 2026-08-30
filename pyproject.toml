@@ -17,6 +17,11 @@ dev = ["pytest>=8", "ruff>=0.7", "pydantic>=2.9"]
 [tool.setuptools.packages.find]
 include = ["creche_bot*", "fakes*"]
 
+# Os CSVs do mapa territorial da fila viajam com o pacote: `BackendMapa` lê a oferta
+# real deles, e sem isto uma instalação sem a árvore de fontes sobe sem creche nenhuma.
+[tool.setuptools.package-data]
+creche_bot = ["MapaFilaCreche/*.csv"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

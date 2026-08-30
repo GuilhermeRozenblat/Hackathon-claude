@@ -16,7 +16,7 @@ creche_bot/dados/     → estado NOSSO (sessão, consentimento, outbox)
 
 Portas diferentes, donos diferentes, e nenhuma sabe da outra.
 
-## As 16 operações
+## As 17 operações
 
 | Grupo | Operação | Devolve |
 |---|---|---|
@@ -26,7 +26,8 @@ Portas diferentes, donos diferentes, e nenhuma sabe da outra.
 | | `criterios_do_processo()` | **a régua vigente**, ordenada, sem as autopreenchíveis |
 | Histórico | `buscar_por_responsavel(cpf)` | `CadastroAnterior \| None` |
 | Endereço | `resolver_cep(cep, numero)` | `Endereco \| None`, com coordenadas |
-| Oferta | `escolas_proximas(endereco, grupamento, horario, n)` | top N **já ordenado** |
+| Oferta | `escolas_proximas(endereco, grupamento, horario, n)` | top N **já ordenado**, com `chance` |
+| | `panorama_da_regiao(endereco)` | o que aconteceu na microárea no ano-base |
 | Inscrição | `validar_nis(nis)` | `(válido, códigos de critério que ele comprova)` |
 | | `inscrever(dados, preferencias)` | o número da inscrição |
 | | `enviar_documento(numero, codigo_criterio, arquivo, mime)` | `DadosExtraidos` |

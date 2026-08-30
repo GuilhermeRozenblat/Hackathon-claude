@@ -14,7 +14,7 @@ from creche_bot.backend.porta import BackendIndisponivel
 from creche_bot.canal.tipos import Botao, Local, MensagemSaida
 from creche_bot.conversa.passos.criterios import pendentes
 from creche_bot.conversa.sessao import Passo
-from creche_bot.dados.porta import Inscricao
+from creche_bot.dados.porta import EventoInscricao, Inscricao
 
 BOTOES_ENTREGA = (Botao("whatsapp", "Mandar foto aqui"),
                   Botao("creche", "Levar na creche"),
@@ -48,6 +48,15 @@ def enviar(p: Passo) -> MensagemSaida:
         nome_escola=nomes.get(primeira, ""),
         nome_crianca=p.dados.get("nome_crianca", "a criança"),
         etapa_codigo="recebida"))
+
+    # O cadastro aberto vira o cadastro DAQUELA inscrição, e a próxima criança começa uma
+    # linha nova — 1.738 responsáveis inscreveram duas ou mais em 2025.
+    p.repo.fechar_cadastro(p.contato_id, numero)
+    # Primeiro marco da linha do tempo. Sem ele o /status de quem acabou de se inscrever
+    # mostraria uma história vazia até o backend mexer alguma coisa.
+    p.repo.registrar_evento(EventoInscricao(
+        protocolo=numero, etapa_codigo="recebida", tipo="aguardando",
+        titulo="Inscrição recebida"))
 
     if _documentos(p.dados):
         p.ir("PENDENCIAS")

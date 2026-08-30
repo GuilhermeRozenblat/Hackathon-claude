@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Sete tabelas, no schema `creche` do Postgres. Este documento explica **o que cada uma
+Onze tabelas, no schema `creche` do Postgres. Este documento explica **o que cada uma
 guarda e por que ela existe** — e, tão importante quanto, **o que deliberadamente não está
 aqui**.
 
@@ -11,8 +11,12 @@ erDiagram
     contato ||--o{ identidade_canal : "é alcançável por"
     contato ||--o| consentimento : "aceitou (LGPD art. 14)"
     contato ||--o| sessao : "está no meio de"
+    contato ||--o{ cadastro : "respondeu"
     contato ||--o{ inscricao : "fez"
+    cadastro ||--o{ resposta_criterio : "declarou"
+    cadastro ||--o{ preferencia_escola : "escolheu em ordem"
     inscricao ||--o{ outbox : "gera notificação"
+    inscricao ||--o{ evento_inscricao : "andou por"
 
     contato {
         text id PK "UUID interno — nunca o id do canal"
@@ -60,6 +64,46 @@ erDiagram
         smallint tentativas
     }
 
+    cadastro {
+        bigint id PK "identity"
+        text contato_id FK
+        text protocolo "NULL = ainda aberto"
+        text nome_crianca
+        date nascimento_crianca
+        text grupamento "derivado, nunca perguntado"
+        text cep "e numero, logradouro, bairro, lat, lng"
+        text horario
+        text telefone "e email"
+        timestamptz atualizado_em
+    }
+
+    resposta_criterio {
+        bigint cadastro_id PK "e FK"
+        text codigo PK "o Criterio.codigo da régua"
+        boolean declarado
+        boolean comprovado
+        boolean sensivel "LGPD art. 11 — nunca ecoar"
+    }
+
+    preferencia_escola {
+        bigint cadastro_id PK "e FK"
+        smallint posicao PK "1 = primeira opção"
+        text id_escola "desig7 da unidade"
+        text nome_escola
+        double distancia_km "o fato que estava na tela"
+        boolean vaga_ociosa
+        double familias_por_vaga
+        smallint ano_referencia "de quando é o número"
+    }
+
+    evento_inscricao {
+        text protocolo PK "SEM FK — ver LGPD abaixo"
+        text etapa_codigo PK "idempotência do polling"
+        text tipo "TipoEtapa: decide o tom da tela"
+        text titulo
+        timestamptz quando
+    }
+
     marca {
         text chave PK
         text valor "até onde o backend já foi lido"
@@ -68,6 +112,33 @@ erDiagram
 
 `marca` não se liga a ninguém de propósito: é o ponteiro do polling, não tem dado pessoal
 e sobrevive ao expurgo.
+
+### As quatro tabelas do cadastro consultável
+
+`sessao.contexto` continua sendo o estado **vivo** da conversa, em jsonb, porque o formato
+muda toda semana. Mas jsonb não responde "quantas famílias de Curicica pararam antes de
+escolher a creche" — e é essa a pergunta que alguém vai fazer. Então o mesmo dado sai numa
+segunda forma, em colunas, por `conversa/projecao.py`, que é a única tradução entre as
+duas.
+
+**Grava a cada turno, não só no envio.** Família que abandona no meio deixa rastro do que
+já respondeu, e o abandono é justamente o que interessa medir. A `UNIQUE` parcial em
+`protocolo IS NULL` garante um cadastro aberto por contato; os já enviados podem ser
+vários, porque 1.738 responsáveis inscreveram duas ou mais crianças em 2025.
+
+**`resposta_criterio` é código + booleano, nunca texto.** O que a família digitou nas
+perguntas sensíveis não atravessa: o banco sabe que `violencia_domestica` foi declarado, e
+nada além disso. A coluna `sensivel` existe para quem consultar saber que aquela linha é
+LGPD art. 11 e não um booleano qualquer.
+
+**`preferencia_escola` guarda o fato que estava na tela.** Distância, vaga aberta e
+concorrência do ano de `ano_referencia`, congelados no momento da escolha. Sem isso
+ninguém reconstrói depois com base em que a família decidiu — o painel muda de ano para
+ano, e a chance estimada junto.
+
+**`evento_inscricao` é a linha do tempo.** PK `(protocolo, etapa_codigo)` torna o registro
+idempotente, porque o polling relê a mesma situação várias vezes. `tipo` é o `TipoEtapa` do
+domínio — a taxonomia fechada, nunca o código do backend, que muda por município.
 
 ## Tabela por tabela
 
@@ -167,7 +238,7 @@ Data API a quem tiver a chave anônima — e essa chave costuma acabar no front.
 guardam nome de criança e CPF.
 
 - Schema fora da lista de exposição: **não alcançável** pela Data API
-- RLS ligada nas 7 tabelas, sem política nenhuma
+- RLS ligada nas 11 tabelas, sem política nenhuma
 - `anon`, `authenticated` e `service_role` sem `USAGE` no schema
 - TLS obrigatório na conexão
 
@@ -179,11 +250,18 @@ em [BANCO.md](BANCO.md).
 `apagar_tudo(contato_id)` roda numa transação só:
 
 1. `DELETE` na `outbox` pelos protocolos daquele contato — **explícito, porque não há FK**
-2. `DELETE` no `contato` — e as FKs em cascata levam `identidade_canal`, `consentimento`,
-   `sessao` e `inscricao`
+2. `DELETE` na `evento_inscricao` pelos mesmos protocolos — **também sem FK, mesmo motivo**
+3. `DELETE` no `contato` — e as FKs em cascata levam `identidade_canal`, `consentimento`,
+   `sessao`, `inscricao` e `cadastro`; `resposta_criterio` e `preferencia_escola` caem
+   junto pelo cascata de `cadastro`
 
-Sobra `marca`, que não tem dado pessoal. Três testes cobrem isso, sendo um deles
-especificamente o órfão na outbox.
+As duas tabelas sem FK são as que guardam dado pessoal fora da árvore de `contato`:
+`outbox.variaveis` carrega nome de criança, e `evento_inscricao` carrega a história de um
+protocolo. Um `CASCADE` escondido tornaria fácil esquecer que elas existem — por isso o
+apagamento é explícito e testado.
+
+Sobra `marca`, que não tem dado pessoal. Os testes cobrem isso, incluindo o órfão na outbox
+e o do cadastro.
 
 ## Uma lacuna conhecida
 
