@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Segredos. `.env.*` pega .env.local, .env.prod e afins; só o exemplo escapa.
+.env
+.env.*
+!.env.example
+
+# Sinks de dado pessoal: sessão tem CPF, nome e telefone em claro dentro do JSON.
+*.db
+*.db-wal
+*.db-shm
+documentos/
+cache_geo.json
+creche.db
+creche.db-wal
+creche.db-shm
+
+# Skills locais de terceiros (impeccable, grill-me): ~7 MB, ferramenta de quem
+# desenvolve, não código do produto. Para versionar: git add -f
+.agents/
+.claude/
+.codex/
+.impeccable/
+skills-lock.json
