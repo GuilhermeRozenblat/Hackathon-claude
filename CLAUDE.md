@@ -10,7 +10,7 @@ rede municipal. Telegram primeiro (validação), WhatsApp depois.
 | `docs/ROTEIRO.md` | Mapa entre o roteiro de conversa e os estados do código |
 | `docs/DECISOES.md` | As decisões que custariam caro reverter, com o porquê |
 | `docs/ARQUITETURA.md` | O desenho completo |
-| `docs/MODELO_DADOS.md` | As 7 tabelas, o ER e o que deliberadamente não está no banco |
+| `docs/MODELO_DADOS.md` | As 11 tabelas, o ER e o que deliberadamente não está no banco |
 | `docs/BANCO.md` | Configurar o Postgres do Supabase |
 | `docs/TELEGRAM.md` | Configurar o bot no @BotFather |
 
@@ -59,17 +59,28 @@ injetado no construtor. Há teste que varre o pacote e falha se vazar. Essa past
 próprio e é trabalhada em paralelo — não mexa nela.
 
 **Fronteira com o backend.** Histórico do responsável, **régua do processo vigente**,
-endereço a partir do CEP, escolas próximas e situação da inscrição vêm do **backend
-externo**, via `creche_bot/backend/porta.py` (16 operações). Não recalcule nada disso
-aqui. Hoje roda `BackendMock`; amanhã, `BackendHTTP`. Nada do JSON dele sai de `backend/`.
+endereço a partir do CEP, escolas próximas, panorama da região e situação da inscrição vêm
+do **backend externo**, via `creche_bot/backend/porta.py` (17 operações). Não recalcule
+nada disso aqui. Hoje roda `BackendMapa` — a oferta real das 820 creches de
+`creche_bot/MapaFilaCreche/`, com `BackendMock` por baixo para o que os CSVs não têm.
+`BACKEND=mock` volta para as três escolas inventadas do roteiro, que é o que a bateria de
+testes usa. Amanhã, `BackendHTTP`. Nada do JSON dele sai de `backend/`.
 
-**Honestidade.** O sistema **não decide quem entra** — só cadastra e informa status.
-Nunca gere "probabilidade de conseguir a vaga", "garantido", "certeza", "vai conseguir".
+**Honestidade.** O sistema **não decide quem entra** — só cadastra, estima e informa
+status. Nunca gere "garantido", "certeza", "vai conseguir", "pode comemorar".
 **Nem pontuação, nem posição na fila, nem nota de corte**: a classificação é norma
 (Resolução SME nº 542/2025), roda em SQL determinístico depois do fechamento das
-inscrições, e no momento da conversa não existe. Sobre uma creche, só o que é fato
-verificável: distância, vaga ociosa agora e concorrência do ano passado, rotulada como
-passado. Há teste que varre o roteiro inteiro.
+inscrições, e no momento da conversa não existe. Há teste que varre o roteiro inteiro.
+
+Sobre uma creche o bot mostra distância, vaga ociosa agora, concorrência do ano passado
+e a **chance estimada** — `confirmados ÷ demanda de 1ª opção` naquela unidade, calculada
+em `backend/mapa.py` sobre os dados reais de 2025. Duas condições, sempre:
+
+- **o ano vai colado no número.** Sem ele a estimativa vira previsão sobre o processo de
+  agora, e é isso que o bot não pode dizer;
+- **a classificação não está dentro dela.** Duas famílias que veem 40% na mesma tela podem
+  ter desfechos opostos por causa da régua de prioridade. Por isso é "chance estimada",
+  nunca "sua chance", e nunca "você vai conseguir".
 
 **Dado sensível.** Deficiência, TGD/TEA e altas habilidades são dado de saúde; violência
 doméstica, doença crônica, uso de substâncias e situação prisional também são sensíveis

@@ -19,6 +19,7 @@ ordem de chegada, e a posição muda conforme outras famílias comprovam.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date
 
 from creche_bot.backend.porta import BackendIndisponivel
@@ -163,7 +164,42 @@ def _br(iso: str | None) -> str:
     return date.fromisoformat(iso).strftime("%d/%m/%Y") if iso else "a definir"
 
 
+# Ícone por `TipoEtapa` — a taxonomia FECHADA, nunca o código do backend, que muda por
+# município. Tipo novo cai no traço e a tela continua legível.
+ICONE_ETAPA = {
+    "aguardando": "🕐", "acao_no_chat": "✋", "acao_presencial": "📍",
+    "convocacao": "🔔", "concluida": "✅", "encerrada": "⚪",
+}
+
+
+def _linha_do_tempo(p: Passo, numero: str) -> str:
+    """O caminho que a inscrição já andou. Vazio até haver mais de uma etapa.
+
+    Com uma etapa só a lista não informa nada que o balão acima não tenha dito, e ocupa
+    tela de quem está ansiosa por notícia. É história, não posição na fila: diz o que já
+    aconteceu com ESTA inscrição, nunca onde ela está em relação às outras.
+    """
+    historia = p.repo.eventos(numero)
+    if len(historia) < 2:
+        return ""
+    linhas = "\n".join(f"{ICONE_ETAPA.get(e.tipo, '·')} {e.titulo}" for e in historia)
+    return f"\n\nComo foi até aqui:\n{linhas}"
+
+
 def _situacao(p: Passo, d: dict, prefixo: str = "") -> MensagemSaida:
+    """A situação atual, com a história embaixo.
+
+    Menos a convocação: quando há vaga selecionada e prazo correndo, o balão fica só com
+    a vaga e o prazo. É o caso dos 7,7% que perderam vaga já convocados em 2025, e
+    qualquer coisa a mais na tela compete com a única ação que importa ali.
+    """
+    msg = _desenhar(p, d, prefixo)
+    if d["estado"] == "selecionada" or not (historia := _linha_do_tempo(p, d["numero"])):
+        return msg
+    return replace(msg, texto=msg.texto + historia)
+
+
+def _desenhar(p: Passo, d: dict, prefixo: str = "") -> MensagemSaida:
     p.dados["consultada"] = d
     p.ir("CONSULTA_ACOES")
     nome = d["nome"].split()[0]

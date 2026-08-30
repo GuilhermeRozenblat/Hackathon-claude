@@ -49,8 +49,11 @@ Frases curtas. Português simples. Emoji com moderação, um por mensagem.
 REGRAS QUE VOCÊ NUNCA QUEBRA:
 - Uma pergunta por mensagem. Nunca duas no mesmo balão.
 - Nunca prometa vaga. Não diga "garantido", "com certeza", "vai conseguir".
+- A chance que aparece na tela é estimativa do que aconteceu em 2025 naquela creche. Pode
+  falar dela, sempre com o ano junto e sempre como estimativa — nunca como garantia, e
+  nunca sem o ano.
 - Nunca fale de pontuação nem de posição na fila. A classificação só roda depois que as
-  inscrições fecham, e é a Secretaria que faz, não você.
+  inscrições fecham, é a Secretaria que faz, e ela não está na chance estimada.
 - Nunca invente número, nome de escola, endereço ou prazo. Use só o que vier nos dados.
 - Sem markdown: nada de *, _, ` ou #. Texto puro.
 - No máximo 4 linhas por mensagem."""
@@ -118,12 +121,20 @@ TEXTOS = {
     # ------------------------------------------------------ bloco 7 e 10
     "pedir_horario": "Você precisa de vaga em tempo integral (dia todo) ou parcial "
                      "(meio período)?",
-    "achei_creches": "Achei estas creches perto de você que atendem {grupamento} em "
-                     "{horario}:\n\n{creches}\n\nQuais você quer? Pode escolher quantas "
-                     "quiser, na ordem de preferência.",
+    "achei_creches": "Achei estas creches perto de {rua}, que atendem {grupamento} em "
+                     "{horario}:\n\n{creches}\n{regiao}\n"
+                     "Funciona como o Sisu: você escolhe até 3, na ordem que preferir. "
+                     "Toque na sua 1a opção.",
+    # O rodapé que obriga a tela a dizer de onde vem o número. Some com a chance se um dia
+    # a chance sumir — e é de propósito que os dois andem no mesmo texto.
+    "contexto_regiao": "\nNa região {bairro}, em {ano}: {demanda} famílias pediram vaga de "
+                       "1a opção e {atendidos} conseguiram.\n"
+                       "A chance de cada creche é estimativa a partir de {ano}, contando "
+                       "quem a pediu como 1a opção. Não é promessa para este ano, e não "
+                       "inclui as perguntas de prioridade — quem decide é a Secretaria.\n",
     "sem_escolas": "Não achei creche com esse horário perto daí. Quer tentar outro "
                    "endereço, ou mudar o horário?",
-    "mais_uma": "Anotei {posicao}. Quer adicionar mais alguma?",
+    "mais_uma": "Anotei {escola} como sua {posicao}.\n\nQuer escolher a {proxima}?",
 
     # ------------------------------------------------------ bloco 8 critérios
     "abrir_criterios": "Agora as perguntas que definem a prioridade na fila. São rápidas, "

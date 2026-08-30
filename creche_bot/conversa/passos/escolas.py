@@ -1,15 +1,19 @@
 """Blocos 7 e 10 — horário da vaga e escolha das creches.
 
-## O que este painel PODE mostrar
+## O que este painel mostra
 
-Distância, vaga aberta agora e concorrência do ano passado. São fatos verificáveis.
+Distância, vaga aberta agora, concorrência do ano passado e a **chance estimada** em cada
+creche — calculada em `backend/mapa.py` sobre os dados reais de 2025: dos que pediram
+aquela unidade como 1ª opção, a fração que foi atendida. Todo número sai com o ano
+colado, e o rodapé de região repete que é estimativa a partir de 2025.
 
-## O que ele NUNCA mostra: nota de corte
+## O que ele continua NUNCA mostrando: pontuação e posição na fila
 
-A classificação do processo vigente só roda depois do fechamento das inscrições — no
-momento da conversa ela não existe. E o teto da régua foi 465 pontos em 2023 e 100 em
-2024, então histórico de pontuação não é comparável entre anos. Prometer isso sobre
-alocação de vaga pública é passivo.
+A classificação do processo vigente é norma (Resolução SME nº 542/2025), roda em SQL
+determinístico depois do fechamento das inscrições, e no momento da conversa não existe.
+Ela **não está** dentro da chance estimada: duas famílias que veem 40% na mesma tela podem
+ter desfechos opostos por causa da régua de prioridade. Por isso a chance é sempre
+"estimada", nunca "sua chance", e nunca vira "você vai conseguir".
 
 ## Múltipla ordenável sem widget de múltipla ordenável
 
@@ -33,6 +37,15 @@ from creche_bot.dominio.tipos import (
 
 ORDINAL = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣"}
 BOTOES_HORARIO = (Botao("integral", "Integral"), Botao("parcial", "Parcial"))
+
+# Três opções, como no Sisu. Não é limite de tela — cabe mais em lista — é o que a base
+# sustenta: em 2025 a taxa de atendimento foi 68,8% com 1 opção e 69,7% com 5, então
+# pedir mais escolha custa desistência sem devolver vaga.
+MAX_OPCOES = 3
+
+# Abaixo disso "N famílias por vaga" arredonda para 1 e vira "1 famílias por vaga" —
+# ruído gramatical dizendo que não houve disputa. Quando não houve, a linha some.
+DISPUTA_VISIVEL = 1.5
 
 
 def num(v: float, casas: int = 1) -> str:
@@ -79,9 +92,23 @@ def _achatar(v: VagaSugerida) -> dict:
     return {"id": v.id_escola, "nome": v.nome, "endereco": v.endereco,
             "lat": v.lat, "lng": v.lng, "km": v.distancia_km,
             "minutos": v.minutos_a_pe, "ociosa": v.vaga_ociosa,
-            "referencia": v.referencia,
+            "referencia": v.referencia, "chance": v.chance,
             "concorrencia": (None if v.concorrencia is None else
                              [v.concorrencia.familias_por_vaga, v.concorrencia.ano])}
+
+
+def _chance(e: dict) -> str:
+    """A chance estimada naquela creche, sempre com o ano de onde ela saiu.
+
+    O ano não é enfeite: sem ele o número vira previsão sobre o processo de agora, que é
+    justamente o que o bot não pode dizer. A conta está em `backend/mapa.py` — quantos dos
+    que pediram esta creche como 1ª opção foram atendidos no ano-base.
+    """
+    if e.get("chance") is None:
+        return ""
+    ano = e["concorrencia"][1] if e["concorrencia"] else ""
+    base = f" (base {ano})" if ano else ""
+    return f"chance estimada {round(e['chance'] * 100)}%{base}"
 
 
 def _linha(e: dict, posicao: int) -> str:
@@ -89,20 +116,31 @@ def _linha(e: dict, posicao: int) -> str:
     if e["referencia"]:
         # A família reconhece o lugar pelo apelido, não pelo nome oficial.
         partes.append(e["referencia"])
-    if e["ociosa"]:
-        partes.append("🟢 tem vaga aberta agora")
-    elif e["concorrencia"]:
+
+    detalhe = []
+    if (chance := _chance(e)):
+        detalhe.append(chance)
+    elif e["concorrencia"] and e["concorrencia"][0] >= DISPUTA_VISIVEL:
+        # Sem chance calculada, a concorrência crua é o que sobra de fato verificável.
         por_vaga, ano = e["concorrencia"]
-        partes.append(f"em {ano}, {num(por_vaga, 0)} famílias por vaga")
-    return f"{ORDINAL[posicao]} {e['nome']}\n   " + " · ".join(partes)
+        detalhe.append(f"em {ano}, {num(por_vaga, 0)} famílias por vaga")
+    if e["ociosa"]:
+        detalhe.append("🟢 tem vaga aberta agora")
+
+    corpo = f"{ORDINAL[posicao]} {e['nome']}\n   " + " · ".join(partes)
+    return f"{corpo}\n   " + " · ".join(detalhe) if detalhe else corpo
 
 
 def sugerir(p: Passo) -> MensagemSaida:
     from creche_bot.conversa.passos.endereco import endereco_de
 
+    endereco = endereco_de(p.dados)
     try:
         sugestoes = p.backend.escolas_proximas(
-            endereco_de(p.dados), p.dados["grupamento"], p.dados["horario"], n=3)
+            endereco, p.dados["grupamento"], p.dados["horario"], n=MAX_OPCOES)
+        # Contexto da região junto da oferta: os dois vêm da mesma leitura do mapa, e
+        # separar em dois turnos faria a família escolher antes de saber onde está.
+        panorama = p.backend.panorama_da_regiao(endereco)
     except BackendIndisponivel:
         return p.diz("backend_fora")
 
@@ -112,16 +150,28 @@ def sugerir(p: Passo) -> MensagemSaida:
 
     p.dados["escolas"] = [_achatar(v) for v in sugestoes]
     p.dados["preferencias"] = []
+    p.dados["regiao"] = (None if panorama is None else
+                         {"bairro": panorama.bairro, "ano": panorama.ano,
+                          "demanda": panorama.demanda, "atendidos": panorama.atendidos})
     p.ir("ESCOLAS")
     return _painel(p)
+
+
+def _regiao(p: Passo) -> str:
+    if not (r := p.dados.get("regiao")):
+        return ""
+    return p.txt("contexto_regiao", bairro=r["bairro"], ano=r["ano"],
+                 demanda=r["demanda"], atendidos=r["atendidos"])
 
 
 def _painel(p: Passo) -> MensagemSaida:
     escolas = p.dados["escolas"]
     corpo = "\n\n".join(_linha(e, i) for i, e in enumerate(escolas, 1))
-    return p.diz("achei_creches",
+    rua = p.dados.get("endereco", {}).get("logradouro", "você")
+    return p.diz("achei_creches", rua=rua,
                  grupamento=GRUPAMENTO_LEGIVEL[p.dados["grupamento"]],
                  horario=HORARIO_LEGIVEL[p.dados["horario"]], creches=corpo,
+                 regiao=_regiao(p),
                  botoes=botoes_nomeados([(f"esc:{e['id']}", e["nome"]) for e in escolas]))
 
 
@@ -142,12 +192,15 @@ def escolher(p: Passo) -> MensagemSaida:
 
 
 def _mais_uma(p: Passo) -> MensagemSaida:
+    """Confirma a posição recém-preenchida e chama a próxima — a ordem do Sisu sai da
+    SEQUÊNCIA DE TOQUES, porque nem WhatsApp nem Telegram têm widget de ordenar."""
     posicao = len(p.dados["preferencias"])
     ultima = next(e for e in p.dados["escolas"]
                   if e["id"] == p.dados["preferencias"][-1])
     # 2 restantes + "Pronto" = 3 botões. Sempre cabe.
     botoes = botoes_nomeados([(f"esc:{e['id']}", e["nome"]) for e in _restantes(p)[:2]])
-    return p.diz("mais_uma", posicao=f"{ORDINAL[posicao]} {ultima['nome']}",
+    return p.diz("mais_uma", escola=ultima["nome"], posicao=f"{posicao}a opção",
+                 proxima=f"{posicao + 1}a opção",
                  botoes=(*botoes, Botao("pronto", "Pronto, é só isso")))
 
 

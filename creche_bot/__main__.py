@@ -11,7 +11,9 @@ import sys
 import threading
 from pathlib import Path
 
+from creche_bot.backend.mapa import BackendMapa
 from creche_bot.backend.mock import BackendMock
+from creche_bot.backend.porta import BackendCreche
 from creche_bot.canal.telegram import Telegram
 from creche_bot.conversa.maquina import Maquina
 from creche_bot.dados.memoria import RepositorioMemoria
@@ -41,6 +43,18 @@ def escolher_repositorio() -> Repositorio:
     return RepositorioPostgres(dsn)
 
 
+def escolher_backend() -> BackendCreche:
+    """`BackendMapa` é o padrão: oferta real, das 820 creches de `MapaFilaCreche/`.
+
+    `BACKEND=mock` volta para as três escolas inventadas do roteiro — serve para demo
+    determinística e é o que a bateria de testes usa. Quando o `BackendHTTP` do município
+    subir, ele entra aqui e as duas opções saem.
+    """
+    if os.environ.get("BACKEND", "").lower() == "mock":
+        return BackendMock()
+    return BackendMapa()
+
+
 def main() -> None:
     carregar_env(RAIZ / ".env")
     configurar_log()
@@ -49,7 +63,7 @@ def main() -> None:
         sys.exit("TELEGRAM_TOKEN não configurado no .env — veja TELEGRAM.md")
 
     repo = escolher_repositorio()
-    backend = BackendMock()          # troque por BackendHTTP quando o backend real subir
+    backend = escolher_backend()
     redator = criar(os.environ.get("ANTHROPIC_API_KEY") or None)
     canal = Telegram(token)
     maquina = Maquina(backend, redator, repo, Transcritor())

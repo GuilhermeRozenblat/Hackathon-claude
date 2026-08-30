@@ -13,8 +13,8 @@ frente tem pasta própria, `CLAUDE.md` próprio e um teste que falha se alguém 
 
 As três se encontram em dois arquivos congelados:
 
-- `creche_bot/dados/porta.py` — 16 operações de persistência
-- `creche_bot/backend/porta.py` — 16 operações do município
+- `creche_bot/dados/porta.py` — 21 operações de persistência
+- `creche_bot/backend/porta.py` — 17 operações do município
 
 **Mudar um desses dois é PR próprio, revisado por todos os lados.** Enquanto eles não
 mudarem, ninguém quebra ninguém — e `make fronteira` prova.

@@ -16,16 +16,17 @@ o resto do projeto conhece só `porta.py`.
 Fora desta pasta não existe `sqlite3`, `SELECT`, `session`, `connection` nem `cursor`.
 Há um teste que varre `creche_bot/` e falha se aparecer.
 
-Quem consome recebe um `Repositorio` injetado no construtor e chama 16 métodos. Nenhum
-deles devolve `Row`, `dict` de coluna ou objeto de ORM — só `Inscricao` e `EventoPendente`,
-que são dataclasses de `porta.py`.
+Quem consome recebe um `Repositorio` injetado no construtor e chama 21 métodos. Nenhum
+deles devolve `Row`, `dict` de coluna ou objeto de ORM — só as dataclasses de `porta.py`:
+`Inscricao`, `EventoPendente`, `Cadastro`, `RespostaCriterio`, `PreferenciaEscola` e
+`EventoInscricao`.
 
 ## O estado hoje
 
 `postgres.py` roda contra o Supabase. O sqlite3 da validação foi removido: sobraram as
 duas implementações que o contrato prevê, e é contra as duas que todo teste roda.
 
-**Sem SQLAlchemy e sem Alembic, de propósito.** São 16 métodos de uma tabela cada, num só
+**Sem SQLAlchemy e sem Alembic, de propósito.** São 21 métodos sobre onze tabelas, num só
 arquivo — um ORM aqui é a abstração especulativa que o `CLAUDE.md` da raiz proíbe. DDL
 idempotente no boot custa menos que migração versionada enquanto o schema muda toda
 semana; Alembic entra quando ele parar de mudar.

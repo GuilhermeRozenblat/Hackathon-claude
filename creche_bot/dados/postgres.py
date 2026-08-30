@@ -34,7 +34,14 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from creche_bot.dados.porta import EventoPendente, Inscricao
+from creche_bot.dados.porta import (
+    Cadastro,
+    EventoInscricao,
+    EventoPendente,
+    Inscricao,
+    PreferenciaEscola,
+    RespostaCriterio,
+)
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +95,72 @@ CREATE TABLE IF NOT EXISTS {s}.inscricao (
 );
 CREATE INDEX IF NOT EXISTS ix_inscricao_contato ON {s}.inscricao (contato_id);
 
+-- O que a família digitou, em colunas. O jsonb da sessão continua sendo o estado vivo da
+-- conversa; isto é o dado consultável, gravado a cada turno — inclusive de quem desistiu
+-- no meio, que é justamente o que interessa medir.
+CREATE TABLE IF NOT EXISTS {s}.cadastro (
+    id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    contato_id         text NOT NULL REFERENCES {s}.contato(id) ON DELETE CASCADE,
+    protocolo          text,
+    nome_crianca       text,
+    nascimento_crianca date,
+    sexo               text,
+    grupamento         text,
+    documento_crianca  text,
+    nome_responsavel   text,
+    cpf_responsavel    text,
+    relacao            text,
+    cep                text,
+    numero             text,
+    logradouro         text,
+    bairro             text,
+    lat                double precision,
+    lng                double precision,
+    horario            text,
+    telefone           text,
+    email              text,
+    criado_em          timestamptz NOT NULL DEFAULT now(),
+    atualizado_em      timestamptz NOT NULL DEFAULT now()
+);
+-- Um cadastro ABERTO por contato. Parcial porque os já enviados são vários: 1.738
+-- responsáveis inscreveram duas ou mais crianças em 2025.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_cadastro_aberto
+    ON {s}.cadastro (contato_id) WHERE protocolo IS NULL;
+CREATE INDEX IF NOT EXISTS ix_cadastro_contato ON {s}.cadastro (contato_id);
+
+CREATE TABLE IF NOT EXISTS {s}.resposta_criterio (
+    cadastro_id    bigint NOT NULL REFERENCES {s}.cadastro(id) ON DELETE CASCADE,
+    codigo         text NOT NULL,
+    declarado      boolean NOT NULL,
+    comprovado     boolean NOT NULL DEFAULT false,
+    sensivel       boolean NOT NULL DEFAULT false,
+    PRIMARY KEY (cadastro_id, codigo)
+);
+
+CREATE TABLE IF NOT EXISTS {s}.preferencia_escola (
+    cadastro_id       bigint NOT NULL REFERENCES {s}.cadastro(id) ON DELETE CASCADE,
+    posicao           smallint NOT NULL,
+    id_escola         text NOT NULL,
+    nome_escola       text NOT NULL,
+    distancia_km      double precision,
+    vaga_ociosa       boolean NOT NULL DEFAULT false,
+    familias_por_vaga double precision,
+    ano_referencia    smallint,
+    PRIMARY KEY (cadastro_id, posicao)
+);
+
+-- A história da inscrição, para o /status mostrar o caminho e não só o agora.
+CREATE TABLE IF NOT EXISTS {s}.evento_inscricao (
+    protocolo      text NOT NULL,
+    etapa_codigo   text NOT NULL,
+    tipo           text NOT NULL,
+    titulo         text NOT NULL,
+    quando         timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (protocolo, etapa_codigo)
+);
+CREATE INDEX IF NOT EXISTS ix_evento_protocolo
+    ON {s}.evento_inscricao (protocolo, quando);
+
 -- Sem FK para contato, de propósito: o expurgo da LGPD apaga por protocolo,
 -- explicitamente, e um CASCADE escondido tornaria fácil esquecer disso.
 CREATE TABLE IF NOT EXISTS {s}.outbox (
@@ -140,14 +213,38 @@ COMMENT ON COLUMN {s}.outbox.chave IS
 COMMENT ON COLUMN {s}.outbox.enviado_em IS 'NULL = ainda na fila.';
 COMMENT ON TABLE {s}.marca IS
     'Até onde o backend já foi lido. Sem dado pessoal: sobrevive ao expurgo.';
+COMMENT ON TABLE {s}.cadastro IS
+    'O que a família respondeu, em colunas. Gravado a cada turno, inclusive de quem '
+    'abandonou no meio. protocolo NULL = cadastro ainda aberto.';
+COMMENT ON COLUMN {s}.cadastro.protocolo IS
+    'NULL enquanto a inscrição não foi efetivada. A UNIQUE parcial garante um '
+    'cadastro aberto por contato; os enviados podem ser vários.';
+COMMENT ON COLUMN {s}.cadastro.bairro IS
+    'Derivado do CEP pelo servidor, NUNCA digitado: campo livre gerou 1.608 grafias '
+    'para ~925 bairros na base histórica.';
+COMMENT ON TABLE {s}.resposta_criterio IS
+    'Régua de prioridade reduzida a código + booleano. O texto digitado não chega aqui.';
+COMMENT ON COLUMN {s}.resposta_criterio.sensivel IS
+    'LGPD art. 11 — saúde, violência doméstica, substâncias, situação prisional. '
+    'Não é booleano qualquer: nunca ecoe em tela nem em log.';
+COMMENT ON TABLE {s}.preferencia_escola IS
+    'As opções de creche na ordem escolhida (1 = primeira), com o fato que estava na '
+    'tela na hora: sem isso não dá para auditar com base em que a escolha foi feita.';
+COMMENT ON TABLE {s}.evento_inscricao IS
+    'História da inscrição. PK (protocolo, etapa_codigo) torna o registro idempotente: '
+    'o polling relê a mesma situação várias vezes.';
 
-ALTER TABLE {s}.contato           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {s}.identidade_canal  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {s}.consentimento     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {s}.sessao            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {s}.inscricao         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {s}.outbox            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {s}.marca             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.contato            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.identidade_canal   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.consentimento      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.sessao             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.inscricao          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.outbox             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.marca              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.cadastro           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.resposta_criterio  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.preferencia_escola ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {s}.evento_inscricao   ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON SCHEMA {s} FROM PUBLIC;
 
@@ -281,6 +378,105 @@ class RepositorioPostgres:
                 " contexto=excluded.contexto, atualizado_em=now()",
                 (contato_id, estado, Jsonb(contexto, dumps=_json)))
 
+    # ---------------------------------------------------------------- cadastro
+    def salvar_cadastro(self, cadastro: Cadastro) -> None:
+        """Cadastro + régua + preferências numa transação só.
+
+        Meia gravação faria a régua discordar da escolha de creche, e é exatamente o
+        par que alguém vai cruzar em SQL depois. O UPSERT bate na UNIQUE parcial de
+        `protocolo IS NULL` — por isso o WHERE explícito no ON CONFLICT.
+        """
+        with self._pool.connection() as con, con.cursor() as cur:
+            cur.execute(
+                f"INSERT INTO {self._s}.cadastro"
+                " (contato_id, protocolo, nome_crianca, nascimento_crianca, sexo,"
+                "  grupamento, documento_crianca, nome_responsavel, cpf_responsavel,"
+                "  relacao, cep, numero, logradouro, bairro, lat, lng, horario,"
+                "  telefone, email)"
+                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                " ON CONFLICT (contato_id) WHERE protocolo IS NULL DO UPDATE SET"
+                " nome_crianca=excluded.nome_crianca,"
+                " nascimento_crianca=excluded.nascimento_crianca, sexo=excluded.sexo,"
+                " grupamento=excluded.grupamento,"
+                " documento_crianca=excluded.documento_crianca,"
+                " nome_responsavel=excluded.nome_responsavel,"
+                " cpf_responsavel=excluded.cpf_responsavel, relacao=excluded.relacao,"
+                " cep=excluded.cep, numero=excluded.numero,"
+                " logradouro=excluded.logradouro, bairro=excluded.bairro,"
+                " lat=excluded.lat, lng=excluded.lng, horario=excluded.horario,"
+                " telefone=excluded.telefone, email=excluded.email,"
+                " atualizado_em=now()"
+                " RETURNING id",
+                (cadastro.contato_id, cadastro.protocolo, cadastro.nome_crianca,
+                 cadastro.nascimento_crianca, cadastro.sexo, cadastro.grupamento,
+                 cadastro.documento_crianca, cadastro.nome_responsavel,
+                 cadastro.cpf_responsavel, cadastro.relacao, cadastro.cep,
+                 cadastro.numero, cadastro.logradouro, cadastro.bairro, cadastro.lat,
+                 cadastro.lng, cadastro.horario, cadastro.telefone, cadastro.email))
+            cadastro_id = cur.fetchone()["id"]
+
+            # Reescreve inteiro: a família corrige respostas no bloco 11, e um UPSERT
+            # linha a linha deixaria para trás o critério que ela desmarcou.
+            cur.execute(f"DELETE FROM {self._s}.resposta_criterio WHERE cadastro_id=%s",
+                        (cadastro_id,))
+            cur.executemany(
+                f"INSERT INTO {self._s}.resposta_criterio"
+                " (cadastro_id, codigo, declarado, comprovado, sensivel)"
+                " VALUES (%s,%s,%s,%s,%s)",
+                [(cadastro_id, r.codigo, r.declarado, r.comprovado, r.sensivel)
+                 for r in cadastro.criterios])
+
+            cur.execute(f"DELETE FROM {self._s}.preferencia_escola WHERE cadastro_id=%s",
+                        (cadastro_id,))
+            cur.executemany(
+                f"INSERT INTO {self._s}.preferencia_escola"
+                " (cadastro_id, posicao, id_escola, nome_escola, distancia_km,"
+                "  vaga_ociosa, familias_por_vaga, ano_referencia)"
+                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                [(cadastro_id, p.posicao, p.id_escola, p.nome_escola, p.distancia_km,
+                  p.vaga_ociosa, p.familias_por_vaga, p.ano_referencia)
+                 for p in cadastro.preferencias])
+
+    def cadastro_de(self, contato_id: str, protocolo: str | None = None) -> Cadastro | None:
+        with self._cursor() as cur:
+            cur.execute(
+                f"SELECT * FROM {self._s}.cadastro WHERE contato_id=%s"
+                f" AND protocolo IS NOT DISTINCT FROM %s", (contato_id, protocolo))
+            if (linha := cur.fetchone()) is None:
+                return None
+
+            cur.execute(
+                f"SELECT codigo, declarado, comprovado, sensivel"
+                f" FROM {self._s}.resposta_criterio WHERE cadastro_id=%s ORDER BY codigo",
+                (linha["id"],))
+            criterios = tuple(RespostaCriterio(**r) for r in cur.fetchall())
+
+            cur.execute(
+                f"SELECT posicao, id_escola, nome_escola, distancia_km, vaga_ociosa,"
+                f" familias_por_vaga, ano_referencia FROM {self._s}.preferencia_escola"
+                " WHERE cadastro_id=%s ORDER BY posicao", (linha["id"],))
+            preferencias = tuple(PreferenciaEscola(**p) for p in cur.fetchall())
+
+        nascimento = linha["nascimento_crianca"]
+        return Cadastro(
+            contato_id=linha["contato_id"], protocolo=linha["protocolo"],
+            nome_crianca=linha["nome_crianca"],
+            nascimento_crianca=nascimento.isoformat() if nascimento else None,
+            sexo=linha["sexo"], grupamento=linha["grupamento"],
+            documento_crianca=linha["documento_crianca"],
+            nome_responsavel=linha["nome_responsavel"],
+            cpf_responsavel=linha["cpf_responsavel"], relacao=linha["relacao"],
+            cep=linha["cep"], numero=linha["numero"], logradouro=linha["logradouro"],
+            bairro=linha["bairro"], lat=linha["lat"], lng=linha["lng"],
+            horario=linha["horario"], telefone=linha["telefone"], email=linha["email"],
+            criterios=criterios, preferencias=preferencias)
+
+    def fechar_cadastro(self, contato_id: str, protocolo: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                f"UPDATE {self._s}.cadastro SET protocolo=%s, atualizado_em=now()"
+                " WHERE contato_id=%s AND protocolo IS NULL", (protocolo, contato_id))
+
     # --------------------------------------------------------------- inscrição
     def salvar_inscricao(self, inscricao: Inscricao) -> None:
         with self._cursor() as cur:
@@ -305,6 +501,25 @@ class RepositorioPostgres:
         with self._cursor() as cur:
             cur.execute(f"UPDATE {self._s}.inscricao SET etapa_codigo=%s WHERE protocolo=%s",
                         (etapa_codigo, protocolo))
+
+    # ---------------------------------------------------- acompanhamento da vaga
+    def registrar_evento(self, evento: EventoInscricao) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                f"INSERT INTO {self._s}.evento_inscricao"
+                " (protocolo, etapa_codigo, tipo, titulo) VALUES (%s,%s,%s,%s)"
+                " ON CONFLICT (protocolo, etapa_codigo) DO NOTHING",
+                (evento.protocolo, evento.etapa_codigo, evento.tipo, evento.titulo))
+
+    def eventos(self, protocolo: str) -> list[EventoInscricao]:
+        with self._cursor() as cur:
+            cur.execute(
+                f"SELECT protocolo, etapa_codigo, tipo, titulo, quando"
+                f" FROM {self._s}.evento_inscricao WHERE protocolo=%s ORDER BY quando",
+                (protocolo,))
+            return [EventoInscricao(linha["protocolo"], linha["etapa_codigo"], linha["tipo"],
+                                    linha["titulo"], linha["quando"].isoformat(timespec="seconds"))
+                    for linha in cur.fetchall()]
 
     # ------------------------------------------------------------------ outbox
     def enfileirar(self, protocolo: str, chave: str, variaveis: dict[str, Any]) -> None:
@@ -357,6 +572,13 @@ class RepositorioPostgres:
         with self._cursor() as cur:
             cur.execute(
                 f"DELETE FROM {self._s}.outbox WHERE protocolo IN"
+                f" (SELECT protocolo FROM {self._s}.inscricao WHERE contato_id=%s)",
+                (contato_id,))
+            # evento_inscricao também não tem FK para contato, pelo mesmo motivo que a
+            # outbox: sem esta linha sobraria histórico com nome de criança depois do
+            # expurgo. As tabelas de cadastro caem no CASCADE de `contato`.
+            cur.execute(
+                f"DELETE FROM {self._s}.evento_inscricao WHERE protocolo IN"
                 f" (SELECT protocolo FROM {self._s}.inscricao WHERE contato_id=%s)",
                 (contato_id,))
             cur.execute(f"DELETE FROM {self._s}.contato WHERE id=%s", (contato_id,))

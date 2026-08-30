@@ -12,6 +12,7 @@ import pytest
 from creche_bot.backend.mock import CPF_CONHECIDO, BackendMock
 from creche_bot.canal.tipos import Anexo, MensagemEntrada, MensagemSaida
 from creche_bot.conversa.maquina import Maquina
+
 # Os testes que montam a própria Maquina (processo fechado, por ex.) usam este direto —
 # não passam pela fixture `repo`, porque precisam inspecionar o repositório depois.
 from creche_bot.dados.memoria import RepositorioMemoria
@@ -431,11 +432,38 @@ def test_nenhuma_tela_estoura_os_limites_do_whatsapp(bot):
 
 
 def test_bot_nunca_promete_vaga_nem_pontuacao(bot):
+    """A chance estimada por creche PODE aparecer; a promessa e a classificação, não.
+
+    O painel do bloco 10 mostra um percentual calculado sobre 2025 (ver
+    `backend/mapa.py`). Esta lista é a fronteira que continua de pé: garantia, certeza, e
+    a régua que só roda depois do fechamento das inscrições.
+    """
     proibidas = ("garantido", "com certeza", "vai conseguir", "sua pontuação",
                  "nota de corte", "posição na fila")
     for entrada in CAMINHO_CURTO:
         texto = bot.processar(entrada).texto.lower()
         assert not any(x in texto for x in proibidas), texto
+
+
+def test_chance_na_tela_nunca_aparece_sem_o_ano_de_onde_veio():
+    """Sem o ano, "33%" vira previsão sobre o processo de agora — que não existe ainda.
+
+    Roda contra o `BackendMapa` de propósito: é ele que produz a chance, e o mock das três
+    escolas do roteiro não produziria número nenhum para verificar.
+    """
+    from creche_bot.backend.mapa import BackendMapa
+    from creche_bot.conversa.passos.escolas import _chance
+
+    backend = BackendMapa()
+    endereco = backend.resolver_cep("22710560", "100")
+    for vaga in backend.escolas_proximas(endereco, "maternal_2", "integral"):
+        linha = _chance({"chance": vaga.chance,
+                         "concorrencia": (None if vaga.concorrencia is None else
+                                          [vaga.concorrencia.familias_por_vaga,
+                                           vaga.concorrencia.ano])})
+        if linha:
+            assert "estimada" in linha, linha
+            assert str(vaga.concorrencia.ano) in linha, linha
 
 
 def test_nenhum_texto_usa_markdown():
