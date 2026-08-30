@@ -37,6 +37,7 @@ from creche_bot.dominio.tipos import (
     FormaEntrega,
     Grupamento,
     Horario,
+    PanoramaRegiao,
     PontoEntrega,
     Situacao,
     VagaSugerida,
@@ -94,6 +95,17 @@ class BackendCreche(Protocol):
 
         O bot NÃO reordena nem recalcula. Raio padrão de 2 km: 72,8% dos confirmados
         ficaram na própria 1ª opção, e entre os que trocaram, 82,9% andaram até 2 km.
+        """
+
+    def panorama_da_regiao(self, endereco: Endereco) -> PanoramaRegiao | None:
+        """O que aconteceu na microárea no processo passado. `None` = sem base.
+
+        Contexto, não previsão: quantas famílias pediram, quantas foram atendidas e
+        quantas vagas estão ociosas ali agora. Serve para a família escolher as opções
+        sabendo em que região está, que é a decisão que ela realmente toma no bloco 10.
+
+        O bot não deriva probabilidade disso e não pode: a classificação roda depois do
+        fechamento das inscrições. Quem renderiza é obrigado a estampar `ano`.
         """
 
     # ------------------------------------------------------------ inscrição
