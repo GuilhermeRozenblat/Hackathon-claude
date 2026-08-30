@@ -49,7 +49,10 @@ CADASTRO_NOVO = [
     msg(escolha="nao"),                                # sem necessidade especial
     msg("Pedro Henrique Lima"), msg(escolha="sim"),
     msg("Carla Souza Lima"), msg("Carla Souza Lima"),
-    msg("(21) 99988-7766"), msg(escolha="nao"),        # sem e-mail
+    msg("07/11/1990"),                                 # nascimento do responsável
+    msg(escolha="nao"),                                # sem deficiência na família
+    msg("(21) 99988-7766"), msg(escolha="nao"),        # sem segundo contato
+    msg(escolha="nao"),                                # sem e-mail
 ]
 
 
@@ -149,6 +152,12 @@ def test_documento_ilegivel_nao_grava(bot):
 def test_correcao_volta_ao_campo_certo(bot):
     responder(bot, *CADASTRO_NOVO)
     r = bot.processar(msg(escolha="corrigir"))
+    assert len(r.lista) <= 10
+
+    # São mais campos do que os 10 itens do WhatsApp: a lista pagina em vez de truncar,
+    # senão os últimos do formulário ficariam impossíveis de corrigir.
+    assert r.lista[-1].id == "mais_campos"
+    r = bot.processar(msg(escolha="mais_campos"))
     assert len(r.lista) <= 10 and any(i.id == "telefone" for i in r.lista)
 
     r = bot.processar(msg(escolha="telefone"))
@@ -195,3 +204,88 @@ def test_bot_nunca_promete_vaga(bot):
     for e in entradas:
         texto = bot.processar(e).texto.lower()
         assert not any(x in texto for x in proibidas), texto
+
+
+def test_ja_tenho_inscricao_vai_para_o_status(bot):
+    """Bloco 0 do roteiro tem duas portas: começar, ou consultar o que já existe."""
+    r = bot.processar(msg("/start"))
+    assert any(b.id == "ja_tenho" for b in r.botoes)
+
+    r = bot.processar(msg(escolha="ja_tenho"))
+    assert "ainda não tem inscrição" in r.texto
+    contato = bot._repo.contato_de("telegram", "777")
+    assert not bot._repo.tem_consentimento(contato), "consultar status não é consentir"
+
+
+def test_matricula_tem_saida_para_quem_nao_sabe(bot):
+    """O roteiro pede o botão 'não sei / não tenho agora'. Sem ele a pessoa trava numa
+    pergunta cuja resposta está numa gaveta em casa."""
+    r = responder(bot, msg("/start"), msg(escolha="aceito"),
+                  msg("999.888.777-66"), msg("10/02/2024"),
+                  msg(escolha="rede_municipal"))
+    assert "matrícula" in r.texto.lower()
+    assert [b.id for b in r.botoes] == ["nao_sei"]
+
+    r = bot.processar(msg(escolha="nao_sei"))
+    assert "deficiência" in r.texto.lower(), "seguiu para a próxima pergunta"
+
+
+def test_prioridade_sai_da_idade_do_responsavel():
+    """Critério legal deduzido, não perguntado — o roteiro é explícito nisso."""
+    from creche_bot.conversa.formulario import criterios_prioridade
+
+    assert criterios_prioridade({"data_nascimento_responsavel": "1950-06-01"}) == (
+        "responsavel_60_mais",)
+    assert criterios_prioridade({"data_nascimento_responsavel": "2010-06-01"}) == (
+        "responsavel_menor_18",)
+    assert criterios_prioridade({"data_nascimento_responsavel": "1990-06-01"}) == ()
+    assert criterios_prioridade({}) == (), "sem a data, nada é marcado"
+
+
+def test_segundo_contato_e_prioridade_aparecem_no_resumo(bot):
+    entradas = [
+        msg("/start"), msg(escolha="aceito"),
+        msg("999.888.777-66"), msg("10/02/2024"),
+        msg(escolha="nunca_estudou"), msg(escolha="nunca_estudou"), msg(escolha="nao"),
+        msg("Pedro Henrique Lima"), msg(escolha="sim"),
+        msg("Carla Souza Lima"), msg("Carla Souza Lima"),
+        msg("07/11/1955"),                              # responsável com mais de 60
+        msg(escolha="nao"),
+        msg("(21) 99988-7766"),
+        msg(escolha="sim"), msg("(21) 3333-4444"),      # segundo contato
+        msg(escolha="nao"),
+    ]
+    r = responder(bot, *entradas)
+    assert "(21) 3333-4444" in r.texto
+    assert "60 anos ou mais" in r.texto
+
+
+def test_protocolo_vem_com_link_de_acompanhamento(bot):
+    responder(bot, *CADASTRO_NOVO)
+    bot.processar(msg(escolha="ok"))
+    r = bot.processar(msg("20220-030"))
+    bot.processar(msg(escolha=r.botoes[0].id))
+    bot.processar(msg(escolha="pronto"))
+    bot.processar(msg(escolha="confirma"))
+    r = bot.processar(msg(escolha="creche"))
+    assert "matricula.rio/acompanhar/RIO-" in r.texto
+
+
+def test_start_nao_apaga_a_inscricao_que_ja_existe(bot):
+    """/start recomeça o cadastro. Quem já tem protocolo continua tendo — senão o
+    'já tenho inscrição' e o /status respondem sempre que não existe nada."""
+    responder(bot, *CADASTRO_NOVO)
+    bot.processar(msg(escolha="ok"))
+    r = bot.processar(msg("20220-030"))
+    bot.processar(msg(escolha=r.botoes[0].id))
+    bot.processar(msg(escolha="pronto"))
+    bot.processar(msg(escolha="confirma"))
+    r = bot.processar(msg(escolha="creche"))
+    assert "RIO-" in r.texto
+
+    bot.processar(msg("/start"))
+    r = bot.processar(msg(escolha="ja_tenho"))
+    assert "Pedro" in r.texto and "Passo 3 de 5" in r.texto
+
+    r = bot.processar(msg("/status"))
+    assert "Passo 3 de 5" in r.texto

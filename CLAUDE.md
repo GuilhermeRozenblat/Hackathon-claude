@@ -36,7 +36,8 @@ de feature.
 **Privacidade (elegibilidade a ZDR da Anthropic).** Documentos de usuário e dados de
 criança passam por aqui:
 
-- Modelo é `claude-opus-5`. **Nunca** Fable 5 nem Mythos 5 — são Covered Models, exigem
+- Modelo é `claude-haiku-4-5` — o mais barato dos elegíveis a ZDR, e a tarefa é reescrever
+  uma frase curta. **Nunca** Fable 5 nem Mythos 5 — são Covered Models, exigem
   retenção de 30 dias e não existem sob ZDR.
 - Imagem vai **base64 inline** no `/v1/messages`. **Proibido** `client.files.*`, Batch
   API, code execution, MCP connector, Managed Agents — nenhum é elegível a ZDR.
@@ -73,6 +74,10 @@ geral, e sempre com a opção de não responder.
 `creche_bot/segredos.py` instala um formatador que redige token e chave de log e de
 traceback — o token do Telegram viaja no caminho da URL da Bot API, e um traceback de
 urllib bastaria para vazá-lo. Não configure logging por fora dele.
+
+Única exceção: `DEBUG_CONTEUDO=1` (`make debug`) espelha texto, botões e o tamanho do
+anexo no console — depuração na máquina do dev, nunca onde o log é coletado. Os bytes da
+foto continuam fora, e há teste que cobra isso.
 
 ## Estilo
 

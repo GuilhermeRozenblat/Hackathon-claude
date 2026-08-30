@@ -99,7 +99,7 @@ Da documentação oficial da Anthropic, só o que é acionável:
 - Também **não** elegíveis a ZDR: Batch API, code execution, MCP connector, Managed
   Agents, Agent Skills. → Nenhum pode tocar dado de usuário.
 - **Fable 5 e Mythos 5 são "Covered Models": exigem retenção de 30 dias e não existem sob
-  ZDR.** → Usar `claude-opus-5`. Nunca Fable/Mythos aqui.
+  ZDR.** → Usar `claude-haiku-4-5`. Nunca Fable/Mythos aqui.
 - ZDR é acordo por organização, via time comercial — não dá para ligar sozinho.
 - Mesmo com ZDR, conteúdo sinalizado pelo sistema de segurança pode ser retido até 2 anos.
   **Por isso minimização é o controle de verdade**, não a política.
@@ -366,7 +366,7 @@ porque o despacho é por `etapa.tipo` e não por `codigo`. Ver [D4](DECISOES.md)
 `ia/cliente.py` é o único lugar que fala com a Anthropic, e carrega as regras no topo:
 
 ```python
-MODELO = "claude-opus-5"   # nunca Fable/Mythos: Covered Models, sem ZDR
+MODELO = "claude-haiku-4-5"   # nunca Fable/Mythos: Covered Models, sem ZDR
 
 # REGRAS INVIOLÁVEIS (elegibilidade a ZDR):
 #   - imagem vai inline em base64 no /v1/messages

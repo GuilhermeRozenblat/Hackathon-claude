@@ -9,6 +9,7 @@ stateDiagram-v2
     [*] --> INICIO
     INICIO --> CONSENTIMENTO
     CONSENTIMENTO --> BUSCA_CPF: aceita
+    CONSENTIMENTO --> ACOMPANHAMENTO: já tenho inscrição
     CONSENTIMENTO --> [*]: recusa
     BUSCA_CPF --> BUSCA_NASCIMENTO
     BUSCA_NASCIMENTO --> RESUMO: data lake achou
@@ -16,6 +17,7 @@ stateDiagram-v2
     FORMULARIO --> FORMULARIO: próxima pergunta
     FORMULARIO --> RESUMO: completo
     RESUMO --> CORRECAO: quero corrigir
+    CORRECAO --> CORRECAO: ver os outros campos
     CORRECAO --> FORMULARIO
     CORRECAO --> BUSCA_CPF: corrigir CPF/nascimento
     RESUMO --> LOCALIZACAO: está tudo certo
@@ -34,15 +36,15 @@ stateDiagram-v2
 
 | Roteiro | Estado | Arquivo | Observação |
 |---|---|---|---|
-| 0 · Boas-vindas | `INICIO`, `CONSENTIMENTO` | `passos/busca.py` | Consentimento LGPD art. 14 no mesmo balão da saudação |
+| 0 · Boas-vindas | `INICIO`, `CONSENTIMENTO` | `passos/busca.py` | Consentimento LGPD art. 14 no mesmo balão da saudação. "Já tenho inscrição" salta para o status sem consentir nada |
 | 1 · Pesquisa inicial | `BUSCA_CPF`, `BUSCA_NASCIMENTO` | `passos/busca.py` | CPF **e** data: CPF sozinho traria a criança errada |
-| 2 · Sobre a vaga | `FORMULARIO` | `formulario.py` | 4 origens não cabem em 3 botões → duas perguntas |
-| 3 · Dados pessoais | `FORMULARIO` | `formulario.py` | `pergunta_alt` troca o texto quando não há filiação na certidão |
-| 4 · Contato | `FORMULARIO` | `formulario.py` | E-mail só é perguntado se a pessoa disser que tem |
-| 5 · Resumo | `RESUMO`, `CORRECAO` | `passos/resumo.py` | Correção usa **lista** (até 10), não botões |
+| 2 · Sobre a vaga | `FORMULARIO` | `formulario.py` | 4 origens não cabem em 3 botões → duas perguntas. Matrícula tem `Campo.escape` ("Não sei agora") |
+| 3 · Dados pessoais | `FORMULARIO` | `formulario.py` | `pergunta_alt` troca o texto quando não há filiação na certidão. A data de nascimento do responsável marca os critérios de prioridade sem perguntar — `criterios_prioridade()` |
+| 4 · Contato | `FORMULARIO` | `formulario.py` | Segundo contato e e-mail só são perguntados se a pessoa disser que tem |
+| 5 · Resumo | `RESUMO`, `CORRECAO` | `passos/resumo.py` | Correção usa **lista** (até 10), não botões — e pagina em 9 + "ver os outros", porque são até 14 campos |
 | 6 · Escolas | `LOCALIZACAO`, `ESCOLHA` | `passos/escolas.py` | Ordem montada em toques — ver [D6](DECISOES.md) |
 | 7 · Confirmação | `CONFIRMA_ESCOLAS` | `passos/escolas.py` | |
-| 8 · Documentação | `ENTREGA`, `RECEBER_DOCUMENTOS` | `passos/entrega.py` | Três caminhos; o do CRAS é honesto sobre a lacuna |
+| 8 · Documentação | `ENTREGA`, `RECEBER_DOCUMENTOS` | `passos/entrega.py` | Três caminhos; o do CRAS é honesto sobre a lacuna. Link do painel é **mock** (`entrega.PAINEL`) até o backend real devolver o dele |
 | — · Acompanhamento | `ACOMPANHAMENTO` | `passos/acompanhamento.py` | Comportamento vem de `etapa.tipo`, nunca do `codigo` |
 
 ## Comandos globais

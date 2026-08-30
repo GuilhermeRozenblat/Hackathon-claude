@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
-from creche_bot.canal.tipos import Botao, ItemLista, MensagemSaida
+from creche_bot.canal.tipos import (
+    MAX_ITENS_LISTA,
+    Botao,
+    ItemLista,
+    MensagemSaida,
+)
 from creche_bot.conversa.formulario import (
     FORMULARIO,
+    PRIORIDADES,
     Campo,
+    criterios_prioridade,
     formatar,
     proximo_campo,
     validar,
@@ -23,7 +30,10 @@ LINHAS: tuple[tuple[str, str], ...] = (
     ("tipo_necessidade", "Tipo"),
     ("filiacao", "Filiação"),
     ("nome_responsavel", "Responsável"),
+    ("data_nascimento_responsavel", "Nascimento do responsável"),
+    ("deficiencia_responsavel", "Deficiência na família"),
     ("telefone", "Telefone"),
+    ("outro_contato", "Outro contato"),
     ("email", "E-mail"),
 )
 
@@ -34,6 +44,7 @@ LEGIVEL = {
     "deficiencia_fisica": "deficiência física",
     "deficiencia_intelectual": "deficiência intelectual",
     "tgd_tea": "TGD/TEA", "altas_habilidades": "altas habilidades", "outra": "outra",
+    "nao_sei": "ainda não sei",
 }
 
 
@@ -52,8 +63,15 @@ def _valor(dados: dict, chave: str) -> str | None:
 
 
 def montar(dados: dict) -> str:
-    return "\n".join(f"• {rotulo}: {v}" for chave, rotulo in LINHAS
-                     if (v := _valor(dados, chave)) is not None)
+    linhas = [f"• {rotulo}: {v}" for chave, rotulo in LINHAS
+              if (v := _valor(dados, chave)) is not None]
+
+    # Deduzido da idade do responsável, não perguntado. A família vê o que foi marcado
+    # em nome dela — marcar critério é registrar um fato, não prometer vaga nenhuma.
+    if criterios := criterios_prioridade(dados):
+        marcados = ", ".join(PRIORIDADES[c] for c in criterios)
+        linhas.append(f"• Prioridade registrada: {marcados}")
+    return "\n".join(linhas)
 
 
 def resumo(p: Passo) -> MensagemSaida:
@@ -64,14 +82,32 @@ def resumo(p: Passo) -> MensagemSaida:
     )
 
 
+def _lista_de_correcao(p: Passo, pagina: int = 0) -> MensagemSaida:
+    """Os campos preenchidos, para a pessoa escolher qual corrigir.
+
+    São até 14 e o WhatsApp aceita 10 itens, então a lista pagina: 9 campos mais o
+    "ver mais". Truncar em 10 deixaria campo impossível de corrigir — e o e-mail, que
+    é o último do formulário, seria justamente um deles.
+    """
+    p.ir("CORRECAO")
+    todos = [ItemLista(chave, rotulo, _valor(p.dados, chave))
+             for chave, rotulo in LINHAS if _valor(p.dados, chave) is not None]
+
+    inicio = pagina * (MAX_ITENS_LISTA - 1)
+    pagina_atual = todos[inicio:inicio + MAX_ITENS_LISTA - 1]
+    resto = todos[inicio + MAX_ITENS_LISTA - 1:]
+    if resto:
+        p.dados["pagina_correcao"] = pagina + 1
+        pagina_atual.append(ItemLista("mais_campos", "Ver os outros campos"))
+    else:
+        p.dados.pop("pagina_correcao", None)
+
+    return MensagemSaida(p.txt("qual_corrigir"), lista=tuple(pagina_atual))
+
+
 def confirmacao(p: Passo) -> MensagemSaida:
     if p.msg.escolha == "corrigir":
-        p.ir("CORRECAO")
-        # Lista, não botões: são até 11 campos e o WhatsApp aceita 10 itens de lista.
-        itens = tuple(ItemLista(chave, rotulo, _valor(p.dados, chave))
-                      for chave, rotulo in LINHAS
-                      if _valor(p.dados, chave) is not None)[:10]
-        return MensagemSaida(p.txt("qual_corrigir"), lista=itens)
+        return _lista_de_correcao(p)
 
     if p.msg.escolha == "ok":
         p.ir("LOCALIZACAO")
@@ -83,6 +119,11 @@ def confirmacao(p: Passo) -> MensagemSaida:
 def correcao(p: Passo) -> MensagemSaida:
     """Apaga o campo escolhido e volta ao formulário, que reencontra a lacuna sozinho."""
     escolhido = p.msg.escolha
+
+    if escolhido == "mais_campos":
+        return _lista_de_correcao(p, p.dados.get("pagina_correcao", 1))
+
+    p.dados.pop("pagina_correcao", None)
     campo = next((c for c in FORMULARIO if c.chave == escolhido), None)
 
     if escolhido in ("cpf", "data_nascimento"):

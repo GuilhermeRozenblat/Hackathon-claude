@@ -15,10 +15,15 @@ from __future__ import annotations
 
 from creche_bot.backend.porta import BackendIndisponivel
 from creche_bot.canal.tipos import Botao, Local, MensagemSaida
+from creche_bot.conversa.formulario import criterios_prioridade
 from creche_bot.conversa.sessao import Passo
 from creche_bot.dados.porta import Inscricao
 
 FORMAS = {"whatsapp", "creche", "cras"}
+
+# ponytail: link mockado. Quando o backend real subir, ele volta em `Situacao` e este
+# formato sai daqui — é o município que define a URL de acompanhamento, não nós.
+PAINEL = "https://matricula.rio/acompanhar/{protocolo}"
 
 
 def entrega(p: Passo) -> MensagemSaida:
@@ -32,8 +37,11 @@ def entrega(p: Passo) -> MensagemSaida:
         )
 
     p.dados["forma_entrega"] = forma
+    # Os critérios de prioridade seguem junto, derivados da idade do responsável. Fora
+    # do payload eles não moram em lugar nenhum: `p.dados` guarda o que a pessoa disse.
+    payload = {**p.dados, "prioridade": list(criterios_prioridade(p.dados))}
     try:
-        situacao = p.backend.inscrever(dict(p.dados), p.dados["preferencias"], forma)
+        situacao = p.backend.inscrever(payload, p.dados["preferencias"], forma)
         documentos = p.backend.documentos_exigidos(p.dados["preferencias"][0])
         pontos = p.backend.pontos_de_entrega(forma, p.dados["preferencias"][0],
                                              p.dados.get("local", ""))
@@ -50,7 +58,8 @@ def entrega(p: Passo) -> MensagemSaida:
 
     lista = "\n".join(f"📄 {d}" for d in documentos)
     rodape = (f"Seu número de protocolo é {situacao.protocolo}\n"
-              f"Vou te avisar por aqui a cada atualização ✅")
+              f"Acompanhe por aqui: {PAINEL.format(protocolo=situacao.protocolo)}\n"
+              f"E eu te aviso neste chat a cada atualização ✅")
 
     if forma == "whatsapp":
         p.ir("RECEBER_DOCUMENTOS")
@@ -86,7 +95,8 @@ def receber_documentos(p: Passo) -> MensagemSaida:
     if p.msg.escolha == "terminei":
         p.ir("ACOMPANHAMENTO")
         return MensagemSaida(
-            f"Tudo recebido! ✅\n\nProtocolo {p.dados['protocolo']}. "
+            f"Tudo recebido! ✅\n\nProtocolo {p.dados['protocolo']}\n"
+            f"Acompanhe por aqui: {PAINEL.format(protocolo=p.dados['protocolo'])}\n\n"
             f"Agora é com a gente — te aviso a cada novidade 💙")
 
     if p.msg.anexo is None:

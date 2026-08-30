@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -26,6 +27,38 @@ log = logging.getLogger(__name__)
 API = "https://api.telegram.org/bot{token}/{metodo}"
 ARQUIVO = "https://api.telegram.org/file/bot{token}/{caminho}"
 LIMITE_DOWNLOAD = 20 * 1024 * 1024   # getFile não baixa mais que isso
+
+
+def _debug() -> bool:
+    """Espelha a conversa no console. Depuração local só: por aqui passam CPF, nome de
+    criança e endereço, e o log normal carrega só ID. Nunca ligue onde o log é coletado.
+
+    Lido a cada mensagem, não no import: assim vale também quando `DEBUG_CONTEUDO=1` vem
+    do `.env`, que o `__main__` carrega depois de importar este módulo.
+    """
+    return os.environ.get("DEBUG_CONTEUDO", "").strip().lower() in {"1", "true", "sim"}
+
+
+def _resumo_entrada(m: MensagemEntrada) -> str:
+    partes = [repr(m.texto)] if m.texto else []
+    if m.escolha:
+        partes.append(f"tocou {m.escolha!r}")
+    if m.anexo:   # tamanho e mime; os bytes nunca entram no traço
+        partes.append(f"[anexo {m.anexo.mime} {len(m.anexo.conteudo) // 1024} KB]")
+    return " ".join(partes) or "(sem conteúdo)"
+
+
+def _resumo_saida(m: MensagemSaida) -> str:
+    partes = [repr(m.texto)]
+    if m.botoes:
+        partes.append("botões: " + " | ".join(b.rotulo for b in m.botoes))
+    if m.lista:
+        partes.append("lista: " + " | ".join(i.titulo for i in m.lista))
+    if m.figurinha:
+        partes.append(f"figurinha: {m.figurinha}")
+    if m.local:
+        partes.append(f"local: {m.local.nome}")
+    return " ".join(partes)
 
 
 class ErroTelegram(Exception):
@@ -105,6 +138,8 @@ class Telegram:
 
     # ----------------------------------------------------------------- saída
     def enviar(self, id_externo: str, msg: MensagemSaida) -> None:
+        if _debug():
+            log.info("→ %s · %s", id_externo, _resumo_saida(msg))
         agora = time.monotonic()
         if (espera := self._intervalo - (agora - self._ultimo_envio.get(id_externo, 0))) > 0:
             time.sleep(espera)
@@ -133,6 +168,8 @@ class Telegram:
                     entrada = self._traduzir(upd)
                     if entrada is None:
                         continue
+                    if _debug():
+                        log.info("← %s · %s", entrada.id_externo, _resumo_entrada(entrada))
                     if (resposta := processar(entrada)) is not None:
                         self.enviar(entrada.id_externo, resposta)
                 except Exception:

@@ -14,12 +14,14 @@ _CPF = Campo("cpf", "", "cpf")
 _DATA = Campo("data_nascimento", "", "data")
 
 
+BOTOES_INICIO = (Botao("aceito", "Vamos começar"),
+                 Botao("ja_tenho", "Já tenho inscrição"),
+                 Botao("recuso", "Agora não"))
+
+
 def inicio(p: Passo) -> MensagemSaida:
     p.ir("CONSENTIMENTO")
-    return MensagemSaida(
-        f"{p.txt('saudacao')}\n\n{CONSENTIMENTO}",
-        botoes=(Botao("aceito", "Vamos começar"), Botao("recuso", "Agora não")),
-    )
+    return MensagemSaida(f"{p.txt('saudacao')}\n\n{CONSENTIMENTO}", botoes=BOTOES_INICIO)
 
 
 def consentimento(p: Passo) -> MensagemSaida:
@@ -27,11 +29,18 @@ def consentimento(p: Passo) -> MensagemSaida:
         p.ir("INICIO")
         return MensagemSaida(p.txt("recusou"))
 
+    if p.msg.escolha == "ja_tenho":
+        # Quem já se inscreveu quer status, não cadastro. Sem protocolo na sessão,
+        # `acompanhamento` devolve "você ainda não tem inscrição" e manda /start —
+        # nada de dado novo é tratado aqui, então o consentimento continua intacto.
+        from creche_bot.conversa.passos.acompanhamento import acompanhamento
+
+        p.ir("ACOMPANHAMENTO")
+        return acompanhamento(p)
+
     if p.msg.escolha != "aceito":
-        return MensagemSaida(
-            "Preciso da sua autorização para continuar 🤝",
-            botoes=(Botao("aceito", "Vamos começar"), Botao("recuso", "Agora não")),
-        )
+        return MensagemSaida("Preciso da sua autorização para continuar 🤝",
+                             botoes=BOTOES_INICIO)
 
     p.repo.registrar_consentimento(p.contato_id, CONSENTIMENTO_VERSAO,
                                    p.msg.canal, p.msg.id_externo)

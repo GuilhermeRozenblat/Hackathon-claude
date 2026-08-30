@@ -15,7 +15,7 @@ from creche_bot.ia.persona import SISTEMA, TEXTOS
 
 log = logging.getLogger(__name__)
 
-MODELO = "claude-opus-5"   # nunca Fable/Mythos: são Covered Models, sem ZDR
+MODELO = "claude-haiku-4-5"   # nunca Fable/Mythos: são Covered Models, sem ZDR
 
 
 @runtime_checkable
@@ -55,10 +55,7 @@ class RedatorClaude:
             r = self._cliente.messages.create(
                 model=MODELO,
                 max_tokens=300,
-                system=[{"type": "text", "text": SISTEMA,
-                         "cache_control": {"type": "ephemeral"}}],   # prompt estável: cacheia
-                output_config={"effort": "low"},                     # conversa é volume
-                thinking={"type": "adaptive"},
+                system=SISTEMA,   # 182 tokens: abaixo do mínimo cacheável, cache não pega
                 messages=[{"role": "user", "content":
                            f"Reescreva com suas palavras, mantendo o sentido e os números "
                            f"exatos:\n\n{base}"}],

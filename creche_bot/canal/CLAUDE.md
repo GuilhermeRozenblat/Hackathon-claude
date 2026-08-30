@@ -41,6 +41,8 @@ def enviar(id_externo: str, msg: MensagemSaida) -> None
   abreviar duas escolas para o mesmo texto é pior que truncar, porque a pessoa escolhe
   errado sem saber.
 - **Nunca logue conteúdo de mensagem nem bytes de foto.** Só `id_externo` e `id_mensagem`.
+  A exceção é `DEBUG_CONTEUDO=1` (`make debug`): espelha texto, rótulos e o tamanho do
+  anexo no console do dev. Os bytes ficam fora mesmo assim — `tests/canal/test_traco.py`.
 
 ## Como verificar
 

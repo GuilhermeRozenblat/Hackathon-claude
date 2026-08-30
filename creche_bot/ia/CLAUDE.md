@@ -40,15 +40,15 @@ Produto mexe nele toda semana. Por isso é só texto, sem lógica: `TEXTOS` é u
 ## Regras de privacidade (elegibilidade a ZDR)
 
 ```python
-MODELO = "claude-opus-5"   # nunca Fable 5 / Mythos 5: Covered Models, sem ZDR
+MODELO = "claude-haiku-4-5"   # nunca Fable 5 / Mythos 5: Covered Models, sem ZDR
 ```
 
 **Proibido** nesta pasta: `client.files.*`, Batch API, `code_execution`, MCP connector,
 Managed Agents. Nenhum é elegível a ZDR. Há teste que faz `grep` aqui e falha.
 
-Técnica: `prompt caching` no system prompt (é longo e estável, maior corte de custo);
-`effort="low"` na conversa, que é volume; e **trate `stop_reason == "refusal"`** — vem
-HTTP 200, não exceção.
+Técnica: sem `effort` e sem `thinking` — Haiku 4.5 não aceita nenhum dos dois (400); sem
+`cache_control`, porque o system tem ~180 tokens e nunca alcança o mínimo cacheável; e
+**trate `stop_reason == "refusal"`** — vem HTTP 200, não exceção.
 
 ## Regras de tom
 

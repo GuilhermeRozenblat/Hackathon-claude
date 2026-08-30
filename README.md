@@ -100,7 +100,7 @@ um é **PR próprio, revisado por todas as trilhas** — nunca dentro de um PR d
 **Privacidade (elegibilidade a ZDR da Anthropic).** Documento de usuário e dado de criança
 passam por aqui:
 
-- Modelo é `claude-opus-5`. Nunca Fable 5 nem Mythos 5 — são Covered Models, exigem
+- Modelo é `claude-haiku-4-5`. Nunca Fable 5 nem Mythos 5 — são Covered Models, exigem
   retenção de 30 dias e não existem sob ZDR.
 - Imagem vai **base64 inline** no `/v1/messages`. Proibido `client.files.*`, Batch API,
   code execution, MCP connector, Managed Agents — nenhum é elegível a ZDR.

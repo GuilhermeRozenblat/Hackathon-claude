@@ -27,6 +27,7 @@ class Campo:
     opcoes: tuple[tuple[str, str], ...] = ()      # (id, rótulo) — máx. 3, limite WhatsApp
     eco: bool = False                             # "Recebido: Fulano ✅"
     erro: str = "Não entendi 🤔 Pode mandar de novo?"
+    escape: tuple[str, str] | None = None         # (id, rótulo) de fuga em campo de texto
     pular_se: Callable[[dict[str, Any]], bool] | None = field(default=None, compare=False)
     pergunta_alt: Callable[[dict[str, Any]], str] | None = field(default=None, compare=False)
     aviso: str | None = None                      # texto que precede a pergunta
@@ -38,6 +39,10 @@ class Campo:
         )
         assert (self.tipo == "botoes") == bool(self.opcoes), (
             f"campo {self.chave!r}: tipo 'botoes' e opções têm que andar juntos"
+        )
+        assert not (self.escape and self.opcoes), (
+            f"campo {self.chave!r}: escape é para pergunta aberta; com opções, "
+            f"a saída é mais uma opção"
         )
 
 
@@ -92,8 +97,9 @@ FORMULARIO: tuple[Campo, ...] = (
     ),
     Campo(
         "matricula", "Você tem o número de matrícula dele ou dela em mãos?", "texto",
+        escape=("nao_sei", "Não sei agora"),
         pular_se=lambda d: d.get("origem_escolar") != "rede_municipal",
-        erro="Se não tiver agora, tudo bem — escreve 'não sei' que a gente segue.",
+        erro="Não peguei o número 🤔 Se não tiver em mãos, toca em 'Não sei agora'.",
     ),
     Campo(
         "tem_necessidade",
@@ -130,8 +136,30 @@ FORMULARIO: tuple[Campo, ...] = (
     ),
     Campo("nome_responsavel",
           "E qual é o nome do responsável que vai acompanhar essa matrícula?", eco=True),
+    # A idade responde sozinha dois critérios legais de prioridade. Perguntar
+    # "você tem 60 anos ou mais?" ou "você é menor de 18?" é constrangedor e
+    # desnecessário: a data já diz. Ver `criterios_prioridade()`.
+    Campo("data_nascimento_responsavel",
+          "Qual é a data de nascimento do responsável? (dia/mês/ano)", "data", eco=True,
+          erro="Não peguei a data 🤔 Escreve assim: 07/11/1990"),
+    Campo(
+        "deficiencia_responsavel",
+        "O candidato tem pai, mãe ou responsável com alguma deficiência?", "botoes",
+        (("sim", "Sim"), ("nao", "Não"), ("nao_informar", "Prefiro não dizer")),
+        aviso="sensivel",
+    ),
     Campo("telefone", "Show! Agora preciso do telefone do responsável, "
                       "para mantermos contato sobre a inscrição.", "telefone", eco=True,
+          erro="Esse telefone não parece completo 🤔 Manda com DDD."),
+    Campo(
+        "tem_outro_contato",
+        "Tem algum outro celular, de uma segunda pessoa, para o caso de eu não "
+        "conseguir falar com você?", "botoes",
+        (("sim", "Sim, tenho outro"), ("nao", "Não tenho outro")),
+    ),
+    Campo("outro_contato", "Pode me passar esse outro número, por favor?",
+          "telefone", eco=True,
+          pular_se=lambda d: d.get("tem_outro_contato") != "sim",
           erro="Esse telefone não parece completo 🤔 Manda com DDD."),
     Campo("tem_email", "O responsável tem e-mail?", "botoes",
           (("sim", "Sim"), ("nao", "Não"))),
@@ -154,6 +182,33 @@ def formatar(campo: Campo, valor: Any) -> str:
         a, m, d = v.split("-")
         return f"{d}/{m}/{a}"
     return v
+
+
+PRIORIDADES = {
+    "responsavel_60_mais": "responsável com 60 anos ou mais",
+    "responsavel_menor_18": "responsável com menos de 18 anos",
+}
+
+
+def _idade(nascimento: date, hoje: date | None = None) -> int:
+    hoje = hoje or date.today()
+    return hoje.year - nascimento.year - (
+        (hoje.month, hoje.day) < (nascimento.month, nascimento.day))
+
+
+def criterios_prioridade(dados: dict[str, Any]) -> tuple[str, ...]:
+    """Critérios legais que saem da idade do responsável, sem perguntar nada a mais.
+
+    MARCAR o critério não é DECIDIR a vaga: quem aloca é o município. Aqui só sai a
+    etiqueta que vai junto da inscrição.
+    """
+    bruto = dados.get("data_nascimento_responsavel")
+    if not bruto:
+        return ()
+    idade = _idade(date.fromisoformat(bruto))
+    return tuple(chave for chave, corta in
+                 (("responsavel_60_mais", idade >= 60),
+                  ("responsavel_menor_18", idade < 18)) if corta)
 
 
 def proximo_campo(dados: dict[str, Any]) -> Campo | None:

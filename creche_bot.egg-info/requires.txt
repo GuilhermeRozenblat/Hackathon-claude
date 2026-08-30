@@ -1,0 +1,13 @@
+
+[dev]
+pytest>=8
+ruff>=0.7
+pydantic>=2.9
+
+[ia]
+anthropic>=0.40
+
+[postgres]
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+alembic>=1.13

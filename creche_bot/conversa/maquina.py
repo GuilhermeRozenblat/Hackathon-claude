@@ -51,6 +51,17 @@ PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
 # registrado — LGPD art. 14, guarda no código e não confiança no fluxo.
 EXIGEM_CONSENTIMENTO = frozenset(PASSOS) - {"INICIO", "CONSENTIMENTO"}
 
+# `/start` recomeça o cadastro, e não é para apagar a inscrição que já existe: sem isto,
+# quem manda /start por hábito perde o protocolo e o /status responde "você não tem
+# inscrição". Enquanto `dados/porta.py` não souber buscar inscrição por contato, a
+# sessão é o único lugar onde o protocolo mora.
+INSCRICAO_EM_ANDAMENTO = ("protocolo", "nome_candidato")
+
+
+def _guardar_inscricao(dados: dict) -> dict:
+    return {c: dados[c] for c in INSCRICAO_EM_ANDAMENTO if c in dados}
+
+
 AJUDA = ("Sou o Zé Matrícula, da Matrícula Rio 💙\n\n"
          "/start para começar de novo\n"
          "/status para ver sua inscrição\n"
@@ -74,7 +85,7 @@ class Maquina:
             return MensagemSaida(self._redator.texto("apagado"))
 
         if comando == "/start":
-            estado, dados = "INICIO", {}
+            estado, dados = "INICIO", _guardar_inscricao(dados)
         elif comando == "/ajuda":
             return MensagemSaida(AJUDA)
         elif comando == "/status":

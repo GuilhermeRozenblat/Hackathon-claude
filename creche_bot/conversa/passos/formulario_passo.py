@@ -39,10 +39,7 @@ def perguntar_proximo(p: Passo, prefixo: str = "") -> MensagemSaida:
 
     p.dados["perguntou"] = campo.chave
     p.ir("FORMULARIO")
-    return MensagemSaida(
-        prefixo + _texto_da_pergunta(p, campo),
-        botoes=tuple(Botao(i, r) for i, r in campo.opcoes),
-    )
+    return MensagemSaida(prefixo + _texto_da_pergunta(p, campo), botoes=_botoes(campo))
 
 
 def formulario(p: Passo) -> MensagemSaida:
@@ -54,9 +51,12 @@ def formulario(p: Passo) -> MensagemSaida:
 
     if campo.opcoes:
         if p.msg.escolha not in {i for i, _ in campo.opcoes}:
-            return MensagemSaida(_texto_da_pergunta(p, campo),
-                                 botoes=tuple(Botao(i, r) for i, r in campo.opcoes))
+            return MensagemSaida(_texto_da_pergunta(p, campo), botoes=_botoes(campo))
         p.dados[campo.chave] = p.msg.escolha
+    elif campo.escape and p.msg.escolha == campo.escape[0]:
+        # "Não sei agora": vale como resposta. A pessoa não fica presa numa pergunta
+        # cuja resposta ela não tem em mãos.
+        p.dados[campo.chave] = campo.escape[0]
     else:
         ok, valor = validar(campo, p.texto)
         if not ok:
@@ -64,8 +64,15 @@ def formulario(p: Passo) -> MensagemSaida:
         p.dados[campo.chave] = valor
 
     eco = (f"Recebido: {formatar(campo, p.dados[campo.chave])} ✅\n\n"
-           if campo.eco else "")
+           if campo.eco and p.dados[campo.chave] != (campo.escape or ("",))[0] else "")
     return perguntar_proximo(p, prefixo=eco)
+
+
+def _botoes(campo: Campo) -> tuple[Botao, ...]:
+    """Opções fechadas viram botões; pergunta aberta pode ter um só, o de fuga."""
+    if campo.opcoes:
+        return tuple(Botao(i, r) for i, r in campo.opcoes)
+    return (Botao(*campo.escape),) if campo.escape else ()
 
 
 def _todos() -> tuple[Campo, ...]:
