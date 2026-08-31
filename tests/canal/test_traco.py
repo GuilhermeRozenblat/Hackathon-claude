@@ -1,4 +1,4 @@
-"""DEBUG_CONTEUDO espelha a conversa no console — mas nunca os bytes da foto."""
+"""DEBUG_CONTEUDO espelha a conversa no console, mas nunca os bytes da foto."""
 
 from __future__ import annotations
 

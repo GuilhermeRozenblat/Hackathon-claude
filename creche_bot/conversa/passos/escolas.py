@@ -1,9 +1,9 @@
-"""Bloco 6 — horário da vaga, painel de creches e a confirmação da escolha (bloco 7).
+"""Bloco 6: horário da vaga, painel de creches e a confirmação da escolha (bloco 7).
 
 ## O que este painel mostra
 
 Distância, vaga aberta agora, concorrência do ano passado e a **chance estimada** em cada
-creche — calculada em `backend/mapa.py` sobre os dados reais de 2025: dos que pediram
+creche, calculada em `backend/mapa.py` sobre os dados reais de 2025: dos que pediram
 aquela unidade como 1ª opção, a fração que foi atendida. Todo número sai com o ano
 colado, e o rodapé de região repete que é estimativa a partir de 2025.
 
@@ -24,7 +24,7 @@ ter desfechos opostos por causa da régua de prioridade. Por isso a chance é se
 
 O WhatsApp tem 3 botões ou 10 itens de lista, sem ordenação. A ordem sai da SEQUÊNCIA DE
 TOQUES: cada toque acrescenta uma preferência e o bot confirma a posição. E "Pronto"
-aparece desde o primeiro toque, porque forçar 5 opções não muda o desfecho — em 2025 a
+aparece desde o primeiro toque, porque forçar 5 opções não muda o desfecho: em 2025 a
 taxa de atendimento foi 68,8% com 1 opção e 69,7% com 5.
 """
 
@@ -43,12 +43,12 @@ from creche_bot.dominio.tipos import (
 ORDINAL = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣"}
 BOTOES_HORARIO = (Botao("integral", "Integral"), Botao("parcial", "Parcial"))
 
-# Três opções, como no Sisu. Não é limite de tela — cabe mais em lista — é o que a base
+# Três opções, como no Sisu. Não é limite de tela, porque cabe mais em lista. É o que a base
 # sustenta: em 2025 a taxa de atendimento foi 68,8% com 1 opção e 69,7% com 5, então
 # pedir mais escolha custa desistência sem devolver vaga.
 MAX_OPCOES = 3
 
-# Abaixo disso "N famílias por vaga" arredonda para 1 e vira "1 famílias por vaga" —
+# Abaixo disso "N famílias por vaga" arredonda para 1 e vira "1 famílias por vaga",
 # ruído gramatical dizendo que não houve disputa. Quando não houve, a linha some.
 DISPUTA_VISIVEL = 1.5
 
@@ -72,7 +72,7 @@ def pedir_horario(p: Passo) -> MensagemSaida:
 
 
 def _garantir_grupamento(p: Passo) -> None:
-    """Derivado da data de nascimento — nunca perguntado. "Berçário" e "Maternal I" são
+    """Derivado da data de nascimento, nunca perguntado. "Berçário" e "Maternal I" são
     vocabulário interno da rede, não de família."""
     if p.dados.get("grupamento") or "nascimento_crianca" not in p.dados:
         return
@@ -103,14 +103,16 @@ def _chance(e: dict) -> str:
     """A chance estimada naquela creche, sempre com o ano de onde ela saiu.
 
     O ano não é enfeite: sem ele o número vira previsão sobre o processo de agora, que é
-    justamente o que o bot não pode dizer. A conta está em `backend/mapa.py` — quantos dos
+    justamente o que o bot não pode dizer. A conta está em `backend/mapa.py`: quantos dos
     que pediram esta creche como 1ª opção foram atendidos no ano-base.
     """
-    if e.get("chance") is None:
+    conc = e.get("concorrencia")
+    if e.get("chance") is None or not conc or conc[1] is None:
         return ""
-    ano = e["concorrencia"][1] if e["concorrencia"] else ""
-    base = f" (base {ano})" if ano else ""
-    return f"chance estimada {round(e['chance'] * 100)}%{base}"
+    # Sem ano não sai número. A válvula de escape que imprimia "chance estimada 95%" seco
+    # transformava a estimativa numa previsão sobre o processo de agora, e 95% é o teto
+    # da conta, então a família lia quase-certeza onde não há nenhuma.
+    return f"chance estimada {round(e['chance'] * 100)}% (base {conc[1]})"
 
 
 def _linha(e: dict, posicao: int) -> str:
@@ -162,8 +164,14 @@ def sugerir(p: Passo) -> MensagemSaida:
 def _regiao(p: Passo) -> str:
     if not (r := p.dados.get("regiao")):
         return ""
-    return p.txt("contexto_regiao", bairro=r["bairro"], ano=r["ano"],
-                 demanda=r["demanda"], atendidos=r["atendidos"])
+    texto = p.txt("contexto_regiao", bairro=r["bairro"], ano=r["ano"],
+                  demanda=r["demanda"], atendidos=r["atendidos"])
+    # A explicação da chance só entra se alguma creche da tela mostra uma. Creche sem
+    # concorrência comparável não mostra número, e explicar o que não está ali deixa o
+    # bot falando de "chance" sem exibir nenhuma.
+    if any(_chance(e) for e in p.dados.get("escolas", ())):
+        texto += p.txt("contexto_chance", ano=r["ano"])
+    return texto
 
 
 def _painel(p: Passo) -> MensagemSaida:
@@ -194,7 +202,7 @@ def escolher(p: Passo) -> MensagemSaida:
 
 
 def _mais_uma(p: Passo) -> MensagemSaida:
-    """Confirma a posição recém-preenchida e chama a próxima — a ordem do Sisu sai da
+    """Confirma a posição recém-preenchida e chama a próxima. A ordem do Sisu sai da
     SEQUÊNCIA DE TOQUES, porque nem WhatsApp nem Telegram têm widget de ordenar."""
     posicao = len(p.dados["preferencias"])
     ultima = next(e for e in p.dados["escolas"]

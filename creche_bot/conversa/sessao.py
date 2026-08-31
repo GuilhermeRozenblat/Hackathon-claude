@@ -18,7 +18,7 @@ def dizer(redator: Redator, chave: str, *, prefixo: str = "",
           local: Local | None = None, **vars: Any) -> MensagemSaida:
     """Texto do roteiro + a figurinha que combina com a situação.
 
-    A figurinha vem do mapa em `persona.py`, junto do texto — assim ninguém precisa
+    A figurinha vem do mapa em `persona.py`, junto do texto, e assim ninguém precisa
     lembrar de escolher emoji em 40 lugares, e mudar o tom é mexer num arquivo só.
     """
     return MensagemSaida(prefixo + redator.texto(chave, **vars), botoes=botoes,
@@ -42,7 +42,7 @@ class Passo:
         return self.redator.texto(chave, **vars)
 
     def diz(self, chave: str, **kw: Any) -> MensagemSaida:
-        """`txt` quando a mensagem é só aquele texto — e aí ela ganha a figurinha."""
+        """`txt` quando a mensagem é só aquele texto, e aí ela ganha a figurinha."""
         return dizer(self.redator, chave, **kw)
 
     @property

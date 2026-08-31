@@ -1,66 +1,57 @@
 # Canal Telegram
 
-Traduzir o transporte do Telegram para o modelo canônico e de volta. **Você não conhece
-regra de negócio**: nada de decidir o que responder, só como entregar.
+Traduzir o transporte do Telegram para o modelo canônico e de volta. **Você não conhece regra
+de negócio**: não decide o que responder, só como entregar.
 
-## Seus arquivos
-
-`telegram.py` · `render.py` · `figurinhas.py` · `tests/canal/`
-
-Só lê: `tipos.py` (congelado). **Não toque** em `conversa/`, `ia/`, `dados/`,
-`backend/`, `notificacao/`.
-
-## Entrega
+**Seus arquivos:** `telegram.py` · `render.py` · `figurinhas.py` · `tests/canal/`.
+**Só lê:** `tipos.py` (congelado). **Não toque** em `conversa/`, `ia/`, `dados/`, `backend/`,
+`notificacao/`.
 
 ```python
-# telegram.py
-def rodar(nucleo: Nucleo) -> None:      # long polling, loop principal
+def rodar(nucleo: Nucleo) -> None      # long polling, loop principal
 def enviar(id_externo: str, msg: MensagemSaida) -> None
 ```
 
-1. Update do Telegram → `MensagemEntrada`. Texto, foto (baixada em bytes), áudio de voz,
-   documento e clique de botão (`callback_query` → `escolha`). `id_mensagem` preenchido
-   sempre.
-2. `MensagemSaida` → payload do Telegram, em `render.py`.
-3. `figurinhas.py`: chave (`"comemorando"`, `"pensando"`, `"festa"`, `"abraco"`,
-   `"atencao"`…) → `file_id`. Mapa em dict; `file_id` é estável, então cacheia. Quem
-   escolhe a chave de cada mensagem é `ia/persona.py` (mapa `FIGURINHAS`), não você.
+1. Update do Telegram → `MensagemEntrada`: texto, foto (bytes), áudio de voz, documento e
+   clique de botão (`callback_query` → `escolha`). `id_mensagem` sempre preenchido.
+2. `MensagemSaida` → payload, em `render.py`.
+3. `figurinhas.py`: chave (`"comemorando"`, `"festa"`, `"atencao"`…) → emoji hoje, `file_id`
+   quando houver pack. Quem escolhe a chave é `ia/persona.py`, não você.
+
+## Os dois modos de entrega
+
+**Polling (`getUpdates`) é o daqui**, e é o que faz rodar em localhost sem HTTPS nem ngrok.
+
+⚠️ **`rodar()` chama `deleteWebhook` antes de entrar no loop**: os dois modos são exclusivos, e
+sem isso `getUpdates` devolve 409. A consequência é que **subir o bot local com o token de
+produção derruba o bot hospedado**, em silêncio, até alguém rodar
+`python scripts/configurar_webhook.py https://…` de novo. Para depurar depois do deploy, use um
+token de teste, ou `--remover` e reaponte no fim.
+
+**O webhook já existe, e não é seu:** `scripts/servidor.py` recebe o POST na hospedagem e chama
+o mesmo núcleo. Se mexer em como um update vira `MensagemEntrada`, os dois caminhos mudam, e
+`tests/test_servidor.py` cobre o lado de lá.
 
 ## Regras específicas
 
-- **Long polling (`getUpdates`), não webhook.** É o que faz a V1 rodar em localhost sem
-  HTTPS nem ngrok. O WhatsApp exigirá webhook na Fase 3 — problema de outro arquivo.
 - **`getFile` baixa no máximo 20 MB.** Foto maior: peça outra, com mensagem gentil.
-- **Áudio acima de `MAX_SEGUNDOS_AUDIO` não é baixado.** A transcrição roda local e é
-  síncrona: um áudio de cinco minutos travaria o polling para todo mundo. O `mime` vem do
-  cliente e não autoriza nada — serve só para o núcleo saber que é voz.
-- **Rate limit ~1 msg/s por chat.** Fila de envio com backoff. `429` vem com
-  `retry_after` — respeite.
+- **Áudio acima de `MAX_SEGUNDOS_AUDIO` (120s) não é baixado.** A transcrição é síncrona: um
+  áudio de cinco minutos travaria o polling para todo mundo. O `mime` vem do cliente e não
+  autoriza nada, serve só para o núcleo saber que é voz.
+- **Rate limit ~1 msg/s por chat.** Fila de envio com backoff; `429` vem com `retry_after`.
 - **Texto puro.** Não gere `MarkdownV2`: o escape do Telegram é fonte clássica de bug e o
   WhatsApp usa outro dialeto. Envie sem `parse_mode`.
 - **`local` vira uma segunda mensagem** (`sendVenue`), depois do texto. Nunca um anexo.
-- **Rótulo de botão tem 20 caracteres, e a abreviação NÃO mora aqui.** Ela está em
-  `canal/tipos.py` (`abreviar`, `botoes_nomeados`), junto do limite que existe para
-  respeitar — o construtor de `MensagemSaida` cobra antes do render chegar. Quem *produz*
-  o botão abrevia. Se dois nomes colidirem depois de abreviados, `botoes_nomeados` numera:
-  abreviar duas escolas para o mesmo texto é pior que truncar, porque a pessoa escolhe
-  errado sem saber.
-- **Nunca logue conteúdo de mensagem nem bytes de foto.** Só `id_externo` e `id_mensagem`.
-  A exceção é `DEBUG_CONTEUDO=1` (`make debug`): espelha texto, rótulos e o tamanho do
-  anexo no console do dev. Os bytes ficam fora mesmo assim — `tests/canal/test_traco.py`.
+- **A abreviação de rótulo NÃO mora aqui.** Está em `canal/tipos.py` (`abreviar`,
+  `botoes_nomeados`), junto do limite que ela existe para respeitar, e o construtor cobra antes
+  do render. Se dois nomes colidirem depois de abreviados, `botoes_nomeados` numera: abreviar
+  duas escolas para o mesmo texto é pior que truncar, porque a pessoa escolhe errado sem saber.
+- **Nunca logue conteúdo de mensagem nem bytes de foto.** Só `id_externo` e `id_mensagem`. A
+  exceção é `DEBUG_CONTEUDO=1` (`make debug`), e mesmo aí os bytes ficam fora, veja
+  `tests/canal/test_traco.py`.
 
-## Como verificar
+## Verificar
 
-```bash
-make contratos && make canal
-```
-
-Testes sem rede: um update de exemplo (JSON fixo) vira a `MensagemEntrada` esperada; uma
-`MensagemSaida` com 3 botões vira o payload esperado; nomes longos abreviam sem colidir.
-
-Com rede, quando houver token: `rodar()` com um núcleo que ecoa — mandar "oi" no Telegram
-e receber de volta com botão e figurinha.
-
-## Pronto quando
-
-O eco funciona no Telegram real, e `make canal` passa sem rede.
+`make contratos && make canal`, sem rede: um update de exemplo vira a `MensagemEntrada`
+esperada; uma `MensagemSaida` com 3 botões vira o payload esperado; nomes longos abreviam sem
+colidir. Com token: `make eco`, mandar "oi" no Telegram e receber de volta com botão e emoji.

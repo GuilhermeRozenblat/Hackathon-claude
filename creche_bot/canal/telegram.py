@@ -76,14 +76,18 @@ class Telegram:
         self._ultimo_envio: dict[str, float] = {}
 
     # ------------------------------------------------------------------ HTTP
-    def _chamar(self, metodo: str, timeout: int = 70, **params: Any) -> Any:
+    def _chamar(self, metodo: str, timeout_local: int = 70, **params: Any) -> Any:
+        """`timeout_local` é o timeout do socket; o `timeout` de getUpdates (long polling)
+        é um parâmetro da API do Telegram e viaja em `params`, não aqui — os dois têm nomes
+        parecidos mas são coisas diferentes, por isso o nome distinto.
+        """
         corpo = urllib.parse.urlencode({
             k: (json.dumps(v) if isinstance(v, dict | list) else v)
             for k, v in params.items() if v is not None
         }).encode()
         req = urllib.request.Request(API.format(token=self._token, metodo=metodo), data=corpo)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout_local) as r:
                 return json.load(r)["result"]
         except urllib.error.HTTPError as e:
             detalhe = json.load(e)
@@ -91,13 +95,15 @@ class Telegram:
                 espera = detalhe.get("parameters", {}).get("retry_after", 1)
                 log.warning("rate limit; aguardando %ss", espera)
                 time.sleep(espera + 0.5)
-                return self._chamar(metodo, timeout, **params)
+                return self._chamar(metodo, timeout_local, **params)
             if e.code == 409:
                 raise ErroTelegram(
                     "409: outro processo faz polling com este token. "
-                    "Use um bot por desenvolvedor — veja TELEGRAM.md."
+                    "Use um bot por desenvolvedor. Veja TELEGRAM.md."
                 ) from e
             raise ErroTelegram(f"{metodo} -> {e.code}: {detalhe.get('description')}") from e
+        except (urllib.error.URLError, OSError) as e:
+            raise ErroTelegram(f"{metodo} -> erro de rede: {e}") from e
 
     # --------------------------------------------------------------- entrada
     def _baixar(self, file_id: str, mime: str = "image/jpeg") -> Anexo | None:
@@ -112,6 +118,16 @@ class Telegram:
         if len(conteudo) > LIMITE_DOWNLOAD:
             return None
         return Anexo(conteudo=conteudo, mime=mime, nome=info["file_path"])
+
+    def receber(self, upd: dict) -> MensagemEntrada | None:
+        """Um update avulso -> modelo canônico. É a porta de entrada do WEBHOOK.
+
+        `rodar()` é o caminho do long polling, e chama `_traduzir` direto. Quando a
+        hospedagem recebe o update por HTTP (`scripts/servidor.py`), não há laço nenhum:
+        chega um dicionário, sai uma `MensagemEntrada`. Este método existe para esse caso
+        não precisar alcançar um `_privado` de fora do módulo.
+        """
+        return self._traduzir(upd)
 
     def _traduzir(self, upd: dict) -> MensagemEntrada | None:
         """Update do Telegram -> modelo canônico. Nada do dicionário dele sai daqui."""
@@ -133,7 +149,7 @@ class Telegram:
             if som.get("duration", 0) <= MAX_SEGUNDOS_AUDIO:
                 anexo = self._baixar(som["file_id"], som.get("mime_type") or "audio/ogg")
         elif (doc := m.get("document")):
-            # O mime vem do cliente, não é confiável para autorizar nada — serve só para
+            # O mime vem do cliente, não é confiável para autorizar nada, e serve só para
             # o extrator saber se abre como imagem ou como PDF.
             anexo = self._baixar(doc["file_id"], doc.get("mime_type", "application/octet-stream"))
 
@@ -147,12 +163,12 @@ class Telegram:
     def enviar(self, id_externo: str, msg: MensagemSaida) -> None:
         if _debug():
             log.info("→ %s · %s", id_externo, _resumo_saida(msg))
-        agora = time.monotonic()
-        if (espera := self._intervalo - (agora - self._ultimo_envio.get(id_externo, 0))) > 0:
-            time.sleep(espera)
         for metodo, params in render(msg):
-            self._chamar(metodo, timeout=20, chat_id=id_externo, **params)
-        self._ultimo_envio[id_externo] = time.monotonic()
+            agora = time.monotonic()
+            if (espera := self._intervalo - (agora - self._ultimo_envio.get(id_externo, 0))) > 0:
+                time.sleep(espera)
+            self._chamar(metodo, 20, chat_id=id_externo, **params)
+            self._ultimo_envio[id_externo] = time.monotonic()
 
     # ------------------------------------------------------------- polling
     def rodar(self, processar: Callable[[MensagemEntrada], MensagemSaida | None]) -> None:

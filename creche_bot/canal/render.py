@@ -1,7 +1,7 @@
 """MensagemSaida -> payload do Telegram.
 
 Só tradução de plataforma. A abreviação de rótulo mora em `tipos.py`, junto do limite
-que ela existe para respeitar — o construtor de MensagemSaida cobra antes do render.
+que ela existe para respeitar, e o construtor de MensagemSaida cobra antes do render.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from creche_bot.canal.tipos import MensagemSaida
 
 
 def render(msg: MensagemSaida) -> list[tuple[str, dict[str, Any]]]:
-    """Devolve [(metodo, params)] — uma MensagemSaida pode virar mais de uma mensagem.
+    """Devolve [(metodo, params)]: uma MensagemSaida pode virar mais de uma mensagem.
 
     Sem `parse_mode`: texto puro, sempre. MarkdownV2 do Telegram e `*negrito*` do WhatsApp
     são dialetos incompatíveis, e o escape do Telegram é fonte clássica de bug.

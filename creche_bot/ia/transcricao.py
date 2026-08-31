@@ -1,12 +1,12 @@
 """Áudio -> texto, na própria máquina.
 
-Claude não recebe áudio — a API aceita texto, imagem e PDF, e nada mais. E mandar a voz
+Claude não recebe áudio: a API aceita texto, imagem e PDF, e nada mais. E mandar a voz
 de uma família para um serviço de transcrição de terceiros quebraria a regra de
 privacidade do projeto (ZDR, dado de criança). Então o modelo roda aqui: os bytes entram,
 o texto sai, nada atravessa a rede.
 
 # ponytail: faster-whisper em CPU, síncrono, na thread do polling. É o que cabe num
-# processo só. Se o volume crescer, isto vira uma fila — não um serviço.
+# processo só. Se o volume crescer, isto vira uma fila, não um serviço.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class Transcritor:
         """O `__main__` chama isto numa thread no boot, e engole tudo o que der errado.
 
         Em disco frio o modelo baixa ~460 MB: medimos 159s. Como o polling do Telegram é
-        síncrono, carregar na primeira voz deixaria o bot inteiro mudo esse tempo todo —
+        síncrono, carregar na primeira voz deixaria o bot inteiro mudo esse tempo todo,
         para todo mundo, não só para quem mandou o áudio. Sem a dependência ou sem rede,
         `_whisper` fica `None` e áudio vira pedido para escrever; o bot sobe do mesmo
         jeito.
@@ -50,7 +50,7 @@ class Transcritor:
             self._whisper = WhisperModel(self._nome, device="cpu", compute_type="int8")
         except ImportError:
             log.warning("faster-whisper não instalado, áudio vai virar pedido para "
-                        "escrever — para ligar: pip install -e '.[audio]'")
+                        "escrever. Para ligar: pip install -e '.[audio]'")
         except Exception:
             log.exception("não deu para carregar o modelo de voz")
 

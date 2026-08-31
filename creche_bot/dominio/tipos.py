@@ -1,4 +1,4 @@
-"""CONTRATO CONGELADO — v2, roteiro do processo 195/2025.
+"""CONTRATO CONGELADO: v2, roteiro do processo 195/2025.
 
 Tipos de domínio que cruzam fronteira de módulo. Sem dependência de banco, de canal
 ou de IA: é só vocabulário compartilhado.
@@ -12,14 +12,14 @@ estável, por isso `TipoEtapa` é `Literal`. Etapa nova que caia num tipo conhec
 funciona sem código novo.
 
 **Régua do processo é DADO, não código.** Pesos, ordem e texto dos critérios de
-prioridade mudam todo ano — entre 2023 e 2024 só 3 das 13 perguntas sobreviveram e o teto
+prioridade mudam todo ano: entre 2023 e 2024 só 3 das 13 perguntas sobreviveram e o teto
 caiu de 465 para 100 pontos. Por isso `Criterio` é uma lista que o backend devolve, nunca
 um enum aqui dentro.
 
 **Duas visões da inscrição, de propósito.** `Situacao`/`Etapa` é o que MUDA e dispara
 notificação. `Desfecho` é o que a família VÊ quando consulta: um estado só, calculado
 como a melhor situação entre as opções dela. O banco grava uma situação por opção de
-creche, e mostrar isso cru quebra a confiança na hora — 77,8% das linhas
+creche, e mostrar isso cru quebra a confiança na hora: 77,8% das linhas
 "Cancelado pelo sistema" pertencem a inscrições que foram ATENDIDAS.
 
 **O que não existe aqui: pontuação e posição na fila.** A classificação roda depois do
@@ -33,7 +33,7 @@ from typing import Literal
 
 # ------------------------------------------------------------------ a criança
 
-# Vocabulário INTERNO da rede. A família nunca vê "Berçário" nem "Maternal I" — vê o
+# Vocabulário INTERNO da rede. A família nunca vê "Berçário" nem "Maternal I", e sim o
 # rótulo de `GRUPAMENTO_LEGIVEL`.
 Grupamento = Literal["bercario", "maternal_1", "maternal_2", "fora_da_faixa"]
 
@@ -60,7 +60,7 @@ def meses_entre(nascimento: date, corte: date) -> int:
 
 
 def grupamento_de(nascimento: date, corte: date) -> Grupamento:
-    """Deriva o grupamento. NUNCA pergunte isso à família — ela não fala essa língua."""
+    """Deriva o grupamento. NUNCA pergunte isso à família, ela não fala essa língua."""
     meses = meses_entre(nascimento, corte)
     for teto, grupamento in BANDAS_EM_MESES:
         if meses < teto:
@@ -93,7 +93,7 @@ DocumentoCrianca = Literal["cpf", "dnv", "nis", "nenhum"]
 class Endereco:
     """Derivado do CEP + número pelo servidor. NUNCA de bairro ou rua digitados.
 
-    Na base histórica o campo livre gerou 1.608 grafias para ~925 bairros — "Inhaúma"
+    Na base histórica o campo livre gerou 1.608 grafias para ~925 bairros: "Inhaúma"
     sozinho tem 13 variantes. O CEP é 100% preenchido e 100% válido desde 2024. Sem o
     número, a precisão cai para ~1,4 km, o suficiente para errar a creche certa dentro
     do raio de 2 km que as famílias aceitam.
@@ -106,7 +106,7 @@ class Endereco:
     lng: float
 
     def __str__(self) -> str:
-        return f"{self.logradouro}, {self.numero} — {self.bairro}"
+        return f"{self.logradouro}, {self.numero}, {self.bairro}"
 
 
 # ------------------------------------------------------------- oferta e vaga
@@ -118,7 +118,7 @@ class Concorrencia:
 
     Não é nota de corte e não é previsão: a classificação do processo vigente só roda
     depois do fechamento das inscrições, então no momento da conversa ela não existe.
-    O teto da régua foi 465 pontos em 2023 e 100 em 2024 — histórico de pontuação não é
+    O teto da régua foi 465 pontos em 2023 e 100 em 2024, e histórico de pontuação não é
     comparável entre anos, mas quantas famílias disputaram cada vaga é fato verificável.
     """
     familias_por_vaga: float
@@ -130,7 +130,7 @@ class PanoramaRegiao:
     """O que ACONTECEU na região no processo passado. Passado observado, nunca previsão.
 
     Existe porque a família decide entre creches sem saber se está numa região onde
-    quase todo mundo foi atendido ou numa onde a fila dobrou a oferta — e esse é o único
+    quase todo mundo foi atendido ou numa onde a fila dobrou a oferta, e esse é o único
     contexto honesto que dá para oferecer antes da classificação rodar. Todos os campos
     são contagem de fato consumado, e `ano` é obrigatório para a tela ser forçada a dizer
     de quando é o número.
@@ -170,7 +170,7 @@ class VagaSugerida:
     # conversa: pontuação de prioridade, empate e ordem de convocação não entram nesta
     # conta. Quem renderiza é obrigado a dizer de que ano é o número e que é estimativa.
     chance: float | None = None
-    referencia: str = ""                    # "RIO 2", "PARK SHOPPING" — o apelido do lugar
+    referencia: str = ""                    # "RIO 2", "PARK SHOPPING", o apelido do lugar
     polo: str = ""                          # unidade real de classificação; não é microárea
     horario_atendimento: str = ""
 
@@ -198,7 +198,7 @@ class Criterio:
     codigo: str
     rotulo: str                     # como aparece para a família, já em português de gente
     pontos: int
-    grupo: str                      # "8.1", "8.3", "8.4" — o turno em que ela é feita
+    grupo: str                      # "8.1", "8.3", "8.4": o turno em que ela é feita
     sensivel: bool = False          # LGPD art. 11: consentimento próprio, e nunca ecoar
     documento: str | None = None    # o que comprova; None = nada a comprovar
     documento_opcional: bool = False   # violência, substâncias, prisão: nunca exigir
@@ -210,10 +210,10 @@ class Criterio:
 EstadoInscricao = Literal[
     "vaga_confirmada",    # 67,7% em 2025
     "lista_de_espera",    # 11,2%
-    "nao_seguiu",         # 9,5% — estado ambíguo no banco: não invente o motivo
-    "perdeu_prazo",       # 7,7% — a maior parte nunca soube que foi chamada
+    "nao_seguiu",         # 9,5%: estado ambíguo no banco: não invente o motivo
+    "perdeu_prazo",       # 7,7%: a maior parte nunca soube que foi chamada
     "cancelada",          # 3,8%
-    "selecionada",        # 0,2% — precisa confirmar, e isso é o PRIMEIRO balão
+    "selecionada",        # 0,2%: precisa confirmar, e isso é o PRIMEIRO balão
     "ativa",              # 0,0%
 ]
 
@@ -253,7 +253,7 @@ class Desfecho:
     prazo_confirmacao: date | None = None
     data_resultado: date | None = None
     inicio_das_aulas: date | None = None
-    # Códigos de `Criterio` declarados e ainda não comprovados. É o que é acionável —
+    # Códigos de `Criterio` declarados e ainda não comprovados. É o que é acionável,
     # e o único número que aparece na consulta.
     pendencias: tuple[str, ...] = ()
 
@@ -266,7 +266,7 @@ class CriancaConhecida:
 
 @dataclass(frozen=True)
 class CadastroAnterior:
-    """O que o histórico devolve para o CPF do RESPONSÁVEL — a âncora da conta.
+    """O que o histórico devolve para o CPF do RESPONSÁVEL, a âncora da conta.
 
     27,9% das crianças de 2025 já constavam em 2024. Além de poupar o preenchimento,
     isso auto-preenche e já valida o critério "esperou na fila no ano anterior": hoje
@@ -307,7 +307,7 @@ TipoDocumento = Literal[
 class DadosExtraidos:
     """O que a leitura de um documento devolve.
 
-    Campo não encontrado é None — NUNCA um chute. `confianca == "baixa"` faz o passo
+    Campo não encontrado é None, NUNCA um chute. `confianca == "baixa"` faz o passo
     pedir de novo em vez de gravar dado errado no cadastro.
     """
     tipo_documento: TipoDocumento = "desconhecido"
@@ -364,12 +364,12 @@ class Etapa:
     def __post_init__(self) -> None:
         if self.tipo == "acao_presencial":
             assert self.endereco_entrega, (
-                f"etapa {self.codigo!r} é presencial e não tem endereço — "
+                f"etapa {self.codigo!r} é presencial e não tem endereço: "
                 "o usuário não saberia para onde ir"
             )
         if self.tipo == "convocacao":
             assert self.prazo, (
-                f"etapa {self.codigo!r} é convocação e não tem prazo — o prazo vencendo "
+                f"etapa {self.codigo!r} é convocação e não tem prazo: o prazo vencendo "
                 "em silêncio é o que faz 7,7% perder a vaga já convocada"
             )
 

@@ -1,4 +1,4 @@
-"""Bloco 6 — endereço por CEP e número, nunca por bairro digitado.
+"""Bloco 6: endereço por CEP e número, nunca por bairro digitado.
 
 Na base histórica o campo livre gerou 1.608 grafias para ~925 bairros: "Inhaúma" sozinho
 tem 13 variantes. O CEP, ao contrário, é 100% preenchido e 100% válido desde 2024. O
@@ -80,6 +80,16 @@ def _resolver(p: Passo, cep: str, numero: str) -> MensagemSaida:
     p.dados["endereco"] = {"cep": endereco.cep, "numero": endereco.numero,
                            "logradouro": endereco.logradouro, "bairro": endereco.bairro,
                            "lat": endereco.lat, "lng": endereco.lng}
+    return confere(p)
+
+
+def confere(p: Passo) -> MensagemSaida:
+    """Desenha a confirmação do endereço já resolvido, a entrada do ENDERECO_CONFIRMA.
+
+    Separada de `_resolver` para a retomada poder redesenhar esta tela sem reconsultar
+    o CEP. Sem ela, voltar aqui respondia "não entendi" ao botão de continuar.
+    """
+    endereco = endereco_de(p.dados)
     p.ir("ENDERECO_CONFIRMA")
     return MensagemSaida(p.txt("confere_endereco", endereco=str(endereco)),
                          botoes=BOTOES_CONFIRMA,

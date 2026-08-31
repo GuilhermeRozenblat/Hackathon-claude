@@ -1,7 +1,7 @@
 """Prova que o bot do Telegram está configurado e que o contrato renderiza de verdade.
 
 Diagnóstico, não produção: usa só a stdlib e não depende de nenhuma trilha estar pronta.
-A Trilha A escreve o `canal/telegram.py` de verdade — este arquivo pode ser apagado depois.
+A Trilha A escreve o `canal/telegram.py` de verdade, e este arquivo pode ser apagado depois.
 
     python scripts/verificar_telegram.py          # só confere o token
     python scripts/verificar_telegram.py --eco    # sobe um eco, para testar no celular
@@ -70,16 +70,18 @@ def main() -> None:
     token = carregar_token()
 
     eu = chamar(token, "getMe")["result"]
-    print(f"✅ token válido — @{eu['username']} ({eu['first_name']})")
+    print(f"✅ token válido: @{eu['username']} ({eu['first_name']})")
     print(f"   pode entrar em grupo: {eu.get('can_join_groups')}  "
           f"(recomendado: False, o bot trata documento de criança)")
-
-    # Webhook velho faz getUpdates devolver 409. Limpar é idempotente.
-    chamar(token, "deleteWebhook", drop_pending_updates=False)
 
     if "--eco" not in sys.argv:
         print("\nPara testar no celular: python scripts/verificar_telegram.py --eco")
         return
+
+    # Webhook velho faz getUpdates devolver 409. Limpar é idempotente, mas também derruba
+    # o bot hospedado se este token for o de produção — só faz sentido para quem vai
+    # mesmo entrar em polling (--eco), não para quem só quer conferir o token.
+    chamar(token, "deleteWebhook", drop_pending_updates=False)
 
     print(f"\n🟢 eco no ar. Abra t.me/{eu['username']} e mande /start. Ctrl+C para parar.")
     offset = None

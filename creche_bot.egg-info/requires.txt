@@ -1,3 +1,4 @@
+psycopg[binary,pool]>=3.2
 
 [audio]
 faster-whisper>=1.0
@@ -9,8 +10,3 @@ pydantic>=2.9
 
 [ia]
 anthropic>=0.40
-
-[postgres]
-sqlalchemy>=2.0
-psycopg[binary]>=3.2
-alembic>=1.13

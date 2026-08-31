@@ -1,4 +1,4 @@
-"""CONTRATO CONGELADO — Fase 0. Não altere sem PR próprio revisado por todas as trilhas.
+"""CONTRATO CONGELADO: Fase 0. Não altere sem PR próprio revisado por todas as trilhas.
 
 O modelo canônico de mensagem. É o que torna o flip Telegram -> WhatsApp barato:
 o núcleo fala este dialeto e nunca sabe em qual plataforma está.
@@ -36,7 +36,7 @@ class MensagemEntrada:
     escolha: str | None = None   # Botao.id ou ItemLista.id que o usuário tocou
 
 
-# Palavras que não distinguem uma creche de outra — as primeiras a cair na abreviação.
+# Palavras que não distinguem uma creche de outra, e são as primeiras a cair na abreviação.
 _RUIDO = ("creche", "emei", "cei", "escola", "municipal", "prof.ª", "profª", "prof.",
           "professora", "professor", "da", "de", "do", "das", "dos", "e")
 
@@ -88,7 +88,7 @@ class ItemLista:
 class Local:
     """Pino nativo. Telegram: sendVenue. WhatsApp: message type `location`.
 
-    AS DUAS PLATAFORMAS EXIGEM lat/lng — endereço em texto não substitui.
+    AS DUAS PLATAFORMAS EXIGEM lat/lng, e endereço em texto não substitui.
     """
     lat: float
     lng: float
@@ -108,7 +108,7 @@ class MensagemSaida:
         assert self.texto.strip(), "mensagem sem texto"
         assert len(self.botoes) <= MAX_BOTOES, (
             f"{len(self.botoes)} botões; o WhatsApp aceita {MAX_BOTOES}. "
-            "Divida o passo em dois — veja ARQUITETURA.md §10.1."
+            "Divida o passo em dois. Veja ARQUITETURA.md §10.1."
         )
         assert len(self.lista) <= MAX_ITENS_LISTA, (
             f"{len(self.lista)} itens; o WhatsApp aceita {MAX_ITENS_LISTA}."

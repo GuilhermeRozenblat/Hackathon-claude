@@ -1,8 +1,8 @@
-"""Bloco 8 — como entregar a documentação, e o protocolo.
+"""Bloco 8: como entregar a documentação, e o protocolo.
 
 O WhatsApp não é uma opção entre três: é o caminho recomendado. Hoje a comprovação
 acontece depois, presencialmente, e valida 8,0% dos casos. Capturar a evidência dentro da
-conversa é o produto — as outras duas portas existem para quem não consegue.
+conversa é o produto, e as outras duas portas existem para quem não consegue.
 
 A lista de documentos é CONDICIONAL ao que a família declarou. Lista genérica faz a
 família levar o papel errado e voltar para casa sem resolver.
@@ -55,7 +55,7 @@ def enviar(p: Passo) -> MensagemSaida:
         etapa_codigo="recebida"))
 
     # O cadastro aberto vira o cadastro DAQUELA inscrição, e a próxima criança começa uma
-    # linha nova — 1.738 responsáveis inscreveram duas ou mais em 2025.
+    # linha nova, e 1.738 responsáveis inscreveram duas ou mais em 2025.
     p.repo.fechar_cadastro(p.contato_id, numero)
     # Primeiro marco da linha do tempo. Sem ele o /status de quem acabou de se inscrever
     # mostraria uma história vazia até o backend mexer alguma coisa.
@@ -106,7 +106,7 @@ def como_entregar(p: Passo) -> MensagemSaida:
 
 
 def receber_documento(p: Passo) -> MensagemSaida:
-    """8a — a foto chega aqui mesmo, que é o caminho que valida de verdade."""
+    """8a: a foto chega aqui mesmo, que é o caminho que valida de verdade."""
     if p.msg.escolha == "depois":
         return protocolo(p, prefixo=f"{p.txt('documento_depois')}\n\n")
 
@@ -142,13 +142,15 @@ def protocolo(p: Passo, prefixo: str = "") -> MensagemSaida:
 
 def depois_do_protocolo(p: Passo) -> MensagemSaida:
     """1.738 responsáveis inscreveram 2 ou mais crianças em 2025. Reaproveita tudo do
-    responsável — só a criança e a pergunta do irmão recomeçam."""
+    responsável, e só a criança e a pergunta do irmão recomeçam."""
     from creche_bot.conversa.maquina import abrir_contato
     from creche_bot.conversa.passos.formulario_passo import perguntar
     from creche_bot.conversa.passos.responsavel import DO_RESPONSAVEL
 
     if p.msg.escolha == "outra_crianca":
-        guardado = {c: v for c, v in p.dados.items() if c in DO_RESPONSAVEL}
+        from creche_bot.conversa.passos.ia import decisao
+
+        guardado = {c: v for c, v in p.dados.items() if c in DO_RESPONSAVEL} | decisao(p.dados)
         p.dados.clear()
         p.dados.update(guardado)
         p.ir("CADASTRO")

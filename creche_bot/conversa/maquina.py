@@ -4,7 +4,7 @@ Máquina explícita, não agente autônomo: determinística, testável, barata, 
 nunca fica presa num loop. O roteiro completo está em `docs/ROTEIRO.md`.
 
 Cada estado tem duas portas: `PASSOS[estado]` consome a resposta que chegou, e
-`ENTRADAS[estado]` desenha a tela pela primeira vez. Correção e retomada usam a segunda —
+`ENTRADAS[estado]` desenha a tela pela primeira vez. Correção e retomada usam a segunda:
 sem ela, voltar a um bloco engole a próxima mensagem da família.
 """
 
@@ -18,21 +18,24 @@ from datetime import datetime
 
 from creche_bot.backend.porta import BackendCreche
 from creche_bot.canal.tipos import MensagemEntrada, MensagemSaida
+from creche_bot.conversa import projecao
 from creche_bot.conversa.formulario import campo_de
 from creche_bot.conversa.passos import (
     consulta,
     criterios,
+    demo,
     endereco,
     entrada,
     escolas,
     formulario_passo,
+    ia,
     pendencias,
     responsavel,
     resumo,
 )
 from creche_bot.conversa.sessao import Passo, dizer
 from creche_bot.dados.porta import Repositorio
-from creche_bot.ia.redacao import Redator
+from creche_bot.ia.redacao import Redator, criar
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +48,7 @@ def _etapa(estado: str, dados: dict) -> str:
     que já diz o suficiente ("ENDERECO_CEP", "HORARIO").
     """
     campo = campo_de(dados.get("perguntou", ""))
-    return f"{estado} — {campo.pergunta}" if campo else estado
+    return f"{estado}: {campo.pergunta}" if campo else estado
 
 
 def abrir_contato(p: Passo) -> MensagemSaida:
@@ -80,27 +83,29 @@ def _fora_da_faixa(p: Passo) -> MensagemSaida:
 
 
 PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
-    # blocos 0, 0.1 e 1 — porta de entrada, retomada, consentimento
+    # bloco 0.0: ligar a IA com a chave da pessoa, ou seguir sem ela
+    "IA_CONFIG": ia.escolher,
+    # blocos 0, 0.1 e 1: porta de entrada, retomada, consentimento
     "INICIO": entrada.porta,
     "PORTA": entrada.porta,
     "RETOMADA": entrada.retomar,
     "FORA_DO_PERIODO": entrada.fora_do_periodo,
     "CONSENTIMENTO": entrada.consentimento,
-    # blocos 1, 2 e 3 — pesquisa inicial, sobre a vaga e dados pessoais
+    # blocos 1, 2 e 3: pesquisa inicial, sobre a vaga e dados pessoais
     "CADASTRO": _cadastro,
     "CADASTRO_ANTERIOR": responsavel.cadastro_anterior,
     "FORA_DA_FAIXA": _fora_da_faixa,
-    # bloco 4 — contato
+    # bloco 4: contato
     "CONTATO": _contato,
-    # bloco 5 — resumo e correção
+    # bloco 5: resumo e correção
     "RESUMO": resumo.confirmacao,
     "CORRECAO": resumo.correcao,
-    # bloco 6 — endereço, horário e o painel de creches
+    # bloco 6: endereço, horário e o painel de creches
     "ENDERECO_CEP": endereco.receber,
     "ENDERECO_CONFIRMA": endereco.confirmar,
     "HORARIO": escolas.horario,
     "ESCOLAS": escolas.escolher,
-    # bloco 7 — confirmação da escolha
+    # bloco 7: confirmação da escolha
     "CONFIRMA_ESCOLAS": escolas.escolhas_confirmadas,
     # a régua do processo vigente, antes da documentação que ela mesma pede
     "CRIT_CADUNICO": criterios.cadunico,
@@ -111,11 +116,11 @@ PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
     "CRIT_IRMAO": criterios.irmao,
     "CRIT_SENSIVEL": criterios.sensivel,
     "CRIT_ANEXO": criterios.anexo,
-    # bloco 8 — documentação e protocolo
+    # bloco 8: documentação e protocolo
     "PENDENCIAS": pendencias.como_entregar,
     "RECEBER_DOC": pendencias.receber_documento,
     "PROTOCOLO": pendencias.depois_do_protocolo,
-    # bloco C — consulta
+    # bloco C: consulta
     "ACOMPANHAR": consulta.acompanhar,
     "CONSULTA_COMO": consulta.como,
     "CONSULTA_NUMERO": consulta.por_numero,
@@ -129,19 +134,29 @@ PASSOS: dict[str, Callable[[Passo], MensagemSaida]] = {
     "CONSULTA_TELEFONE": consulta.novo_telefone,
     "CONSULTA_DOC": consulta.receber_doc,
     "CONSULTA_NAO_ACHOU": consulta.nao_achou,
+    # Fora do roteiro: as três famílias prontas do `/demo`
+    "DEMO": demo.escolher,
 }
 
 # Como REENTRAR num bloco: correção (bloco 11) e retomada (bloco 0.1) usam isto.
 ENTRADAS: dict[str, Callable[[Passo], MensagemSaida]] = {
+    "IA_CONFIG": ia.perguntar,
     "CADASTRO": lambda p: formulario_passo.perguntar(p, "CADASTRO", abrir_contato),
     "CONTATO": lambda p: formulario_passo.perguntar(p, "CONTATO", resumo.resumo),
     "ENDERECO_CEP": endereco.pedir_cep,
+    "ENDERECO_CONFIRMA": endereco.confere,
+    "CADASTRO_ANTERIOR": responsavel.confere_cadastro,
     "HORARIO": escolas.pedir_horario,
     "CRIT_CADUNICO": criterios.comecar,
+    "CRIT_NIS": criterios.reabrir_nis,
+    "CRIT_ANEXO": criterios.reabrir_anexo,
     "ESCOLAS": escolas.sugerir,
     "CONFIRMA_ESCOLAS": escolas.confirmar_escolhas,
     "RESUMO": resumo.resumo,
     "INICIO": entrada.inicio,
+    # A mesma função dos PASSOS: ela já desenha. A linha existe para `_reorientar` poder
+    # redesenhar o menu com o "me perdi" de quem digitou fora, como no resto do roteiro.
+    "DEMO": demo.escolher,
 }
 
 
@@ -151,37 +166,53 @@ def entrar(p: Passo, estado: str) -> MensagemSaida:
 
 
 # Estados em que dado de criança é TRATADO para inscrever. Nenhum é alcançável sem o
-# consentimento do bloco 1 — LGPD art. 14, guarda no código e não confiança no fluxo.
+# consentimento do bloco 1: LGPD art. 14, guarda no código e não confiança no fluxo.
 #
 # Os `CONSULTA_*` ficam de fora de propósito: consultar a própria inscrição é exercício
 # do direito de acesso (art. 18), não tratamento novo, e exigir o consentimento de
 # inscrição ali barraria justamente quem se inscreveu pelo site. O consentimento de
 # comunicação é pedido no C.5, antes de qualquer mensagem proativa.
-LIVRES = {"INICIO", "PORTA", "RETOMADA", "CONSENTIMENTO", "FORA_DO_PERIODO", "ACOMPANHAR"}
+#
+# CONSULTA_DOC é a exceção dentro da exceção: ali a família manda um documento NOVO para
+# o backend guardar, o que é tratamento (LGPD art. 14: "nenhum documento é aceito antes do
+# consentimento registrado"), não leitura — fica de fora da isenção do bloco C, e cai no
+# mesmo gate dos outros blocos. CONSULTA_NIS continua isenta: é número, não documento, e
+# resolve uma pendência de uma inscrição já achada por consulta, o mesmo direito de acesso
+# que justifica o resto do bloco C.
+LIVRES = {"INICIO", "PORTA", "RETOMADA", "CONSENTIMENTO", "FORA_DO_PERIODO", "ACOMPANHAR",
+          "IA_CONFIG", "DEMO"}
+CONSULTA_TRATAM_DADO_NOVO = {"CONSULTA_DOC"}
 EXIGEM_CONSENTIMENTO = frozenset(
-    e for e in PASSOS if e not in LIVRES and not e.startswith("CONSULTA_"))
+    e for e in PASSOS
+    if e not in LIVRES and (not e.startswith("CONSULTA_") or e in CONSULTA_TRATAM_DADO_NOVO))
 
 # `/start` recomeça o cadastro, e não é para apagar a inscrição que já existe: sem isto,
 # quem manda /start por hábito perde o número e o /status responde "você não tem
 # inscrição". Enquanto `dados/porta.py` não souber buscar inscrição por contato, a
 # sessão é o único lugar onde o número mora.
-INSCRICAO_EM_ANDAMENTO = ("numero", "nome_crianca", "nascimento_crianca")
+#
+# `chave_ia` e `ia_dispensada` entram na lista por outro motivo: são a decisão da pessoa
+# sobre a IA, não parte do cadastro. Recomeçar a conversa não pode desligar a IA que ela
+# acabou de ligar, nem perguntar de novo o que ela já respondeu no bloco 0.0.
+PRESERVAR = ("numero", "nome_crianca", "nascimento_crianca", *ia.CHAVES_DECISAO)
 
 # Teto de perguntas livres por contato. Cada uma é uma chamada paga ao modelo, e um chat
 # aberto na internet é um botão de gastar dinheiro dos outros. Estourou a cota, a mensagem
-# volta a ser tratada como resposta do roteiro — o cadastro continua, só a IA descansa.
+# volta a ser tratada como resposta do roteiro. O cadastro continua, só a IA descansa.
 LIMITE_DUVIDAS = 8
 JANELA_DUVIDAS = 3600.0
 
 AJUDA = ("Sou o Zé Matrícula, da Matrícula Carioca\n\n"
          "/start para começar\n"
          "/status para ver sua inscrição\n"
-         "/apagar para apagar seus dados\n\n"
+         "/ia para ligar a conversa com IA\n"
+         "/apagar para apagar seus dados\n"
+         "/demo para ver o bot com dados de exemplo\n\n"
          "Prefere falar com uma pessoa? Ligue 1746.")
 
 
-def _guardar_inscricao(dados: dict) -> dict:
-    return {c: dados[c] for c in INSCRICAO_EM_ANDAMENTO if c in dados}
+def _preservar(dados: dict) -> dict:
+    return {c: dados[c] for c in PRESERVAR if c in dados}
 
 
 class Maquina:
@@ -192,6 +223,8 @@ class Maquina:
         self._repo = repo
         self._transcritor = transcritor
         self._duvidas: dict[str, list[float]] = {}
+        self._por_chave: dict[str, Redator] = {}   # um cliente por chave, não por turno
+        self._ia_avisados: set[str] = set()        # quem já soube que a IA dele caiu
         self._perdidos: set[str] = set()   # quem já foi reorientado na última mensagem
 
     def processar(self, msg: MensagemEntrada) -> MensagemSaida:
@@ -205,16 +238,32 @@ class Maquina:
 
         contato_id = self._repo.contato_de(msg.canal, msg.id_externo)
         estado, dados = self._repo.carregar_sessao(contato_id)
-        comando = (msg.texto or "").strip().lower()
+        # `.lower()` só na cópia que vira comando: a chave da Anthropic tem maiúsculas.
+        digitado = (msg.texto or "").strip()
+        comando = digitado.lower()
+        redator = self._redator_de(dados)
 
         if comando == "/apagar":
             self._repo.apagar_tudo(contato_id)
-            return dizer(self._redator, "apagado")
+            return dizer(redator, "apagado")
 
-        # Sessão de 72h. Passou disso, a conversa recomeça limpa — mas a inscrição que
+        # Sessão de 72h. Passou disso, a conversa recomeça limpa, mas a inscrição que
         # já existe sobrevive, senão o /status responde que ela não existe.
         if entrada.sessao_expirada(dados):
-            estado, dados = "INICIO", _guardar_inscricao(dados)
+            estado, dados = "INICIO", _preservar(dados)
+
+        # Configuração da IA, em qualquer ponto do roteiro. A chave colada SOZINHA entra
+        # pelo mesmo caminho de propósito: sem isto ela seguiria como resposta do campo
+        # que estava no ar, gravada como se fosse um nome, e ecoada de volta na tela.
+        if (pedido := ia.pedido_de_configuracao(digitado)) is not None:
+            try:
+                return ia.comando(self._montar(msg, contato_id, dados, redator),
+                                  estado, pedido)
+            except Exception:
+                # Banco fora no meio de um `/ia` deixaria a pessoa sem resposta nenhuma,
+                # e ela não tem como saber se a chave entrou ou não.
+                log.exception("configuração da IA falhou para o contato %s", contato_id)
+                return dizer(redator, "backend_fora")
 
         # `/start` no meio da conversa DESENHA a retomada; não consome "/start" como se
         # fosse resposta de botão. Era o bug que fazia o bot responder "não entendi".
@@ -223,42 +272,101 @@ class Maquina:
             if estado in entrada.ONDE_PAROU:
                 retomar_de, estado = estado, "RETOMADA"
             else:
-                estado, dados = "INICIO", _guardar_inscricao(dados)
+                estado, dados = "INICIO", _preservar(dados)
         elif comando == "/ajuda":
             return MensagemSaida(AJUDA, figurinha="coracao")
         elif comando == "/status":
             estado = "ACOMPANHAR"
         elif comando == "/avancar":
             return self._avancar(dados)
+        elif comando == "/demo":
+            estado = "DEMO"
 
         if estado in EXIGEM_CONSENTIMENTO and not self._repo.tem_consentimento(contato_id):
             estado, dados = "INICIO", {}      # sem autorização, volta ao começo
 
+        # Bloco 0.0, antes do roteiro: quem nunca decidiu sobre a IA decide agora. É uma
+        # tela só, e ninguém fica preso nela, porque `ia.escolher` segue com qualquer resposta.
+        # ponytail: sai junto com a chave por contato, quando o bot voltar a ter chave de
+        # plataforma. Ver docs/DECISOES.md D20.
+        desenhar_ia = estado == "INICIO" and ia.precisa_escolher(dados)
+        if desenhar_ia:
+            estado = "IA_CONFIG"
+
         dados["visto_em"] = datetime.now().isoformat(timespec="seconds")
-        passo = Passo(msg=msg, contato_id=contato_id, dados=dados,
-                      backend=self._backend, redator=self._redator, repo=self._repo)
+        passo = self._montar(msg, contato_id, dados, redator)
         try:
             # Sai do roteiro sem SALVAR nada: quem perguntou ou se perdeu não perde o
             # lugar na fila, e a próxima mensagem cai no mesmo estado.
             if (fora := self._fora_do_roteiro(passo, estado)) is not None:
-                return fora
+                return self._com_aviso(contato_id, redator, fora)
             self._perdidos.discard(contato_id)
-            resposta = (entrada.retomada(passo, retomar_de) if retomar_de
-                        else self._executar(passo, estado))
+            if retomar_de:
+                resposta = entrada.retomada(passo, retomar_de)
+            elif desenhar_ia:
+                resposta = entrar(passo, estado)   # DESENHA a tela; não consome a mensagem
+            else:
+                resposta = self._executar(passo, estado)
         except Exception:
             log.exception("passo %s falhou para o contato %s", estado, contato_id)
-            return dizer(self._redator, "backend_fora")
+            return dizer(redator, "backend_fora")
 
         self._repo.salvar_sessao(contato_id, passo.proximo or estado, passo.dados)
         self._projetar(contato_id, passo.dados)
-        return resposta
+        return self._com_aviso(contato_id, redator, resposta)
+
+    def _montar(self, msg: MensagemEntrada, contato_id: str, dados: dict,
+                redator: Redator) -> Passo:
+        return Passo(msg=msg, contato_id=contato_id, dados=dados,
+                     backend=self._backend, redator=redator, repo=self._repo)
+
+    def _com_aviso(self, contato_id: str, redator: Redator,
+                   resposta: MensagemSaida) -> MensagemSaida:
+        """A chave da pessoa falhou no meio do turno? Ela fica sabendo, uma vez por queda.
+
+        O cadastro não para: o `RedatorClaude` cai para o texto pronto sozinho. O que não
+        pode é a pessoa achar que a IA dela está funcionando enquanto o bot responde seco.
+        Repetir o aviso a cada mensagem seria a falha oposta, então ele só volta depois
+        que a IA voltar a responder.
+        """
+        aviso = ia.aviso_de_falha(redator)
+        if aviso is None:
+            self._ia_avisados.discard(contato_id)
+            return resposta
+        if contato_id in self._ia_avisados:
+            return resposta
+        if len(self._ia_avisados) > 5_000:     # mesmo motivo do clear das cotas
+            self._ia_avisados.clear()
+        self._ia_avisados.add(contato_id)
+        # Em cima, não embaixo: toda tela do bot termina na pergunta, e um aviso depois
+        # dela empurraria a pergunta para o meio da mensagem.
+        return replace(resposta, texto=f"{aviso}\n\n{resposta.texto}")
+
+    def _redator_de(self, dados: dict) -> Redator:
+        """A IA é do contato, não do processo: cada um liga a sua chave com `/ia`.
+
+        O cliente fica cacheado por chave, porque montar um a cada turno abriria conexão nova
+        por mensagem. `clear` pelo mesmo motivo das cotas: dicionário que só cresce.
+        """
+        chave = dados.get("chave_ia")
+        if not chave:
+            return self._redator
+        if chave not in self._por_chave:
+            if len(self._por_chave) > 500:
+                self._por_chave.clear()
+            try:
+                self._por_chave[chave] = criar(chave)
+            except Exception:      # anthropic não instalado, por exemplo
+                log.exception("não consegui montar o redator da chave do contato")
+                return self._redator
+        return self._por_chave[chave]
 
     def _projetar(self, contato_id: str, dados: dict) -> None:
         """Espelha o contexto nas colunas consultáveis. Nunca derruba a conversa.
 
         A sessão já foi salva quando isto roda: se a projeção falhar, o diálogo continua
-        de onde estava e só o espelho fica para trás. O contrário — perder o turno da
-        família porque uma coluna nova não existia ainda — seria trocar o produto pelo
+        de onde estava e só o espelho fica para trás. O contrário, perder o turno da
+        família porque uma coluna nova não existia ainda, seria trocar o produto pelo
         relatório.
         """
         try:
@@ -276,21 +384,28 @@ class Maquina:
         """Toda mensagem digitada passa por aqui antes de virar resposta de campo.
 
         A pessoa está respondendo, perguntando, ou se perdeu? `None` = segue o roteiro.
-        Só a etapa e a pergunta estática vão para o modelo — nada do que a família já
+        Só a etapa e a pergunta estática vão para o modelo, e nada do que a família já
         contou precisa estar lá para decidir isso.
         """
         texto = passo.texto
         if passo.msg.escolha or not texto or texto.startswith("/"):
             return None      # botão e comando já têm dono; classificar seria gastar à toa
+        if estado == "IA_CONFIG":
+            return None      # quem está configurando a IA não está respondendo o roteiro
 
         etapa = _etapa(estado, passo.dados)
-        intencao = self._redator.classificar(texto, etapa).intencao
+        intencao = passo.redator.classificar(texto, etapa).intencao
 
         if intencao == "duvida":
             if not self._cota(passo.contato_id):
                 return None
-            resposta = self._redator.responder_duvida(texto, etapa)
-            return MensagemSaida(resposta) if resposta else None
+            resposta = passo.redator.responder_duvida(texto, etapa)
+            if resposta:
+                return MensagemSaida(resposta)
+            # Sem chave não há resposta livre. Dizer como ligar é melhor que devolver a
+            # pergunta ao roteiro, onde ela vira "não entendi" no campo seguinte. A cota
+            # vale aqui também: passadas as 8, o aviso para de repetir.
+            return None if passo.dados.get("chave_ia") else MensagemSaida(ia.SEM_IA)
         if intencao == "fora_de_contexto":
             return self._reorientar(passo, estado)
         return None
@@ -298,7 +413,7 @@ class Maquina:
     def _reorientar(self, passo: Passo, estado: str) -> MensagemSaida | None:
         """Veio coisa que não responde a pergunta: repete a pergunta, sem contar erro.
 
-        Duas vezes seguidas seria loop — classificador que erra prenderia a família fora
+        Duas vezes seguidas seria loop: classificador que erra prenderia a família fora
         do cadastro. Na segunda, deixa passar: `_errar` sabe reclamar sozinho, conta as
         três tentativas e oferece a CRE. Estado sem tela de reentrada também passa, porque
         redesenhar ali significaria chamar o handler, que CONSOME a mensagem.
@@ -315,7 +430,7 @@ class Maquina:
         """Janela deslizante de uma hora, por contato.
 
         ponytail: dicionário em memória, um processo só. Some junto com o processo, e é
-        exatamente por isso que existe o `clear` — não vira vazamento no dia do pico.
+        exatamente por isso que existe o `clear`, para não virar vazamento no dia do pico.
         """
         agora = time.monotonic()
         if len(self._duvidas) > 5_000:
@@ -332,9 +447,24 @@ class Maquina:
         """Só existe enquanto o backend é o mock: empurra a inscrição uma etapa e deixa o
         worker de outbox entregar a notificação de verdade.
         ponytail: sai junto com o BackendMock, na Fase 3."""
+        from creche_bot.backend.mock import BackendMock
+
+        # `type(...) is`, não `isinstance`: `BackendMapa` HERDA de `BackendMock` e por isso
+        # herda o `avancar`. A guarda antiga (`avancar is None`) nunca disparava em
+        # produção, e qualquer família que digitasse /avancar depois de se inscrever
+        # receberia R1 a R4 até "Vaga confirmada" — mentira sobre vaga em creche pública.
+        if type(self._backend) is not BackendMock:
+            return MensagemSaida("Esse comando não existe por aqui.")
+
         numero = dados.get("numero")
         avancar = getattr(self._backend, "avancar", None)
         if not numero or avancar is None:
-            return MensagemSaida("Nada para avançar — conclua uma inscrição antes.")
-        avancar(numero)
+            return MensagemSaida("Nada para avançar. Conclua uma inscrição antes.")
+        try:
+            avancar(numero)
+        except KeyError:
+            # O serviço reiniciou e o mock recomeçou vazio. Sem esta guarda a exceção sobe
+            # até o canal e o bot fica MUDO, que é o pior jeito de falhar numa demonstração.
+            return MensagemSaida("Essa inscrição saiu da memória do serviço. "
+                                 "Faça outra com /demo ou /start.")
         return MensagemSaida("Etapa avançada. A notificação chega em instantes 👀")

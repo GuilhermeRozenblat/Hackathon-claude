@@ -13,8 +13,8 @@ from creche_bot.backend.mock import CPF_CONHECIDO, BackendMock
 from creche_bot.canal.tipos import Anexo, MensagemEntrada, MensagemSaida
 from creche_bot.conversa.maquina import Maquina
 
-# Os testes que montam a própria Maquina (processo fechado, por ex.) usam este direto —
-# não passam pela fixture `repo`, porque precisam inspecionar o repositório depois.
+# Os testes que montam a própria Maquina (processo fechado, por ex.) usam este direto
+# e não passam pela fixture `repo`, porque precisam inspecionar o repositório depois.
 from creche_bot.dados.memoria import RepositorioMemoria
 from creche_bot.ia.redacao import RedatorEstatico
 
@@ -46,7 +46,7 @@ def responder(bot, *entradas) -> MensagemSaida:
 
 # Blocos 0 a 3: da porta de entrada até o fim dos dados pessoais.
 # O gate do dado sensível aparece assim que a conversa chega na pergunta de saúde do
-# bloco 2 — aqui a família recusa, que é o caminho mais curto.
+# bloco 2: aqui a família recusa, que é o caminho mais curto.
 ATE_O_CONTATO = [
     msg("/start"), msg(escolha="inscrever"), msg(escolha="autorizo"),
     msg(CPF_NOVO), msg("10/01/2024"),                                    # bloco 1
@@ -115,7 +115,8 @@ def ate_o_protocolo_com_pendencia(bot) -> MensagemSaida:
 
 # ------------------------------------------------------------------ blocos 0 a 2
 def test_porta_de_entrada_tem_as_tres_portas(bot):
-    r = bot.processar(msg("/start"))
+    bot.processar(msg("/start"))
+    r = bot.processar(msg(escolha="sem_ia"))   # o bloco 0.0 pergunta sobre a IA antes
     assert {b.id for b in r.botoes} == {"inscrever", "acompanhar", "duvidas"}
 
 
@@ -150,7 +151,7 @@ def test_cpf_invalido_nao_passa_e_desiste_depois_de_tres(bot):
 
 
 def test_cadastro_anterior_aproveita_o_endereco(bot):
-    """Dispara em 27,9% dos casos, no CPF do responsável — a única busca que o backend tem."""
+    """Dispara em 27,9% dos casos, no CPF do responsável, a única busca que o backend tem."""
     r = responder(bot, *ATE_O_CONTATO[:-2], msg(CPF_CONHECIDO))
     assert "Curicica" in r.texto
     assert {b.id for b in r.botoes} == {"tudo_certo", "mudei_endereco"}
@@ -219,7 +220,7 @@ def test_recusar_o_sensivel_pula_a_pergunta_de_saude_sem_travar(bot):
 
 # ------------------------------------------------------------------ bloco 3
 def test_fora_da_faixa_falha_cedo_e_explica(bot):
-    """A família não pode descobrir isso no resultado — e o bloco 1 já pega isso."""
+    """A família não pode descobrir isso no resultado, e o bloco 1 já pega isso."""
     r = responder(bot, msg("/start"), msg(escolha="inscrever"), msg(escolha="autorizo"),
                   msg(CPF_NOVO), msg("05/01/2019"))
     assert "pré-escola" in r.texto
@@ -243,7 +244,7 @@ def test_endereco_so_por_cep_e_numero(bot):
     assert "número" in r.texto, "sem o número a precisão cai para ~1,4 km"
 
     r = bot.processar(msg("100"))
-    assert "Rua Franz Weissmann, 100 — Curicica" in r.texto
+    assert "Rua Franz Weissmann, 100, Curicica" in r.texto
     assert r.local is not None
 
 
@@ -345,7 +346,7 @@ def test_documento_ilegivel_nao_vira_comprovacao(bot):
 # ------------------------------------------------------------------ bloco 6
 def test_painel_nunca_mostra_nota_de_corte(bot):
     """A classificação só roda depois do fechamento: no momento da conversa ela não
-    existe. E o teto foi 465 em 2023 e 100 em 2024 — histórico não é comparável."""
+    existe. E o teto foi 465 em 2023 e 100 em 2024, e histórico não é comparável."""
     r = ate_as_escolas(bot)
     assert "nota de corte" not in r.texto.lower()
     assert "ponto" not in r.texto.lower()
@@ -402,7 +403,7 @@ def test_resumo_repete_o_declarado_e_nada_de_pontuacao(bot):
 
 def test_resumo_nunca_repete_resposta_sensivel(bot):
     """Ecoar dado de saúde num histórico que fica no aparelho da família é o que o
-    art. 11 manda evitar — guardar, sim; repetir, não."""
+    art. 11 manda evitar: guardar, sim; repetir, não."""
     r = responder(bot, *COM_PENDENCIA[:-4])
     assert "deficiência" not in r.texto.lower()
 
@@ -466,6 +467,64 @@ def test_start_no_meio_oferece_retomar(bot):
 
     r = bot.processar(msg(escolha="continuar"))
     assert "CEP" in r.texto, "continuou exatamente onde parou"
+    # "Não peguei o CEP" também contém "CEP": sem esta linha o teste passa com o bug
+    # de retomar pelo PASSOS, que consome o "continuar" como se fosse a resposta.
+    assert "não peguei" not in r.texto.lower(), "retomada refez a pergunta, não deu erro"
+
+
+def test_retomar_desenha_a_tela_e_nao_consome_o_botao(bot):
+    """Retomada usa ENTRADAS, não PASSOS: o "continuar" não é resposta de campo.
+
+    Cada estado reentrável precisa redesenhar a própria tela. Retomar pelo consumidor
+    fazia o bot responder "não peguei o CEP" a uma mensagem que ninguém mandou.
+    """
+    parar_em = {
+        "ENDERECO_CEP": ([*ATE_O_RESUMO, msg(escolha="certo")], "onde vocês moram"),
+        "ENDERECO_CONFIRMA": ([*ATE_O_RESUMO, msg(escolha="certo"),
+                               msg("22710-560, 100")], "confere se é aqui"),
+    }
+    for estado, (caminho, esperado) in parar_em.items():
+        b = Maquina(BackendMock(), RedatorEstatico(), RepositorioMemoria())
+        for e in caminho:
+            b.processar(e)
+        b.processar(msg("/start"))
+        r = b.processar(msg(escolha="continuar"))
+        assert esperado in r.texto.lower(), f"{estado} não redesenhou: {r.texto!r}"
+
+
+def test_retomar_no_bloco_8_nao_consome_o_continuar(bot):
+    """Mesma armadilha de `test_retomar_desenha_a_tela_e_nao_consome_o_botao`, um nível
+    mais fundo: CRIT_NIS e CRIT_ANEXO também precisam de ENTRADAS própria, senão o
+    "continuar" da retomada cai no handler que consome resposta de campo — em CRIT_NIS
+    isso mostrava "não parece o NIS" para um botão, e em CRIT_ANEXO descartava o
+    documento pendente como se a família tivesse escolhido "não tenho agora"."""
+    contato = bot._repo.contato_de("telegram", "777")
+
+    bot._repo.salvar_sessao(contato, "CRIT_NIS", {"criterios": []})
+    bot.processar(msg("/start"))
+    r = bot.processar(msg(escolha="continuar"))
+    assert "NIS" in r.texto
+    assert "não parece" not in r.texto.lower()
+
+    bot._repo.salvar_sessao(contato, "CRIT_ANEXO", {
+        "criterios": [{"codigo": "educacao_especial", "documento": "laudo médico",
+                       "rotulo": "x", "grupo": "8.2", "sensivel": False, "opcional": False}],
+        "anexo_de": "educacao_especial", "apos_anexo": "CRIT_FAMILIA",
+        "anexo_generico": False,
+    })
+    bot.processar(msg("/start"))
+    r = bot.processar(msg(escolha="continuar"))
+    assert "laudo médico" in r.texto
+    assert {b.id for b in r.botoes} == {"depois"}, "pedindo o documento, não pulando ele"
+
+
+def test_retomar_no_cadastro_anterior_repete_a_pergunta(bot):
+    """Mesma regra para a tela do histórico, que também não é uma pergunta de campo."""
+    responder(bot, *ATE_O_CONTATO[:-2], msg(CPF_CONHECIDO))
+    bot.processar(msg("/start"))
+    r = bot.processar(msg(escolha="continuar"))
+    assert {b.id for b in r.botoes} == {"tudo_certo", "mudei_endereco"}
+    assert "não entendi" not in r.texto.lower()
 
 
 def test_recomecar_limpa_a_sessao(bot):
@@ -489,11 +548,11 @@ def test_sessao_expirada_recomeca_limpa(bot):
 
 
 def test_sem_consentimento_nada_e_alcancavel(bot):
-    """LGPD art. 14 — guarda no código, não confiança no fluxo."""
+    """LGPD art. 14: guarda no código, não confiança no fluxo."""
     contato = bot._repo.contato_de("telegram", "777")
     bot._repo.salvar_sessao(contato, "CRIT_SENSIVEL", {"criterios": []})
     bot.processar(msg("tentando pular"))
-    assert bot._repo.carregar_sessao(contato)[0] in ("INICIO", "PORTA")
+    assert bot._repo.carregar_sessao(contato)[0] in ("INICIO", "PORTA", "IA_CONFIG")
 
 
 def test_apagar_e_o_direito_de_eliminacao(bot):
@@ -535,7 +594,7 @@ def test_bot_nunca_promete_vaga_nem_pontuacao(bot):
 
 
 def test_chance_na_tela_nunca_aparece_sem_o_ano_de_onde_veio():
-    """Sem o ano, "33%" vira previsão sobre o processo de agora — que não existe ainda.
+    """Sem o ano, "33%" vira previsão sobre o processo de agora, que não existe ainda.
 
     Roda contra o `BackendMapa` de propósito: é ele que produz a chance, e o mock das três
     escolas do roteiro não produziria número nenhum para verificar.
@@ -573,6 +632,13 @@ def test_tres_erros_no_mesmo_campo_oferece_atendente(bot):
         assert "sobrenome" in r.texto
     r = bot.processar(msg("x"))
     assert "1746" in r.texto or "atendente" in r.texto.lower()
+
+    # "Tentar de novo" reabre a pergunta zerada, em vez de validar o toque do botão como
+    # resposta (o que falhava de novo e devolvia a mesma tela de atendente, sem saída).
+    r = bot.processar(msg(escolha="tentar"))
+    assert "atendente" not in r.texto.lower() and "1746" not in r.texto
+    r = bot.processar(msg("Ana Beatriz da Silva"))
+    assert "atendente" not in r.texto.lower()
 
 
 def test_fora_da_faixa_permite_tentar_outra_crianca(bot):
@@ -617,6 +683,17 @@ def test_fora_do_periodo_liga_o_aviso():
     assert repo.tem_consentimento(repo.contato_de("telegram", "777"))
 
 
+def test_fora_do_periodo_nao_liga_aviso_sem_o_botao():
+    """Texto livre (ou qualquer toque que não seja "avisar") não é consentimento: só o
+    botão "Quero ser avisada" liga o aviso — ver a armadilha documentada no CLAUDE.md."""
+    repo = RepositorioMemoria()
+    fechado = Maquina(BackendMock(processo_aberto=False), RedatorEstatico(), repo)
+    responder(fechado, msg("/start"), msg(escolha="inscrever"))
+    r = fechado.processar(msg("não quero, obrigada"))
+    assert "não entendi" in r.texto.lower()
+    assert not repo.tem_consentimento(repo.contato_de("telegram", "777"))
+
+
 def test_ajuda_nao_perde_o_lugar(bot):
     responder(bot, *ATE_O_RESUMO)
     estado_antes = bot._repo.carregar_sessao(bot._repo.contato_de("telegram", "777"))[0]
@@ -649,7 +726,7 @@ def test_backend_fora_nao_mata_a_conversa(bot):
 
 
 def test_conversa_que_cai_e_recomeca_nao_duplica_inscricao(bot):
-    """Sem chave de idempotência, a família que retoma entra duas vezes — e as duas
+    """Sem chave de idempotência, a família que retoma entra duas vezes, e as duas
     inscrições se anulam."""
     primeiro = ate_o_protocolo(bot).texto
 
@@ -658,3 +735,59 @@ def test_conversa_que_cai_e_recomeca_nao_duplica_inscricao(bot):
     bot._repo.salvar_sessao(contato, "CRIT_FAMILIA", dados)
     r = bot.processar(msg(escolha="pronto"))
     assert dados["numero"] in r.texto or dados["numero"] in primeiro
+
+
+def test_chance_sem_ano_nao_vira_numero_na_tela():
+    """Chance sem procedência não sai. É a segunda condição do CLAUDE.md.
+
+    A conta de `backend/mapa.py` tem teto de 95%, e 26% das unidades não têm
+    concorrência comparável. Sem esta guarda, essas creches mostravam "chance estimada
+    95%" seco: número no teto, sem ano, lido como previsão sobre o processo de agora.
+    """
+    from creche_bot.conversa.passos.escolas import _chance
+
+    assert _chance({"chance": 0.95, "concorrencia": None}) == ""
+    assert _chance({"chance": None, "concorrencia": [5.0, 2025]}) == ""
+    linha = _chance({"chance": 0.4, "concorrencia": [5.0, 2025]})
+    assert "40%" in linha and "2025" in linha
+
+
+def test_rodape_so_explica_a_chance_quando_ha_chance_na_tela():
+    """Creche sem concorrência comparável não mostra número. Explicar o que não está ali
+    deixa o bot falando de "chance" sem exibir nenhuma — 5 das 9 creches de um painel real
+    caem nesse caso."""
+    from creche_bot.conversa.passos.escolas import _regiao
+    from creche_bot.ia.persona import TEXTOS
+
+    class PassoFalso:
+        def __init__(self, escolas):
+            self.dados = {"regiao": {"bairro": "Curicica", "ano": 2025,
+                                     "demanda": 390, "atendidos": 342},
+                          "escolas": escolas}
+
+        def txt(self, chave, **v):
+            return TEXTOS[chave].format(**v)
+
+    com = _regiao(PassoFalso([{"chance": 0.4, "concorrencia": [5.0, 2025]}]))
+    sem = _regiao(PassoFalso([{"chance": 0.95, "concorrencia": None}]))
+    assert "estimativa" in com, "com número na tela, a explicação tem que aparecer"
+    assert "chance" not in sem.lower(), f"sem número, não pode falar de chance: {sem!r}"
+    assert "390 famílias" in sem, "a estatística da região continua nos dois casos"
+
+
+def test_avancar_nao_existe_com_o_backend_de_producao():
+    """`/avancar` empurra etapas e dispara R1 a R4. Em produção seria o bot dizendo
+    "Vaga confirmada" para uma família que não tem vaga nenhuma.
+
+    A guarda antiga era `avancar is None`, e nunca disparava: `BackendMapa` herda de
+    `BackendMock` e herda o método junto.
+    """
+    from creche_bot.backend.mapa import BackendMapa
+
+    producao = Maquina(BackendMapa(), RedatorEstatico(), RepositorioMemoria())
+    r = producao.processar(msg("/avancar"))
+    assert "não existe" in r.texto.lower(), r.texto
+
+    demo = Maquina(BackendMock(), RedatorEstatico(), RepositorioMemoria())
+    r = demo.processar(msg("/avancar"))
+    assert "não existe" not in r.texto.lower(), "com o mock o comando continua valendo"

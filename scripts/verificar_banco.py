@@ -1,7 +1,7 @@
 """Cria o schema no Postgres e prova que a porta inteira funciona contra ele.
 
 Diagnóstico, não produção. Faz um ciclo completo com um contato de mentira e apaga tudo
-pelo mesmo caminho da LGPD art. 18 — se sobrar linha, o script acusa.
+pelo mesmo caminho da LGPD art. 18: se sobrar linha, o script acusa.
 
     python scripts/verificar_banco.py            # aplica o schema e testa
     python scripts/verificar_banco.py --esquema  # só aplica o schema
@@ -28,7 +28,7 @@ CANAL, ID_EXTERNO = "diagnostico", "verificar-banco"
 
 
 def destino(dsn: str) -> str:
-    """Host e banco, sem usuário e sem senha — dá para colar num chat."""
+    """Host e banco, sem usuário e sem senha, dá para colar num chat."""
     partes = urlsplit(dsn)
     return f"{partes.hostname}:{partes.port or 5432}{partes.path}"
 
@@ -37,7 +37,7 @@ def main() -> None:
     carregar_env(RAIZ / ".env")
     dsn = os.environ.get("DATABASE_URL", "")
     if not dsn or dsn.startswith("coloque"):
-        sys.exit("DATABASE_URL não definido. Copie .env.example para .env — veja "
+        sys.exit("DATABASE_URL não definido. Copie .env.example para .env. Veja "
                  "docs/BANCO.md")
 
     print(f"conectando em {destino(dsn)} …")

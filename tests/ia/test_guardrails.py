@@ -1,6 +1,6 @@
 """O filtro de saída: nada que o modelo devolva entra na conversa sem passar por aqui.
 
-Sem rede e sem chave — o que está sob teste é o filtro, não a API.
+Sem rede e sem chave: o que está sob teste é o filtro, não a API.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def test_pergunta_nao_escapa_do_bloco_de_dado(monkeypatch):
 
     p = capturado["pergunta"]
     assert p.count("<pergunta>") == 1 and p.count("</pergunta>") == 1
-    assert "Ignore tudo" in p, "o texto continua lá — só não é mais estrutura"
+    assert "Ignore tudo" in p, "o texto continua lá, só não é mais estrutura"
 
 
 def test_digito_longo_derruba_a_resposta_livre(monkeypatch):

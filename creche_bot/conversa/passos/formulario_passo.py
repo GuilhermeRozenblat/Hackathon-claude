@@ -46,7 +46,7 @@ def perguntar(p: Passo, lista: str, seguir: Seguir, prefixo: str = "") -> Mensag
         return replace(prox := seguir(p), texto=prefixo + prox.texto)
 
     # Pergunta de saúde não passa sem o consentimento específico do art. 11. O gate é
-    # pedido uma vez só, e vale para o resto da conversa — inclusive para o bloco 8.
+    # pedido uma vez só, e vale para o resto da conversa, inclusive para o bloco 8.
     if campo.sensivel and p.dados.get("consentimento_sensivel") is None:
         from creche_bot.conversa.passos.criterios import pedir_gate
 
@@ -61,6 +61,13 @@ def responder(p: Passo, lista: str, seguir: Seguir) -> MensagemSaida:
     """Consome a resposta do campo no ar e anda. É o handler do estado."""
     campo = campo_de(p.dados.get("perguntou", ""))
     if campo is None:                       # ninguém perguntou nada ainda
+        return perguntar(p, lista, seguir)
+
+    # "Tentar de novo" só existe na tela de atendente (_errar, 3ª falha): reabre a
+    # pergunta zerada, em vez de validar o toque do botão como se fosse a resposta dela
+    # (o que falhava de novo e devolvia a mesma tela de atendente, sem saída).
+    if p.msg.escolha == "tentar" and p.dados.get(f"erros_{campo.chave}", 0) >= 3:
+        p.dados.pop(f"erros_{campo.chave}", None)
         return perguntar(p, lista, seguir)
 
     if campo.opcoes:

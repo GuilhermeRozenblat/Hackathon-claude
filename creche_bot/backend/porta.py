@@ -1,8 +1,8 @@
-"""CONTRATO CONGELADO — v2. A fronteira com os dados do município.
+"""CONTRATO CONGELADO: v2. A fronteira com os dados do município.
 
 Aqui mora o que NÃO é nosso: o histórico da Matrícula Rio, a régua do processo vigente,
 a oferta de creches e o andamento da inscrição. O backend é construído por outro time, e
-o sistema de registro continua sendo o matricula.rio — o bot é canal complementar.
+o sistema de registro continua sendo o matricula.rio, e o bot é canal complementar.
 
 ## A divisão que importa
 
@@ -112,7 +112,7 @@ class BackendCreche(Protocol):
     def validar_nis(self, nis: str) -> tuple[bool, tuple[str, ...]]:
         """(válido, códigos de critério que ele comprova).
 
-        Com o NIS o servidor consulta CadÚnico e Bolsa Família de uma vez — é por isso
+        Com o NIS o servidor consulta CadÚnico e Bolsa Família de uma vez, e é por isso
         que as duas perguntas cabem num turno só.
         """
 
@@ -139,7 +139,7 @@ class BackendCreche(Protocol):
                            filiacao: str) -> list[Desfecho]:
         """Caminho 2 do portal: nome + nascimento + filiação.
 
-        Existe porque nem todo mundo guarda o número — e porque há criança sem filiação
+        Existe porque nem todo mundo guarda o número, e porque há criança sem filiação
         registrada na certidão. Manter os dois caminhos é obrigatório.
         """
 

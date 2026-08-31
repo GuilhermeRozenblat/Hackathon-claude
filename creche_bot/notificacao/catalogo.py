@@ -22,7 +22,7 @@ _TELEGRAM: dict[ChaveTemplate, tuple[str, str]] = {
     ChaveTemplate.ETAPA_AVANCOU: (
         "Novidade sobre a inscrição de {nome_crianca} 👀\n\n{titulo_etapa}\n\n"
         "Não precisa fazer nada agora, eu te aviso.", "comemorando"),
-    # R1 — ataca direto os 8,0% de validação documental.
+    # R1: ataca direto os 8,0% de validação documental.
     ChaveTemplate.DOCUMENTO_PENDENTE: (
         "Oi! Faltou um documento na inscrição de {nome_crianca}:\n\n{pendencias}\n\n"
         "Sem ele esse critério não conta na classificação. Pode mandar a foto por aqui? 📎",
@@ -31,11 +31,11 @@ _TELEGRAM: dict[ChaveTemplate, tuple[str, str]] = {
         "Precisa dar uma passada na creche pela inscrição de {nome_crianca} 🚀\n\n"
         "{nome_escola}\n{endereco}\nAté {prazo}\n\n"
         "Te mandei o endereço no mapa aqui embaixo.", "mapa"),
-    # R2 — o turno que fecha o vazamento dos 7,7%.
+    # R2: o turno que fecha o vazamento dos 7,7%.
     ChaveTemplate.CONVOCACAO: (
         "🎉 Boa notícia! Saiu vaga para {nome_crianca} na {nome_escola}.\n\n"
         "Você tem até {prazo} para confirmar.", "festa"),
-    # R3 — reenvio quando o R2 não foi lido em 24h. Depois disso, escalona para a CRE.
+    # R3: reenvio quando o R2 não foi lido em 24h. Depois disso, escalona para a CRE.
     ChaveTemplate.LEMBRETE_CONVOCACAO: (
         "Passando para lembrar: a vaga de {nome_crianca} na {nome_escola} está esperando "
         "sua confirmação até {prazo}.\n\nSe não der, me avisa que eu registro.", "atencao"),
@@ -60,7 +60,7 @@ def renderizar(chave: ChaveTemplate, variaveis: dict[str, Any],
         raise ValueError(f"{chave}: faltam as variáveis {sorted(faltando)}")
 
     if canal != "telegram":
-        raise NotImplementedError(f"canal {canal!r} — Fase 3, veja creche_bot/backend/CLAUDE.md")
+        raise NotImplementedError(f"canal {canal!r}: Fase 3, veja creche_bot/notificacao/CLAUDE.md")
 
     modelo, figurinha = _TELEGRAM[chave]
     msg: dict[str, Any] = {"texto": modelo.format(**variaveis), "figurinha": figurinha}

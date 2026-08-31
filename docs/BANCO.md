@@ -1,148 +1,105 @@
-# Banco — Postgres no Supabase
+# Banco: Postgres no Supabase
 
-O bot guarda CPF, nome de criança e telefone. Este documento é o caminho para deixar isso
-num lugar que sobreviva ao restart sem virar um vazamento.
+O bot guarda CPF, nome de criança e telefone. Este é o caminho para deixar isso num lugar que
+sobreviva ao restart sem virar vazamento. O modelo está em [MODELO_DADOS.md](MODELO_DADOS.md);
+o porquê das escolhas, em [D21](DECISOES.md).
 
-## 0. O projeto
-
-| | |
+| Projeto | `ze-matricula` · ref `frzkhffbpwmpjetcenfw` · `sa-east-1` (São Paulo) · schema `creche` |
 |---|---|
-| Projeto | `ze-matricula` |
-| Ref | `frzkhffbpwmpjetcenfw` |
-| Região | `sa-east-1` (São Paulo) — dado de criança sob LGPD fica em território nacional |
-| Organização | CleanApps |
-| Schema | `creche` (fora do alcance da Data API) |
 
-## 1. Pegar a connection string
+Região brasileira porque dado de criança sob LGPD fica em território nacional.
 
-No dashboard do Supabase: **Connect** (topo da página) → aba **Connection string** →
-**Transaction pooler**. Você recebe algo assim:
+## 1. Connection string
+
+Dashboard do Supabase → **Connect** → **Connection string** → **Transaction pooler**:
 
 ```
 postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:6543/postgres
 ```
 
-Troque `<SENHA>` pela senha do banco (**Project Settings → Database → Reset password**, se
-você não a tiver — a senha só aparece no momento em que é criada).
+A senha é a do banco (**Project Settings → Database → Reset password** se você não a tiver).
 
-**Use o pooler, não a conexão direta.** O bot abre duas frentes que escrevem ao mesmo
-tempo — o polling do Telegram e o worker de outbox — e o plano free do Supabase corta
-conexão direta rápido. `RepositorioPostgres` já desliga prepared statement por causa do
-modo transação; a porta 5432 (session pooler) também funciona sem mudar nada.
+> **Os sinais `<` e `>` saem junto.** Eles marcam o buraco, não fazem parte do valor. Deixar
+> `:<minhasenha>@` manda os dois sinais para o Postgres e a resposta é
+> `password authentication failed`, que parece senha errada e não é. Se a senha tiver `@`,
+> `/`, `?`, `#` ou `%`, aí sim precisa de percent-encoding.
 
-## 2. Colocar no `.env`
+**Use o pooler, não a conexão direta.** Duas frentes escrevem ao mesmo tempo, o polling e o
+worker de outbox, e o plano free corta conexão direta rápido. A porta 5432 (session pooler)
+também funciona sem mudar nada.
+
+## 2. `.env` e schema
 
 ```bash
 cp .env.example .env      # o .env é ignorado pelo git; o bot exige permissão 0600
+# DATABASE_URL=postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:6543/postgres
+make banco                # aplica o schema e testa a porta inteira contra ele
 ```
 
-```ini
-DATABASE_URL=postgresql://postgres.<ref>:<SENHA>@aws-0-<regiao>.pooler.supabase.com:6543/postgres
-```
-
-`sslmode=require` é acrescentado sozinho se você não puser: sem TLS, CPF e nome de criança
-atravessam a internet em texto claro.
-
-A connection string carrega a senha do banco. Ela está em `segredos.SEGREDOS`, então o
-formatador de log a redige de mensagem **e** de traceback — mas isso é a segunda linha de
-defesa, não a primeira. Não cole a string em issue, PR ou print.
-
-## 3. Aplicar o schema e provar que funciona
-
-```bash
-make banco
-```
-
-Cria o schema, roda um ciclo completo com um contato de mentira — identidade, sessão,
-inscrição, outbox, marca d'água — e apaga tudo pelo mesmo caminho da LGPD art. 18. Se
-sobrar órfão, o script acusa.
+`sslmode=require` é acrescentado sozinho: sem TLS, CPF e nome de criança atravessam a internet
+em texto claro. A senha está em `segredos.SEGREDOS`, então o formatador de log a redige de
+mensagem e de traceback, segunda linha de defesa, não a primeira. Não cole a string em issue,
+PR ou print.
 
 | Comando | O que faz |
 |---|---|
-| `make banco` | Aplica o schema e testa a porta inteira contra ele |
+| `make banco` | Aplica o schema e roda um ciclo completo com um contato de mentira, apagando tudo pelo caminho da LGPD art. 18. Se sobrar órfão, acusa |
 | `make esquema` | Só aplica o schema (idempotente) |
 | `make dados` | A bateria de testes da persistência |
 | `make limpar` | Derruba o schema `creche` inteiro (pede confirmação) |
+| `make memoria` | Roda o bot sem banco nenhum |
 
-`RepositorioPostgres` reaplica o schema no boot. É DDL idempotente (`IF NOT EXISTS`) e
-custa menos que manter migração versionada enquanto o schema muda toda semana — Alembic
-entra quando ele parar de mudar.
+`RepositorioPostgres` reaplica o schema no boot: DDL idempotente custa menos que migração
+versionada enquanto o schema muda toda semana. Alembic entra quando ele parar de mudar.
 
-## 4. Por que schema `creche` e não `public`
+## 3. Por que schema `creche` e não `public`
 
-No Supabase, o `public` é servido pela **Data API** (PostgREST) para quem tiver a chave
-anônima — e essa chave costuma acabar no front. As tabelas daqui guardam nome de criança e
-CPF: um schema fora da lista de exposição simplesmente **não é alcançável** pela API, e
-isso não depende de ninguém lembrar de manter uma política de RLS restritiva.
+No Supabase o `public` é servido pela **Data API** (PostgREST) a quem tiver a chave anônima, e
+essa chave costuma acabar no front. Um schema fora da lista de exposição **não é alcançável**
+pela API, e isso não depende de ninguém lembrar de manter RLS restritiva numa tabela nova.
 
-RLS fica ligada em todas as tabelas mesmo assim, sem política nenhuma, e `anon`,
-`authenticated` e `service_role` perdem o acesso ao schema. O bot conecta como dono das
-tabelas, que é quem RLS não bloqueia.
+RLS fica ligada em todas mesmo assim, sem política, e `anon`, `authenticated` e `service_role`
+perdem acesso ao schema. O bot conecta como dono das tabelas, que é quem RLS não bloqueia. Se
+um dia alguém precisar ler pela API: uma **view em `public` com `security_invoker = true`**,
+expondo só as colunas necessárias, nunca o schema.
 
-Se um dia alguém precisar ler isso pela API, o caminho é uma **view específica em `public`,
-com `security_invoker = true`, expondo só as colunas necessárias** — nunca expor o schema.
+**Documento não é persistido.** A V1 extrai, guarda estruturado e descarta os bytes. Enquanto
+isso valer, não há o que vazar.
 
-## 5. O que fica guardado
+## 4. Testes
 
-| Tabela | O que é | Some com o expurgo |
-|---|---|---|
-| `contato` | UUID interno da pessoa | sim (cascata) |
-| `identidade_canal` | `(canal, id_externo)` → contato | sim |
-| `consentimento` | versão do texto aceito, quando e por onde | sim |
-| `sessao` | estado da conversa + contexto `jsonb` | sim |
-| `inscricao` | protocolo, escola e etapa atual | sim |
-| `outbox` | eventos a entregar | sim, **por protocolo, explicitamente** |
-| `marca` | até onde o backend já foi lido | não (não tem dado pessoal) |
-
-**Documento não é persistido.** A V1 extrai, guarda o resultado estruturado e descarta os
-bytes (minimização, ARQUITETURA §2.2). Enquanto isso valer, não há o que vazar. Quando a
-creche exigir o arquivo original, ele nasce cifrado, com `expira_em` e job de expurgo — ver
-`creche_bot/dados/CLAUDE.md`.
-
-**`outbox` não tem FK para `contato`, de propósito.** Um `ON DELETE CASCADE` escondido
-tornaria fácil esquecer que a fila também guarda nome de criança. `apagar_tudo()` apaga por
-protocolo, explicitamente, e há teste que falha se sobrar linha.
-
-## 6. Rodar sem banco
+Todo teste da persistência roda duas vezes: contra `RepositorioMemoria` (a referência de
+comportamento) e contra o Postgres. Os testes usam o schema **`creche_teste`**, nunca o
+`creche`: eles dão `TRUNCATE` em tudo que enxergam, e apontar isso para inscrição real seria
+destruição silenciosa.
 
 ```bash
-make memoria      # REPOSITORIO=memoria: o bot inteiro, sem banco nenhum
+make test                        # sem DATABASE_URL, roda só a implementação em memória
+make up                          # Postgres local no Docker, alternativa ao Supabase
+DATABASE_URL=postgresql://creche:$POSTGRES_PASSWORD@127.0.0.1:5432/creche make test
 ```
 
-É a válvula de escape: quem trabalha em canal e conversa não fica bloqueado por Postgres
-fora do ar nem por migração em andamento. O estado some no restart, e é só isso.
+**Não existe variável de banco de teste.** A suíte usa o mesmo `DATABASE_URL` do bot, e quem
+isola é o schema `creche_teste`. Quem estiver com o bot no ar contra aquele projeto divide o
+pooler com a suíte; para não dividir, aponte `DATABASE_URL` para o Postgres local do `make up`.
 
-## 7. Testes
+**Quem roda contra o banco.** Só `tests/dados` — é lá que a paridade entre as duas
+implementações é cobrada, e ela exercita a porta inteira, cadastro e preferências incluídos.
+`tests/conversa` roda em memória, porque lá o objeto de teste é o roteiro. São 332 testes em
+~50s no total.
 
-Todo teste da persistência roda **duas vezes**: contra `RepositorioMemoria` e contra o
-Postgres. A implementação em memória é a referência de comportamento — se as duas
-divergirem em cópia de dict, ordem da fila ou órfão depois do expurgo, o teste acusa.
+**Duas armadilhas do pooler, já resolvidas no `conftest`, e que voltam se alguém desfizer:**
+a conexão administrativa precisa de `prepare_threshold=None` como o pool (senão a limpeza
+morre em `prepared statement "_pg3_0" does not exist` e o erro aparece no teste seguinte); e a
+limpeza é um `TRUNCATE` da lista inteira **sem `CASCADE`** (com ele, o lock alcançava tabela
+fora da lista em ordem imprevisível e a bateria travava em `DeadlockDetected`).
 
-```bash
-make test         # sem DATABASE_URL_TESTE, a metade Postgres é pulada
-```
-
-Os testes usam o schema **`creche_teste`**, nunca o `creche`: eles dão `TRUNCATE` em tudo
-que enxergam, e apontar isso para inscrição real seria destruição silenciosa. Ao fim da
-sessão o schema de teste é derrubado.
-
-Contra o Supabase a suíte leva ~1min40 (era 0,3s só em memória): cada asserção é uma ida e
-volta até São Paulo. Para o ciclo curto de quem está escrevendo código, `make memoria` ou
-o Postgres local do `make up` respondem na hora; o banco remoto vale antes de abrir PR.
-
-Para rodar contra um banco descartável em vez do Supabase:
-
-```bash
-make up           # docker compose: Postgres local na loopback
-DATABASE_URL_TESTE=postgresql://creche:$POSTGRES_PASSWORD@127.0.0.1:5432/creche make test
-```
-
-## 8. Quando algo dá errado
+## 5. Quando algo dá errado
 
 | Sintoma | Causa provável |
 |---|---|
-| `password authentication failed` | Senha do banco ≠ senha da conta. Project Settings → Database → Reset password |
-| `(ENOTFOUND) tenant/user ... not found` | Usuário do pooler é `postgres.<ref>`, não `postgres` — **ou o host está errado por um dígito**: é `aws-0-sa-east-1`, e `aws-1-...` resolve para um pooler de verdade que simplesmente não conhece este tenant. Copie o host do dashboard, não digite |
+| `password authentication failed` | Senha do banco ≠ senha da conta, ou os `<>` do exemplo ficaram na string |
+| `tenant or user not found` | Usuário do pooler é `postgres.<ref>`, não `postgres`, ou o host está errado por um dígito (`aws-0-sa-east-1`; `aws-1-…` resolve para um pooler que não conhece este tenant). Copie do dashboard |
 | `prepared statement ... does not exist` | Alguém tirou `prepare_threshold=None` do pool |
 | `permission denied for schema creche` | Conectou com um papel que não é o dono das tabelas |
-| Conexão cai depois de ociosa | O pooler derruba ociosa; o `check` do pool já trata — confira se ele continua lá |
+| Conexão cai depois de ociosa | O pooler derruba ociosa; o `check` do pool trata, confira se continua lá |

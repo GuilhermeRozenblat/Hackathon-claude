@@ -2,7 +2,7 @@
 
 Um arquivo só, e fora de `__main__.py`, para que dê para testar sem subir o bot inteiro.
 
-O token do Telegram viaja no CAMINHO da URL da Bot API — basta um traceback de urllib com
+O token do Telegram viaja no CAMINHO da URL da Bot API, e basta um traceback de urllib com
 a URL dentro para ele parar no console, no CI, ou num print colado no chat da equipe.
 """
 
@@ -10,17 +10,23 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 # Nomes cujo valor nunca pode aparecer em log, traceback ou mensagem de erro.
 SEGREDOS = ("TELEGRAM_TOKEN", "ANTHROPIC_API_KEY", "DATABASE_URL", "FERNET_KEY",
-            "POSTGRES_PASSWORD")
+            "POSTGRES_PASSWORD", "TELEGRAM_WEBHOOK_SECRET")
+
+# Segredo que o processo NÃO conhece de antemão: a chave da Anthropic chega pelo chat, em
+# `/ia sk-ant-...`, e com `DEBUG_CONTEUDO=1` a mensagem inteira é espelhada no console.
+# Sem valor para comparar, só o formato pega.
+CHAVE_API = re.compile(r"sk-ant-[\w-]{8,}")
 
 
 class FormatadorSeguro(logging.Formatter):
-    """Segredo nunca chega ao log — nem em mensagem, nem em traceback, nem dentro de URL.
+    """Segredo nunca chega ao log: nem em mensagem, nem em traceback, nem dentro de URL.
 
     O token do Telegram viaja no caminho da URL da Bot API, então basta um traceback de
     urllib com a URL dentro para ele parar no console, no CI ou num print colado no chat.
@@ -35,11 +41,11 @@ class FormatadorSeguro(logging.Formatter):
         texto = super().format(record)
         for segredo in self._segredos:
             texto = texto.replace(segredo, "«redigido»")
-        return texto
+        return CHAVE_API.sub("«redigido»", texto)
 
 
 def configurar_log(nivel: int = logging.INFO) -> None:
-    """Log só com ID — e o formatador como segunda linha de defesa. Chame depois do .env."""
+    """Log só com ID, e o formatador como segunda linha de defesa. Chame depois do .env."""
     saida = logging.StreamHandler()
     saida.setFormatter(FormatadorSeguro(
         "%(asctime)s %(levelname)-7s %(name)s · %(message)s", datefmt="%H:%M:%S",

@@ -1,12 +1,12 @@
-"""CONTRATO CONGELADO — Fase 0.2. A fronteira com a persistência.
+"""CONTRATO CONGELADO: Fase 0.2. A fronteira com a persistência.
 
 Quem trabalha no canal, na conversa ou na notificação **nunca** conhece banco. Não há
 `sqlite3`, `SELECT`, `session` nem `connection` fora das implementações desta porta.
 
 Duas implementações hoje:
-  · `memoria.RepositorioMemoria` — zero dependência, zero setup. É o que garante que o
+  · `memoria.RepositorioMemoria`, zero dependência, zero setup. É o que garante que o
     trabalho de Telegram nunca fica bloqueado por uma refatoração no banco.
-  · `sqlite.RepositorioSQLite`  — o que roda por padrão; ponto de partida do Postgres.
+  · `postgres.RepositorioPostgres`, o que roda por padrão, no Supabase.
 
 Adicionar campo aqui = PR próprio. Todo mundo depende deste arquivo.
 """
@@ -46,9 +46,14 @@ class RespostaCriterio:
 class PreferenciaEscola:
     """Uma opção de creche, na POSIÇÃO em que a família a colocou. 1 é a primeira.
 
-    Guarda junto o fato que estava na tela quando ela escolheu — distância, vaga aberta
-    e concorrência do ano de `ano_referencia`. Sem isso não dá para auditar depois com
-    base em que a escolha foi feita, e o painel muda de um processo para o outro.
+    Guarda junto **o fato que estava na tela** quando ela escolheu: distância, vaga
+    aberta, concorrência e a chance estimada, todas do ano de `ano_referencia`. Sem isso
+    não dá para auditar depois com base em que a escolha foi feita, e a conta muda de um
+    processo para o outro.
+
+    `chance` é a estimativa que a família leu (0 a 1), não uma previsão nossa: a
+    classificação não está dentro dela. Fica aqui porque é o número que mais pesa na
+    decisão, e era o único da tela que não sobrevivia ao turno. Ver DECISOES D19.
     """
     posicao: int
     id_escola: str
@@ -56,31 +61,31 @@ class PreferenciaEscola:
     distancia_km: float | None = None
     vaga_ociosa: bool = False
     familias_por_vaga: float | None = None
+    chance: float | None = None
     ano_referencia: int | None = None
 
 
 @dataclass(frozen=True)
 class Cadastro:
-    """O que a família respondeu, em colunas — a mesma coisa que o jsonb da sessão tem,
+    """O que a família respondeu, em colunas, a mesma coisa que o jsonb da sessão tem,
     numa forma que aguenta SQL.
 
     Datas viajam como ISO `str`, não `date`: é o formato que já atravessa
     `sessao.contexto`, e converter em dois lugares só criaria uma terceira grafia.
 
     `protocolo` é `None` até a inscrição ser efetivada. É o que distingue o cadastro
-    ABERTO (um por contato, sobrescrito a cada resposta) dos já enviados — 1.738
+    ABERTO (um por contato, sobrescrito a cada resposta) dos já enviados: 1.738
     responsáveis inscreveram duas ou mais crianças em 2025, e cada uma vira sua linha.
     """
     contato_id: str
     protocolo: str | None = None
     nome_crianca: str | None = None
     nascimento_crianca: str | None = None
-    sexo: str | None = None
     grupamento: str | None = None
     documento_crianca: str | None = None
+    origem: str | None = None
     nome_responsavel: str | None = None
     cpf_responsavel: str | None = None
-    relacao: str | None = None
     cep: str | None = None
     numero: str | None = None
     logradouro: str | None = None
@@ -149,7 +154,7 @@ class Repositorio(Protocol):
 
         Chamado a cada turno da conversa, não só no fim: família que abandona no meio
         deixa rastro do que já respondeu, e é justamente esse abandono que interessa
-        medir. Critérios e preferências vão na mesma transação — meia gravação faria a
+        medir. Critérios e preferências vão na mesma transação, senão meia gravação faria a
         régua discordar da escolha de creche.
         """
 

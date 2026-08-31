@@ -4,7 +4,7 @@ O bot roda com Postgres em produção e com memória no `make memoria`. Se as du
 divergirem, um caminho passa aqui e quebra lá.
 
 A fixture `repo` vem de `tests/conftest.py` e roda cada teste DUAS vezes: em memória e
-no Postgres. Sem `DATABASE_URL_TESTE` a metade Postgres é pulada, e ninguém fica
+no Postgres. Sem `DATABASE_URL` a metade Postgres é pulada, e ninguém fica
 bloqueado por banco fora do ar.
 """
 
@@ -12,7 +12,13 @@ from __future__ import annotations
 
 import pytest
 
-from creche_bot.dados.porta import Inscricao, Repositorio
+from creche_bot.dados.porta import (
+    Cadastro,
+    Inscricao,
+    PreferenciaEscola,
+    Repositorio,
+    RespostaCriterio,
+)
 
 
 def test_implementa_a_porta(repo):
@@ -32,7 +38,7 @@ def test_sessao_nasce_no_inicio(repo):
 
 
 def test_sessao_sobrevive_ao_round_trip(repo):
-    """Restart não pode perder conversa — o estado mora aqui, não no processo."""
+    """Restart não pode perder conversa, porque o estado mora aqui, não no processo."""
     contato = repo.contato_de("telegram", "1")
     repo.salvar_sessao(contato, "CRIT_NIS", {"declarados": ["cadunico"], "n": 3})
 
@@ -156,7 +162,7 @@ def _com_inscricao(repo, protocolo="2026-1", nome="Ana Beatriz") -> str:
 
 def test_carregar_sessao_devolve_copia(repo):
     """O chamador muta o dict que recebe. Devolver a referência interna faria o estado
-    mudar sem passar por salvar_sessao() — e o restart perderia a conversa."""
+    mudar sem passar por salvar_sessao(), e o restart perderia a conversa."""
     contato = repo.contato_de("telegram", "1")
     repo.salvar_sessao(contato, "CRIT_NIS", {"declarados": ["cadunico"]})
 
@@ -216,7 +222,7 @@ def test_pendentes_respeita_o_limite(repo):
 
 
 def test_falha_para_de_insistir_no_teto(repo):
-    """Falhou, tenta de novo — mas depois de N falhas para de girar."""
+    """Falhou, tenta de novo, mas depois de N falhas para de girar."""
     _com_inscricao(repo)
     repo.enfileirar("2026-1", "convocacao", {})
 
@@ -240,7 +246,7 @@ def test_variaveis_com_acento_e_aninhamento(repo):
 
 def test_apagar_tudo_nao_deixa_orfao_na_outbox(repo):
     """A outbox não tem FK para contato. Sobrar linha ali é nome de criança guardado
-    depois que a família pediu para sumir — LGPD art. 18."""
+    depois que a família pediu para sumir. LGPD art. 18."""
     contato = _com_inscricao(repo)
     repo.enfileirar("2026-1", "convocacao", {"nome_crianca": "Ana Beatriz"})
 
@@ -259,9 +265,57 @@ def test_apagar_tudo_nao_deixa_orfao_na_outbox(repo):
 # Não dependem de banco: leem o DDL e a montagem da conexão.
 
 
+def test_cadastro_volta_inteiro_com_regua_e_preferencias(repo):
+    """As quatro tabelas do cadastro, ida e volta, nas duas implementações.
+
+    É aqui que a paridade do espelho consultável é cobrada: `tests/conversa` roda só em
+    memória, porque lá o objeto de teste é o roteiro.
+    """
+    contato = repo.contato_de("telegram", "9")
+    repo.salvar_cadastro(Cadastro(
+        contato_id=contato, nome_crianca="Ana Beatriz", nascimento_crianca="2024-01-10",
+        documento_crianca="11144477735", grupamento="maternal_2", origem="particular",
+        nome_responsavel="Maria", cpf_responsavel="52998224725",
+        cep="22710560", numero="100", logradouro="Rua X", bairro="Curicica",
+        lat=-22.96, lng=-43.39, horario="integral", telefone="21999998888",
+        email="maria@exemplo.com",
+        criterios=(RespostaCriterio("cadunico", True, True),
+                   RespostaCriterio("violencia_domestica", True, False, sensivel=True)),
+        preferencias=(
+            PreferenciaEscola(1, "0716813", "EDI KENIA", distancia_km=1.0,
+                              vaga_ociosa=False, familias_por_vaga=1.14,
+                              chance=0.328, ano_referencia=2025),
+            PreferenciaEscola(2, "0716824", "EDI TEREZINHA", distancia_km=1.37))))
+
+    lido = repo.cadastro_de(contato)
+    assert lido.origem == "particular"
+    assert lido.documento_crianca == "11144477735"
+    assert lido.bairro == "Curicica"
+    assert [c.codigo for c in lido.criterios] == ["cadunico", "violencia_domestica"]
+    assert lido.criterios[1].sensivel is True
+
+    # A chance é o número que a família LEU: sem ela gravada não dá para auditar a escolha.
+    assert [p.posicao for p in lido.preferencias] == [1, 2]
+    assert lido.preferencias[0].chance == 0.328
+    assert lido.preferencias[0].ano_referencia == 2025
+    assert lido.preferencias[1].chance is None      # creche sem estimativa não inventa uma
+
+
+def test_cadastro_enviado_e_o_aberto_convivem(repo):
+    """`fechar_cadastro` carimba o protocolo, e o próximo filho abre outro cadastro:
+    1.738 responsáveis inscreveram duas ou mais crianças em 2025."""
+    contato = repo.contato_de("telegram", "9")
+    repo.salvar_cadastro(Cadastro(contato_id=contato, nome_crianca="Ana"))
+    repo.fechar_cadastro(contato, "2026-0000001")
+    repo.salvar_cadastro(Cadastro(contato_id=contato, nome_crianca="Bruno"))
+
+    assert repo.cadastro_de(contato).nome_crianca == "Bruno"                  # o aberto
+    assert repo.cadastro_de(contato, "2026-0000001").nome_crianca == "Ana"    # o enviado
+
+
 def test_esquema_fica_fora_do_schema_public():
     """No `public` as tabelas ficam ao alcance da Data API do Supabase, que responde a
-    quem tem a chave anônima — e elas guardam nome de criança e CPF."""
+    quem tem a chave anônima, e elas guardam nome de criança e CPF."""
     from creche_bot.dados import postgres
 
     assert "CREATE SCHEMA IF NOT EXISTS {s}" in postgres.ESQUEMA

@@ -19,7 +19,7 @@ from creche_bot.conversa.maquina import Maquina
 from creche_bot.dados.memoria import RepositorioMemoria
 from creche_bot.dados.porta import Repositorio
 from creche_bot.dados.postgres import RepositorioPostgres
-from creche_bot.ia.redacao import criar
+from creche_bot.ia.redacao import RedatorEstatico
 from creche_bot.ia.transcricao import Transcritor
 from creche_bot.notificacao.outbox import rodar_worker
 from creche_bot.segredos import carregar_env, configurar_log
@@ -38,15 +38,20 @@ def escolher_repositorio() -> Repositorio:
 
     dsn = os.environ.get("DATABASE_URL", "")
     if not dsn or dsn.startswith("coloque"):
-        sys.exit("DATABASE_URL não configurado no .env — veja docs/BANCO.md "
+        sys.exit("DATABASE_URL não configurado no .env. Veja docs/BANCO.md "
                  "(ou rode com REPOSITORIO=memoria)")
+    # `<` sobrando é o placeholder do BANCO.md que não foi substituído inteiro. O Postgres
+    # responderia "password authentication failed", que manda procurar a senha errada.
+    if "<" in dsn:
+        sys.exit("DATABASE_URL ainda tem <...> do exemplo. Os sinais < e > marcam o "
+                 "buraco e saem junto com ele. Veja docs/BANCO.md")
     return RepositorioPostgres(dsn)
 
 
 def escolher_backend() -> BackendCreche:
     """`BackendMapa` é o padrão: oferta real, das 820 creches de `MapaFilaCreche/`.
 
-    `BACKEND=mock` volta para as três escolas inventadas do roteiro — serve para demo
+    `BACKEND=mock` volta para as três escolas inventadas do roteiro, e serve para demo
     determinística e é o que a bateria de testes usa. Quando o `BackendHTTP` do município
     subir, ele entra aqui e as duas opções saem.
     """
@@ -60,11 +65,13 @@ def main() -> None:
     configurar_log()
     token = os.environ.get("TELEGRAM_TOKEN", "")
     if not token or token.startswith("coloque"):
-        sys.exit("TELEGRAM_TOKEN não configurado no .env — veja TELEGRAM.md")
+        sys.exit("TELEGRAM_TOKEN não configurado no .env. Veja TELEGRAM.md")
 
     repo = escolher_repositorio()
     backend = escolher_backend()
-    redator = criar(os.environ.get("ANTHROPIC_API_KEY") or None)
+    # A IA é opcional e por conta de quem usa: cada contato liga a dele com `/ia`, e o
+    # bot não gasta a chave de quem hospeda. Sem chave, valem os textos prontos.
+    redator = RedatorEstatico()
     canal = Telegram(token)
     transcritor = Transcritor()
     maquina = Maquina(backend, redator, repo, transcritor)

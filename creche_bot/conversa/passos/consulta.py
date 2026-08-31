@@ -1,13 +1,13 @@
-"""Bloco C — acompanhar uma inscrição que já existe.
+"""Bloco C: acompanhar uma inscrição que já existe.
 
 Serve para quem se inscreveu pelo SITE também. É leitura pura, não toca no fluxo de
-inscrição, e alcança as ~62 mil famílias que usaram o matricula.rio normalmente —
+inscrição, e alcança as ~62 mil famílias que usaram o matricula.rio normalmente,
 inclusive os 7,7% que perdem a vaga já convocados.
 
 ## A regra que não pode ser quebrada aqui
 
 **Nunca mostre a situação bruta da opção.** O banco grava um status por opção de creche, e
-77,8% das linhas "Cancelado pelo sistema" pertencem a inscrições que FORAM ATENDIDAS — é o
+77,8% das linhas "Cancelado pelo sistema" pertencem a inscrições que FORAM ATENDIDAS. É o
 cancelamento automático das outras opções quando uma é preenchida. Uma família que
 conseguiu a vaga veria "cancelado" em 4 das suas 5 escolhas. O que aparece é o DESFECHO,
 calculado no `dominio`, e nada além dele.
@@ -98,7 +98,7 @@ def _buscar_por_nome(p: Passo) -> MensagemSaida:
 
 
 def _errar(p: Passo, chave: str) -> MensagemSaida:
-    """Depois de 3 tentativas sem achar, atendente direto — não deixe a família em loop."""
+    """Depois de 3 tentativas sem achar, atendente direto, para não deixar a família em loop."""
     p.dados["erros_consulta"] = p.dados.get("erros_consulta", 0) + 1
     if p.dados["erros_consulta"] >= 3:
         return _nao_achou(p)
@@ -164,8 +164,8 @@ def _br(iso: str | None) -> str:
     return date.fromisoformat(iso).strftime("%d/%m/%Y") if iso else "a definir"
 
 
-# Ícone por `TipoEtapa` — a taxonomia FECHADA, nunca o código do backend, que muda por
-# município. Tipo novo cai no traço e a tela continua legível.
+# Ícone por `TipoEtapa`: a taxonomia FECHADA, nunca o código do backend, que muda por
+# município. Tipo novo cai no ponto e a tela continua legível.
 ICONE_ETAPA = {
     "aguardando": "🕐", "acao_no_chat": "✋", "acao_presencial": "📍",
     "convocacao": "🔔", "concluida": "✅", "encerrada": "⚪",
@@ -234,7 +234,7 @@ def _desenhar(p: Passo, d: dict, prefixo: str = "") -> MensagemSaida:
                      botoes=(Botao("acoes", "Preciso de mais nada"),))
 
     if estado == "nao_seguiu":
-        # Estado ambíguo no banco. Não invente o motivo — encaminhe.
+        # Estado ambíguo no banco. Não invente o motivo, encaminhe.
         return p.diz("c3c_nao_seguiu", prefixo=prefixo, nome=nome,
                      botoes=(Botao("inscrever", "Nova inscrição"),
                              Botao("atendente", "Falar com a CRE")))
@@ -283,7 +283,7 @@ def nis(p: Passo) -> MensagemSaida:
 
 # ------------------------------------------------- C.4 e C.5 o que fazer daqui
 def _avisos(p: Passo, prefixo: str = "") -> MensagemSaida:
-    """C.5 — o turno mais valioso do fluxo de consulta.
+    """C.5: o turno mais valioso do fluxo de consulta.
 
     É assim que o bot alcança quem se inscreveu pelo site: a família chega por uma
     consulta e sai com o canal de convocação ativo.

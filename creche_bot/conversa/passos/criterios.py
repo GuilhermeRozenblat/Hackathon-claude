@@ -1,4 +1,4 @@
-"""Bloco 8 — a régua de prioridade do processo vigente.
+"""Bloco 8: a régua de prioridade do processo vigente.
 
 O CONTEÚDO vem de `backend.criterios_do_processo()`: ordem, pesos e texto mudam todo ano,
 e régua escrita à mão no código quebra na virada. A FORMA de cada turno é o que está aqui,
@@ -6,7 +6,7 @@ e é estável.
 
 ## Por que este bloco existe
 
-48,9% das famílias declaram CadÚnico e só 6,8% conseguem comprovar — por isso 93,8% das
+48,9% das famílias declaram CadÚnico e só 6,8% conseguem comprovar, e por isso 93,8% das
 inscrições terminam com pontuação validada zero. Capturar o NIS dentro da conversa é a
 razão de existir do projeto.
 
@@ -14,7 +14,7 @@ razão de existir do projeto.
 
 **Perguntas agrupadas em checklist (8.3 e 8.4).** Individualmente, as cinco situações
 sensíveis disparam entre 1,6% e 5,3%; somadas, 13,6% marcam ao menos uma, com média de
-0,18 marcação. Cinco turnos invasivos para esse aproveitamento é péssimo desenho — e pior
+0,18 marcação. Cinco turnos invasivos para esse aproveitamento é péssimo desenho, e pior
 num canal cujo histórico fica no aparelho da família.
 
 **Nada aqui bloqueia.** Documento que falta vira pendência com lembrete, nunca parede.
@@ -52,7 +52,7 @@ def _marcar(p: Passo, codigo: str, comprovado: bool = False) -> None:
 
 def pendentes(dados: dict) -> list[str]:
     """Declarado e ainda sem comprovação. É o que a família precisa ver, e o que o R1
-    cobra depois — nunca a pontuação."""
+    cobra depois, nunca a pontuação."""
     comprovados = set(dados.get("comprovados", ()))
     return [c for c in dados.get("declarados", ()) if c not in comprovados]
 
@@ -88,6 +88,13 @@ def cadunico(p: Passo) -> MensagemSaida:
                          botoes=(Botao("nao_acho", "Não estou achando"),))
 
 
+def reabrir_nis(p: Passo) -> MensagemSaida:
+    """Redesenha a pergunta do NIS ao retomar em CRIT_NIS. Sem isto, `entrar()` cai em
+    `nis()` direto, que trata o botão "Continuar" da retomada como um NIS vazio digitado
+    e responde "não parece o NIS" — ver a armadilha documentada no CLAUDE.md do módulo."""
+    return MensagemSaida(p.txt("pedir_nis"), botoes=(Botao("nao_acho", "Não estou achando"),))
+
+
 def nis(p: Passo) -> MensagemSaida:
     if p.msg.escolha == "nao_acho":
         # Nunca trave a inscrição por falta do NIS: grava, marca pendente, agenda o R1.
@@ -115,7 +122,7 @@ def nis(p: Passo) -> MensagemSaida:
 def pedir_gate(p: Passo, prefixo: str = "") -> MensagemSaida:
     """O consentimento específico da LGPD art. 11, pedido uma vez só na conversa.
 
-    Vale para as perguntas de saúde do bloco 2 do roteiro e para as do bloco 8 — quem
+    Vale para as perguntas de saúde do bloco 2 do roteiro e para as do bloco 8: quem
     recusa não vê nenhuma delas, e a recusa nunca interrompe o cadastro.
     """
     p.ir("CRIT_GATE")
@@ -185,7 +192,7 @@ def _abrir_familia(p: Passo, prefixo: str = "") -> MensagemSaida:
 def _checklist(p: Passo, grupo: str, prefixo: str = "") -> MensagemSaida:
     """Seleção múltipla que o WhatsApp não tem: a lista alterna a cada toque.
 
-    Cabe folgado nos 10 itens — 3 no 8.3 e 5 no 8.4, mais o "pronto".
+    Cabe folgado nos 10 itens: 3 no 8.3 e 5 no 8.4, mais o "pronto".
     """
     marcados = set(p.dados.get("declarados", ()))
     itens = tuple(
@@ -279,6 +286,17 @@ def _pedir_anexo(p: Passo, criterio: dict, seguinte: str,
                  botoes=(Botao("depois", "Não tenho agora"),))
 
 
+def reabrir_anexo(p: Passo) -> MensagemSaida:
+    """Redesenha o pedido de documento ao retomar em CRIT_ANEXO. Sem isto, `entrar()` cai
+    em `anexo()` direto, que trata o "Continuar" da retomada como se não houvesse anexo
+    nem texto e pula o documento em silêncio, como se a família tivesse escolhido "depois"."""
+    codigo = p.dados.get("anexo_de")
+    criterio = next((c for c in p.dados.get("criterios", ()) if c["codigo"] == codigo), None)
+    chave = "pedir_documento_sensivel" if p.dados.get("anexo_generico") else "pedir_documento"
+    return p.diz(chave, documento=(criterio or {}).get("documento") or "o documento",
+                botoes=(Botao("depois", "Não tenho agora"),))
+
+
 def anexo(p: Passo) -> MensagemSaida:
     seguinte = p.dados.get("apos_anexo", "FIM")
 
@@ -324,7 +342,7 @@ def _falta_doc_familia(p: Passo) -> bool:
 
 
 def _fechar(p: Passo, prefixo: str = "") -> MensagemSaida:
-    """Régua terminada — a inscrição é efetivada e o roteiro entra no bloco 8."""
+    """Régua terminada, a inscrição é efetivada e o roteiro entra no bloco 8."""
     from creche_bot.conversa.passos.pendencias import enviar
 
     envio = enviar(p)

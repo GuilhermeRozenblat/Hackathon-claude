@@ -1,7 +1,7 @@
 """Os blocos 1, 2, 3 e 4 do roteiro como DADOS, não como código.
 
 "Uma pergunta por mensagem" é literalmente uma lista de perguntas. Um handler por campo
-seria 15 funções quase idênticas — a máquina caminha estas listas e produz a mesma coisa.
+seria 15 funções quase idênticas, e a máquina caminha estas listas e produz a mesma coisa.
 
 Produto edita este arquivo sem tocar em lógica nenhuma.
 
@@ -27,7 +27,7 @@ class Campo:
     chave: str
     pergunta: str
     tipo: Tipo = "texto"
-    opcoes: tuple[tuple[str, str], ...] = ()      # (id, rótulo) — máx. 3, limite WhatsApp
+    opcoes: tuple[tuple[str, str], ...] = ()      # (id, rótulo), máx. 3, limite WhatsApp
     eco: bool = False                             # "Recebido: Fulano ✅"
     erro: str = "Não entendi 🤔 Pode mandar de novo?"
     escape: tuple[str, str] | None = None         # (id, rótulo) de fuga em campo aberto
@@ -49,7 +49,7 @@ class Campo:
             f"a saída é mais uma opção"
         )
         assert not (self.sensivel and self.eco), (
-            f"campo {self.chave!r}: resposta sensível nunca é ecoada de volta — o "
+            f"campo {self.chave!r}: resposta sensível nunca é ecoada de volta: o "
             f"histórico fica no aparelho da família"
         )
 
@@ -109,7 +109,7 @@ def validar(campo: Campo, bruto: str) -> tuple[bool, Any]:
 
 
 def formatar(campo: Campo, valor: Any) -> str:
-    """Como o valor volta para a pessoa. Guardamos normalizado, mostramos legível —
+    """Como o valor volta para a pessoa. Guardamos normalizado, mostramos legível,
     o eco existe para ela conferir, e dígito cru é difícil de escanear."""
     v = str(valor)
     if campo.tipo == "cpf" and len(v) == 11:
@@ -123,7 +123,7 @@ def formatar(campo: Campo, valor: Any) -> str:
     return v
 
 
-# --------------------------------------- blocos 1, 2 e 3 — pesquisa e cadastro
+# --------------------------------------- blocos 1, 2 e 3: pesquisa e cadastro
 CADASTRO: tuple[Campo, ...] = (
     # ---- Bloco 1: a pesquisa inicial começa pela criança
     # Sem o CPF a inscrição SEGUE: nada bloqueia além do consentimento e da faixa etária.
@@ -192,7 +192,7 @@ CADASTRO: tuple[Campo, ...] = (
 )
 
 
-# ----------------------------------------------------------- bloco 4 — contato
+# ----------------------------------------------------------- bloco 4: contato
 CONTATO: tuple[Campo, ...] = (
     Campo("telefone",
           "Agora preciso do seu celular, para eu te avisar sobre a inscrição. (com DDD)",
@@ -213,7 +213,7 @@ CONTATO: tuple[Campo, ...] = (
 )
 
 
-# ------------------------------------- bloco C.1 — achar inscrição pelo nome
+# ------------------------------------- bloco C.1: achar inscrição pelo nome
 CONSULTA: tuple[Campo, ...] = (
     Campo("busca_nome", "Sem problema, dá pra achar assim também. Qual o nome completo "
                         "da criança? (sem abreviar)",
@@ -237,7 +237,7 @@ LISTAS: dict[str, tuple[Campo, ...]] = {
 def proximo_campo(dados: dict[str, Any], campos: tuple[Campo, ...]) -> Campo | None:
     """Primeiro campo ainda não preenchido e não pulado. `None` = lista completa.
 
-    Quem recusou o consentimento do art. 11 não vê pergunta sensível nenhuma — e a
+    Quem recusou o consentimento do art. 11 não vê pergunta sensível nenhuma, e a
     recusa nunca interrompe o cadastro.
     """
     for campo in campos:

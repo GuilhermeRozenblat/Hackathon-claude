@@ -9,7 +9,7 @@ from creche_bot.ia.persona import FIGURINHAS, TEXTOS
 
 
 def test_toda_figurinha_do_roteiro_existe_no_catalogo():
-    """Chave errada não explode — vira string vazia e a mensagem sai sem emoji nenhum."""
+    """Chave errada não explode: vira string vazia e a mensagem sai sem emoji nenhum."""
     orfas = sorted(set(FIGURINHAS.values()) - set(EMOJI))
     assert not orfas, f"sem emoji em canal/figurinhas.py: {orfas}"
 

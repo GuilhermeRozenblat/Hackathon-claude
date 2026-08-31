@@ -1,4 +1,4 @@
-"""R1 a R4 — os fluxos em que o bot fala primeiro.
+"""R1 a R4: os fluxos em que o bot fala primeiro.
 
 Por que importam: em 2025, 5.519 famílias (7,7%) foram convocadas e perderam a vaga, e a
 maior parte nunca soube que foi chamada. Hoje "não foi avisada" e "foi avisada e desistiu"

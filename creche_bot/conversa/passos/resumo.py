@@ -1,4 +1,4 @@
-"""Bloco 5 — o resumo dos dados, antes de partir para a escolha das creches.
+"""Bloco 5: o resumo dos dados, antes de partir para a escolha das creches.
 
 Mostra o que a família declarou nos blocos 1 a 4, para conferir ou corrigir.
 
@@ -57,7 +57,7 @@ def montar(dados: dict) -> str:
 
     nome = dados.get("nome_crianca", "a criança")
     turma = GRUPAMENTO_LEGIVEL.get(dados.get("grupamento", ""), "creche")
-    linhas.append(f"👶 {nome} — {turma}")
+    linhas.append(f"👶 {nome}, {turma}")
     if (cpf := dados.get("cpf_crianca")) and cpf != "nao_tenho":
         linhas.append(f"🪪 CPF {formatar(campo_de('cpf_crianca'), cpf)}")
     if (origem := ORIGEM_LEGIVEL.get(dados.get("origem_outra") or dados.get("origem", ""))):
@@ -90,7 +90,7 @@ def resumo(p: Passo) -> MensagemSaida:
 
 
 def confirmacao(p: Passo) -> MensagemSaida:
-    """Confirmado, o roteiro entra no bloco 6 — endereço e escolas."""
+    """Confirmado, o roteiro entra no bloco 6: endereço e escolas."""
     from creche_bot.conversa.passos.endereco import pedir_cep
     from creche_bot.conversa.passos.escolas import pedir_horario
 

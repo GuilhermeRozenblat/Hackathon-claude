@@ -40,6 +40,17 @@ def texto(t: str, id_msg: str = "1") -> MensagemEntrada:
     return MensagemEntrada(canal="telegram", id_externo="777", id_mensagem=id_msg, texto=t)
 
 
+def toca(escolha: str, id_msg: str = "2") -> MensagemEntrada:
+    return MensagemEntrada(canal="telegram", id_externo="777", id_mensagem=id_msg,
+                           escolha=escolha)
+
+
+def comecar(bot) -> None:
+    """/start passa pelo bloco 0.0, a tela que pergunta sobre a IA, antes do roteiro."""
+    bot.processar(texto("/start"))
+    bot.processar(toca("sem_ia"))
+
+
 def test_audio_vira_texto_e_segue_o_mesmo_caminho():
     bot = montar(transcritor=lambda _: "quero começar")
     assert "Zé Matrícula" in bot.processar(audio()).texto
@@ -58,12 +69,12 @@ def test_duvida_nao_faz_perder_o_lugar_na_fila():
     """Perguntar no meio do cadastro responde a pergunta e mantém o estado."""
     redator = RedatorFalante()
     bot = montar(redator)
-    bot.processar(texto("/start"))
+    comecar(bot)
 
-    resposta = bot.processar(texto("como funciona a fila?", "2"))
+    resposta = bot.processar(texto("como funciona a fila?", "3"))
 
     assert "Resposta sobre PORTA" in resposta.texto
-    assert bot.processar(texto("oi", "3")).texto == bot.processar(texto("oi", "4")).texto
+    assert bot.processar(texto("oi", "4")).texto == bot.processar(texto("oi", "5")).texto
 
 
 def test_cota_corta_o_chat_aberto_como_botao_de_gastar():
@@ -76,11 +87,11 @@ def test_cota_corta_o_chat_aberto_como_botao_de_gastar():
 
 
 def test_dado_pessoal_nao_vai_junto_com_a_duvida():
-    """Só o nome da etapa vai para o modelo — nada do que a família já contou."""
+    """Só o nome da etapa vai para o modelo, e nada do que a família já contou."""
     redator = RedatorFalante()
     bot = montar(redator)
-    bot.processar(texto("/start"))
-    bot.processar(texto("como funciona a fila?", "2"))
+    comecar(bot)
+    bot.processar(texto("como funciona a fila?", "3"))
 
     assert redator.perguntas == ["como funciona a fila?"]
 
@@ -108,7 +119,7 @@ class RedatorEspiao(RedatorEstatico):
 
 def ate_o_cpf(bot) -> None:
     bot.processar(texto("/start"))
-    for i, escolha in enumerate(("inscrever", "autorizo"), start=2):
+    for i, escolha in enumerate(("sem_ia", "inscrever", "autorizo"), start=2):
         bot.processar(MensagemEntrada(canal="telegram", id_externo="777",
                                       id_mensagem=str(i), escolha=escolha))
 

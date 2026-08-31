@@ -1,0 +1,21 @@
+# O que NUNCA pode entrar no contexto de build. O COPY do Dockerfile já é uma allowlist;
+# isto impede que estes arquivos sequer saiam da máquina para o daemon do Docker.
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+tests
+fakes
+docs
+.claude
+.agents
+.codex
+.impeccable

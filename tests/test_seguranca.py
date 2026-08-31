@@ -32,8 +32,18 @@ def test_token_nao_sobrevive_nem_dentro_do_traceback():
     assert TOKEN not in _formatar(r)
 
 
+def test_chave_da_anthropic_nao_sobrevive_ao_log():
+    """Ela não vem do ambiente: chega no chat, em `/ia sk-ant-...`, e com DEBUG_CONTEUDO=1
+    a mensagem inteira é espelhada. Só o formato pega um segredo que ninguém declarou."""
+    chave = "sk-ant-api03-uAbC-123_deMentira"
+    r = logging.LogRecord("t", logging.INFO, __file__, 1, "← 777 · %r", (f"/ia {chave}",),
+                          None)
+    saida = _formatar(r)
+    assert chave not in saida and "«redigido»" in saida
+
+
 def test_valor_curto_nao_e_redigido():
-    """Redigir string curta apagaria log legítimo — o filtro tem piso de 12 caracteres."""
+    """Redigir string curta apagaria log legítimo, e o filtro tem piso de 12 caracteres."""
     r = logging.LogRecord("t", logging.INFO, __file__, 1, "estado curto", (), None)
     assert _formatar(r) == "estado curto"
 
@@ -53,3 +63,22 @@ def test_env_legivel_por_outros_e_fechado(tmp_path):
     finally:
         os.environ.pop("TELEGRAM_TOKEN", None)
         os.environ.pop("OUTRO", None)
+
+
+def test_dsn_com_placeholder_do_exemplo_para_antes_de_conectar(monkeypatch):
+    """`:<minhasenha>@` faz o Postgres responder "password authentication failed".
+
+    O erro manda procurar a senha errada, e a senha está certa, e o que sobrou foram os
+    sinais que marcavam o buraco no exemplo do BANCO.md. Falhar aqui, com o motivo, custa
+    uma linha e economiza a caçada.
+    """
+    import pytest
+
+    from creche_bot.__main__ import escolher_repositorio
+
+    monkeypatch.delenv("REPOSITORIO", raising=False)
+    monkeypatch.setenv("DATABASE_URL",
+                       "postgresql://postgres.abc:<senha>@x.pooler.supabase.com:6543/postgres")
+    with pytest.raises(SystemExit) as saida:
+        escolher_repositorio()
+    assert "<...>" in str(saida.value), "a mensagem tem que nomear o placeholder"

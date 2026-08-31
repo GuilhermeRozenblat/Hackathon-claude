@@ -1,4 +1,4 @@
-"""Bloco 3, parte do responsável — o reconhecimento do cadastro anterior.
+"""Bloco 3, parte do responsável: o reconhecimento do cadastro anterior.
 
 O roteiro pesquisa cadastro pelo CPF da criança. O backend não tem essa operação:
 `backend/porta.py` só oferece `buscar_por_responsavel(cpf)`, e contrato congelado não
@@ -15,13 +15,13 @@ from __future__ import annotations
 from creche_bot.backend.porta import BackendIndisponivel
 from creche_bot.canal.tipos import Botao, MensagemSaida
 from creche_bot.conversa.sessao import Passo
-from creche_bot.dominio.tipos import CadastroAnterior
+from creche_bot.dominio.tipos import CadastroAnterior, Endereco
 
 BOTOES_CADASTRO = (Botao("tudo_certo", "Tudo certo"),
                    Botao("mudei_endereco", "Mudei de endereço"))
 
 # Campos que descrevem o responsável. Ficam quando a família inscreve uma segunda
-# criança — 1.738 responsáveis fizeram isso em 2025.
+# criança, e 1.738 responsáveis fizeram isso em 2025.
 DO_RESPONSAVEL = ("cpf_responsavel", "nome_responsavel", "nascimento_responsavel",
                   "deficiencia_responsavel", "telefone", "email", "tem_outro_contato",
                   "outro_contato", "quer_email", "endereco", "esperou_na_fila",
@@ -52,10 +52,19 @@ def _mostrar_cadastro(p: Passo, cadastro: CadastroAnterior) -> MensagemSaida:
         p.dados["esperou_na_fila"] = True
         p.dados.setdefault("comprovados", []).append("fila_ano_anterior")
 
+    return confere_cadastro(p)
+
+
+def confere_cadastro(p: Passo) -> MensagemSaida:
+    """Desenha a tela do cadastro anterior, a entrada do CADASTRO_ANTERIOR.
+
+    Lê do contexto, não do backend: assim a retomada redesenha esta tela sem consultar
+    o histórico de novo. Sem ela, continuar aqui respondia "não entendi" ao botão.
+    """
+    e = (p.dados.get("cadastro_anterior") or {}).get("endereco")
     p.ir("CADASTRO_ANTERIOR")
-    endereco = cadastro.endereco
     return p.diz("achou_cadastro",
-                 endereco=str(endereco) if endereco else "endereço não informado",
+                 endereco=str(Endereco(**e)) if e else "endereço não informado",
                  botoes=BOTOES_CADASTRO)
 
 

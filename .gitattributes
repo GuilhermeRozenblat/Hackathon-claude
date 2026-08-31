@@ -1,0 +1,4 @@
+# O painel é uma tela do projeto, não a linguagem dele: 572 KB, dos quais ~4.000
+# das 6.079 linhas são CSV e JSON embutidos para o painel abrir com file://.
+# Sem isto o GitHub mostra 59% HTML num projeto que é Python.
+creche-conectada.html linguist-detectable=false

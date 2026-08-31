@@ -2,14 +2,11 @@ Metadata-Version: 2.4
 Name: creche-bot
 Version: 0.1.0
 Requires-Python: >=3.12
+Requires-Dist: psycopg[binary,pool]>=3.2
 Provides-Extra: ia
 Requires-Dist: anthropic>=0.40; extra == "ia"
 Provides-Extra: audio
 Requires-Dist: faster-whisper>=1.0; extra == "audio"
-Provides-Extra: postgres
-Requires-Dist: sqlalchemy>=2.0; extra == "postgres"
-Requires-Dist: psycopg[binary]>=3.2; extra == "postgres"
-Requires-Dist: alembic>=1.13; extra == "postgres"
 Provides-Extra: dev
 Requires-Dist: pytest>=8; extra == "dev"
 Requires-Dist: ruff>=0.7; extra == "dev"

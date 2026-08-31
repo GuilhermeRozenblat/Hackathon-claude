@@ -1,6 +1,6 @@
 """Testes dos contratos congelados. Rodam sem banco, sem rede, sem nenhuma trilha pronta.
 
-Se um destes quebra, algum módulo violou uma fronteira — e o flip para o WhatsApp
+Se um destes quebra, algum módulo violou uma fronteira, e o flip para o WhatsApp
 quebraria em produção.
 """
 
@@ -52,7 +52,7 @@ def test_texto_vazio_falha():
 
 
 def test_local_carrega_coordenadas():
-    """sendVenue e o location do WhatsApp exigem lat/lng — endereço não substitui."""
+    """sendVenue e o location do WhatsApp exigem lat/lng, e endereço não substitui."""
     loc = Local(-23.51, -46.62, "Creche Jardim", "R. das Acácias, 240")
     assert (loc.lat, loc.lng) != (0, 0)
 
@@ -234,7 +234,7 @@ def test_abreviacao_cabe_e_distingue():
 def test_persistencia_nao_vaza_para_fora_da_pasta():
     """Fora de creche_bot/dados/ não existe SQL, cursor nem conexão.
 
-    Se esta fronteira furar, quem mexe no banco quebra quem mexe no chat — que é
+    Se esta fronteira furar, quem mexe no banco quebra quem mexe no chat, que é
     exatamente o que o desacoplamento existe para impedir.
     """
     import pathlib

@@ -1,4 +1,4 @@
-"""Mensagem de voz vira anexo de áudio — e áudio longo nem é baixado."""
+"""Mensagem de voz vira anexo de áudio, e áudio longo nem é baixado."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """O mock é o espelho do contrato: o BackendHTTP terá que passar nesta mesma bateria.
 
-Nenhum dado aqui é real — saíram do roteiro v2. Os percentuais nos comentários vêm da
+Nenhum dado aqui é real, tudo saiu do roteiro v2. Os percentuais nos comentários vêm da
 base histórica de 2021 a 2025.
 """
 
@@ -70,7 +70,7 @@ def test_cep_resolve_com_coordenadas(b):
     e = b.resolver_cep("22710-560", "100")
     assert (e.bairro, e.numero) == ("Curicica", "100")
     assert e.lat and e.lng, "sem coordenadas não dá para medir distância"
-    assert str(e) == "Rua Franz Weissmann, 100 — Curicica"
+    assert str(e) == "Rua Franz Weissmann, 100, Curicica"
 
 
 def test_cep_desconhecido_nao_inventa(b):
@@ -89,7 +89,7 @@ def test_cep_fora_do_roteiro_vem_da_consulta_externa(b, monkeypatch):
     monkeypatch.setattr(mock.urllib.request, "urlopen",
                         lambda *a, **k: io.StringIO(resposta))
     e = b.resolver_cep("22041-011", "45")
-    assert str(e) == "Rua Santa Clara, 45 — Copacabana"
+    assert str(e) == "Rua Santa Clara, 45, Copacabana"
     assert (e.lat, e.lng) == (-22.9721912, -43.1865895)
     mock._buscar_cep.cache_clear()
 

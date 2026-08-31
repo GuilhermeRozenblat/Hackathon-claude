@@ -1,4 +1,4 @@
-"""Áudio nunca pode derrubar o bot — no pior caso ele pede para a pessoa escrever."""
+"""Áudio nunca pode derrubar o bot: no pior caso ele pede para a pessoa escrever."""
 
 from __future__ import annotations
 

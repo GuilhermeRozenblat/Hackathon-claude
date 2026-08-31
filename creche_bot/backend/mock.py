@@ -1,7 +1,7 @@
 """Backend falso, com os dados do roteiro v2. É o que roda hoje.
 
 Espelha `BackendCreche` por inteiro: quando o `BackendHTTP` do outro time subir, ele
-terá que passar nos mesmos testes. Nenhum dado aqui é real — números, escolas e pessoas
+terá que passar nos mesmos testes. Nenhum dado aqui é real: números, escolas e pessoas
 saíram do roteiro, e os percentuais que aparecem nos comentários vieram da base
 histórica de 2021 a 2025 citada lá.
 
@@ -38,7 +38,7 @@ from creche_bot.dominio.tipos import (
 )
 
 # CPF de teste com dígito verificador válido. Qualquer outro CPF válido cai no caminho
-# "não achei cadastro" — 72,1% dos casos em 2025.
+# "não achei cadastro", 72,1% dos casos em 2025.
 CPF_CONHECIDO = "52998224725"
 NUMERO_CONHECIDO = "2026-0847213"
 
@@ -48,7 +48,7 @@ _CURICICA = Endereco(cep="22710560", numero="100", logradouro="Rua Franz Weissma
 log = logging.getLogger(__name__)
 
 # CEPs do roteiro: resolvem sem rede, e é o que mantém teste e demo determinísticos.
-# Fora daqui o mock consulta a BrasilAPI — ver `_buscar_cep`.
+# Fora daqui o mock consulta a BrasilAPI, ver `_buscar_cep`.
 _CEPS: dict[str, tuple[str, str, float, float]] = {
     "22710560": ("Rua Franz Weissmann", "Curicica", -22.9601, -43.4048),
     "22775003": ("Avenida Ayrton Senna", "Barra da Tijuca", -22.9946, -43.3654),
@@ -71,7 +71,7 @@ _ESCOLAS: tuple[tuple, ...] = (
 )
 
 # A régua do processo 195/2025, como ela viria de `ic.pergunta_processo`. Ordem, pesos e
-# texto mudam todo ano — por isso isto é dado, e o bot lê em vez de saber.
+# texto mudam todo ano, e por isso isto é dado, e o bot lê em vez de saber.
 _CRITERIOS: tuple[Criterio, ...] = (
     Criterio("cadunico", "Família inscrita no CadÚnico", 51, "8.1",
              documento="Número do NIS"),
@@ -104,7 +104,7 @@ _CRITERIOS: tuple[Criterio, ...] = (
 # Microárea 7.9 do mapa territorial da fila, que é onde o roteiro se passa. Ao contrário
 # do resto deste arquivo, estes números são reais: saíram de `MapaFilaCreche/`, recorte
 # de 2025. Ficam aqui para o painel do bloco 10 ter contexto de região mesmo rodando no
-# mock — o `BackendMapa` lê a microárea de verdade a partir do CEP.
+# mock, e o `BackendMapa` lê a microárea de verdade a partir do CEP.
 _PANORAMA_CURICICA = PanoramaRegiao(
     microarea="7.9", bairro="Curicica", demanda=390, atendidos=342, espera=324,
     vagas_ociosas=0, ano=2025)
@@ -117,7 +117,7 @@ _CRAS: tuple[PontoEntrega, ...] = (
 )
 
 # Desfechos mockados: um por estado possível, para o bloco C ser andável inteiro.
-# A frequência de 2025 está no comentário — é o peso real de cada tela.
+# A frequência de 2025 está no comentário, o peso real de cada tela.
 _DESFECHOS: tuple[Desfecho, ...] = (
     Desfecho(NUMERO_CONHECIDO, "Ana Beatriz da Silva", date(2024, 1, 10),   # 67,7%
              "vaga_confirmada", ("EDI Leila Diniz", "CM Criança do Futuro"),
@@ -154,7 +154,7 @@ _ROTEIRO_ETAPAS: tuple[Etapa, ...] = (
 
 
 # O bot despacha por `TipoEtapa`; a consulta mostra `EstadoInscricao`. Uma tabela liga
-# as duas visões — e o BackendHTTP fará o mesmo a partir do status bruto do banco.
+# as duas visões, e o BackendHTTP fará o mesmo a partir do status bruto do banco.
 _ESTADO_POR_ETAPA: dict[str, str] = {
     "aguardando": "ativa",
     "acao_no_chat": "ativa",
@@ -176,13 +176,13 @@ _BRASILAPI = "https://brasilapi.com.br/api/cep/v2/{}"
 def _buscar_cep(cep: str) -> tuple[str, str, float, float] | None:
     """CEP de verdade, para o mock não travar a conversa nos três CEPs do roteiro.
 
-    Vai só o CEP — nunca o número, nunca o nome, e a resposta não é logada. CEP sozinho
+    Vai só o CEP, nunca o número, nunca o nome, e a resposta não é logada. CEP sozinho
     é dado público dos Correios; o número da casa, que junto com ele localiza a família,
     fica aqui dentro.
 
     ponytail: o backend do município resolve isto do lado de lá, com a base de logradouro
     e o geocoder dele. Enquanto ele não sobe, o dublê consulta a BrasilAPI. Rede fora ou
-    CEP inexistente devolve None — o mesmo caminho de antes, "não achei esse CEP".
+    CEP inexistente devolve None, o mesmo caminho de antes, "não achei esse CEP".
     """
     if len(cep) != 8 or cep.startswith("00"):
         return None   # nenhum CEP brasileiro começa com 00: nem gasta a consulta
@@ -204,7 +204,13 @@ def _buscar_cep(cep: str) -> tuple[str, str, float, float] | None:
     try:
         lat, lng = float(coord["latitude"]), float(coord["longitude"])
     except (KeyError, TypeError, ValueError):
-        lat, lng = _CURICICA.lat, _CURICICA.lng   # sem geocoder, o pino não é o forte do mock
+        # Sem coordenada não há endereço. O fallback anterior era o pino de Curicica, e
+        # com ele uma família de Bangu recebia as creches de Curicica com distância em
+        # metros — número errado apresentado como fato, que é o que este projeto não faz.
+        # "Não achei esse CEP" é pior de usar e honesto. Na amostra de CEPs do Rio a
+        # BrasilAPI devolve coordenada em todos os que resolvem, então o caminho é raro.
+        log.warning("CEP sem coordenada; tratando como não encontrado")
+        return None
     return logradouro, bairro, lat, lng
 
 
@@ -229,7 +235,7 @@ class BackendMock:
         return self.periodo_de_inscricao()[1] + timedelta(days=40)
 
     def data_de_corte(self) -> date:
-        """31/03 do ano letivo seguinte — regra do processo, não constante do bot."""
+        """31/03 do ano letivo seguinte, regra do processo, não constante do bot."""
         return date(self.periodo_de_inscricao()[1].year + 1, 3, 31)
 
     def criterios_do_processo(self) -> list[Criterio]:
@@ -277,7 +283,7 @@ class BackendMock:
 
     def panorama_da_regiao(self, endereco: Endereco) -> PanoramaRegiao | None:
         # Microárea 7.9 (Curicica), que é onde o roteiro se passa. Números do processo
-        # de 2025 — passado consumado, e é assim que a tela tem que apresentá-los.
+        # de 2025, passado consumado, e é assim que a tela tem que apresentá-los.
         return _PANORAMA_CURICICA
 
     # ------------------------------------------------------------ inscrição
@@ -330,7 +336,7 @@ class BackendMock:
         """Inscrições feitas nesta sessão também são consultáveis.
 
         Sem isto, quem acabou de se inscrever pelo bot e manda /status ouve que não tem
-        inscrição — e é justamente quem mais volta para conferir.
+        inscrição, e é justamente quem mais volta para conferir.
         """
         return [
             Desfecho(numero=s.numero, nome_crianca=s.nome_crianca,

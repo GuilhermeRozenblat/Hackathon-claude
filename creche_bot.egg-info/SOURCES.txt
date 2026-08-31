@@ -8,7 +8,14 @@ creche_bot.egg-info/SOURCES.txt
 creche_bot.egg-info/dependency_links.txt
 creche_bot.egg-info/requires.txt
 creche_bot.egg-info/top_level.txt
+creche_bot/MapaFilaCreche/mapa_microareas.csv
+creche_bot/MapaFilaCreche/mapa_unidades.csv
+creche_bot/MapaFilaCreche/microareas_distancia.csv
+creche_bot/MapaFilaCreche/microareas_metricas.csv
+creche_bot/MapaFilaCreche/unidades_por_cre.csv
+creche_bot/MapaFilaCreche/vagas_ociosas_geo.csv
 creche_bot/backend/__init__.py
+creche_bot/backend/mapa.py
 creche_bot/backend/mock.py
 creche_bot/backend/porta.py
 creche_bot/canal/__init__.py
@@ -19,6 +26,7 @@ creche_bot/canal/tipos.py
 creche_bot/conversa/__init__.py
 creche_bot/conversa/formulario.py
 creche_bot/conversa/maquina.py
+creche_bot/conversa/projecao.py
 creche_bot/conversa/sessao.py
 creche_bot/conversa/passos/__init__.py
 creche_bot/conversa/passos/consulta.py
@@ -27,13 +35,14 @@ creche_bot/conversa/passos/endereco.py
 creche_bot/conversa/passos/entrada.py
 creche_bot/conversa/passos/escolas.py
 creche_bot/conversa/passos/formulario_passo.py
+creche_bot/conversa/passos/ia.py
 creche_bot/conversa/passos/pendencias.py
 creche_bot/conversa/passos/responsavel.py
 creche_bot/conversa/passos/resumo.py
 creche_bot/dados/__init__.py
 creche_bot/dados/memoria.py
 creche_bot/dados/porta.py
-creche_bot/dados/sqlite.py
+creche_bot/dados/postgres.py
 creche_bot/dominio/__init__.py
 creche_bot/dominio/tipos.py
 creche_bot/ia/__init__.py
@@ -49,3 +58,4 @@ fakes/canal_fake.py
 fakes/ia_fake.py
 tests/test_contratos.py
 tests/test_seguranca.py
+tests/test_servidor.py

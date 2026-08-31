@@ -5,7 +5,7 @@ ESTE É O ÚNICO ARQUIVO DO PROJETO QUE ESCREVE SQL.
 Três escolhas que valem explicação:
 
 **Schema `creche`, não `public`.** No Supabase o `public` é servido pela Data API
-(PostgREST) para quem tem a chave anônima — que costuma acabar no front. Um schema fora
+(PostgREST) para quem tem a chave anônima, que costuma acabar no front. Um schema fora
 da lista de exposição não é alcançável pela API, ponto: não depende de ninguém lembrar de
 manter RLS restritiva numa tabela que guarda nome de criança e CPF. RLS fica ligada mesmo
 assim, como segunda linha.
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS {s}.inscricao (
 CREATE INDEX IF NOT EXISTS ix_inscricao_contato ON {s}.inscricao (contato_id);
 
 -- O que a família digitou, em colunas. O jsonb da sessão continua sendo o estado vivo da
--- conversa; isto é o dado consultável, gravado a cada turno — inclusive de quem desistiu
+-- conversa; isto é o dado consultável, gravado a cada turno, inclusive de quem desistiu
 -- no meio, que é justamente o que interessa medir.
 CREATE TABLE IF NOT EXISTS {s}.cadastro (
     id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -104,12 +104,11 @@ CREATE TABLE IF NOT EXISTS {s}.cadastro (
     protocolo          text,
     nome_crianca       text,
     nascimento_crianca date,
-    sexo               text,
     grupamento         text,
     documento_crianca  text,
+    origem             text,
     nome_responsavel   text,
     cpf_responsavel    text,
-    relacao            text,
     cep                text,
     numero             text,
     logradouro         text,
@@ -145,6 +144,7 @@ CREATE TABLE IF NOT EXISTS {s}.preferencia_escola (
     distancia_km      double precision,
     vaga_ociosa       boolean NOT NULL DEFAULT false,
     familias_por_vaga double precision,
+    chance            double precision,
     ano_referencia    smallint,
     PRIMARY KEY (cadastro_id, posicao)
 );
@@ -181,6 +181,16 @@ CREATE TABLE IF NOT EXISTS {s}.marca (
     chave          text PRIMARY KEY,
     valor          text NOT NULL
 );
+
+-- Acerto de colunas para bancos criados antes: `CREATE TABLE IF NOT EXISTS` não alcança
+-- tabela que já existe, e sem isto o schema fica preso na primeira versão que subiu.
+-- É o preço de não ter Alembic (D21), e cabe em quatro linhas idempotentes.
+-- `sexo` e `relacao` saíram do roteiro no fluxo enxuto: coluna que ninguém preenche vira
+-- barra em zero no painel, que é pior que não existir.
+ALTER TABLE {s}.cadastro           DROP COLUMN IF EXISTS sexo;
+ALTER TABLE {s}.cadastro           DROP COLUMN IF EXISTS relacao;
+ALTER TABLE {s}.cadastro           ADD COLUMN IF NOT EXISTS origem text;
+ALTER TABLE {s}.preferencia_escola ADD COLUMN IF NOT EXISTS chance double precision;
 
 -- As decisões não óbvias ficam legíveis no psql e no dashboard do Supabase, para quem
 -- for mexer no schema sem ter lido docs/MODELO_DADOS.md.
@@ -225,7 +235,7 @@ COMMENT ON COLUMN {s}.cadastro.bairro IS
 COMMENT ON TABLE {s}.resposta_criterio IS
     'Régua de prioridade reduzida a código + booleano. O texto digitado não chega aqui.';
 COMMENT ON COLUMN {s}.resposta_criterio.sensivel IS
-    'LGPD art. 11 — saúde, violência doméstica, substâncias, situação prisional. '
+    'LGPD art. 11: saúde, violência doméstica, substâncias, situação prisional. '
     'Não é booleano qualquer: nunca ecoe em tela nem em log.';
 COMMENT ON TABLE {s}.preferencia_escola IS
     'As opções de creche na ordem escolhida (1 = primeira), com o fato que estava na '
@@ -302,7 +312,7 @@ class RepositorioPostgres:
     def apagar_esquema(self) -> None:
         """Reset do ambiente: derruba o schema inteiro. Chamado só por `make limpar`.
 
-        Não é o expurgo da LGPD — esse é `apagar_tudo()`, por contato.
+        Não é o expurgo da LGPD, que é o `apagar_tudo()`, por contato.
         """
         with self._cursor() as cur:
             cur.execute(f"DROP SCHEMA IF EXISTS {self._s} CASCADE")
@@ -384,23 +394,24 @@ class RepositorioPostgres:
 
         Meia gravação faria a régua discordar da escolha de creche, e é exatamente o
         par que alguém vai cruzar em SQL depois. O UPSERT bate na UNIQUE parcial de
-        `protocolo IS NULL` — por isso o WHERE explícito no ON CONFLICT.
+        `protocolo IS NULL`, e por isso o WHERE explícito no ON CONFLICT.
         """
         with self._pool.connection() as con, con.cursor() as cur:
             cur.execute(
                 f"INSERT INTO {self._s}.cadastro"
-                " (contato_id, protocolo, nome_crianca, nascimento_crianca, sexo,"
-                "  grupamento, documento_crianca, nome_responsavel, cpf_responsavel,"
-                "  relacao, cep, numero, logradouro, bairro, lat, lng, horario,"
+                " (contato_id, protocolo, nome_crianca, nascimento_crianca,"
+                "  grupamento, documento_crianca, origem, nome_responsavel,"
+                "  cpf_responsavel, cep, numero, logradouro, bairro, lat, lng, horario,"
                 "  telefone, email)"
-                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
                 " ON CONFLICT (contato_id) WHERE protocolo IS NULL DO UPDATE SET"
                 " nome_crianca=excluded.nome_crianca,"
-                " nascimento_crianca=excluded.nascimento_crianca, sexo=excluded.sexo,"
+                " nascimento_crianca=excluded.nascimento_crianca,"
                 " grupamento=excluded.grupamento,"
                 " documento_crianca=excluded.documento_crianca,"
+                " origem=excluded.origem,"
                 " nome_responsavel=excluded.nome_responsavel,"
-                " cpf_responsavel=excluded.cpf_responsavel, relacao=excluded.relacao,"
+                " cpf_responsavel=excluded.cpf_responsavel,"
                 " cep=excluded.cep, numero=excluded.numero,"
                 " logradouro=excluded.logradouro, bairro=excluded.bairro,"
                 " lat=excluded.lat, lng=excluded.lng, horario=excluded.horario,"
@@ -408,9 +419,9 @@ class RepositorioPostgres:
                 " atualizado_em=now()"
                 " RETURNING id",
                 (cadastro.contato_id, cadastro.protocolo, cadastro.nome_crianca,
-                 cadastro.nascimento_crianca, cadastro.sexo, cadastro.grupamento,
-                 cadastro.documento_crianca, cadastro.nome_responsavel,
-                 cadastro.cpf_responsavel, cadastro.relacao, cadastro.cep,
+                 cadastro.nascimento_crianca, cadastro.grupamento,
+                 cadastro.documento_crianca, cadastro.origem, cadastro.nome_responsavel,
+                 cadastro.cpf_responsavel, cadastro.cep,
                  cadastro.numero, cadastro.logradouro, cadastro.bairro, cadastro.lat,
                  cadastro.lng, cadastro.horario, cadastro.telefone, cadastro.email))
             cadastro_id = cur.fetchone()["id"]
@@ -431,10 +442,10 @@ class RepositorioPostgres:
             cur.executemany(
                 f"INSERT INTO {self._s}.preferencia_escola"
                 " (cadastro_id, posicao, id_escola, nome_escola, distancia_km,"
-                "  vaga_ociosa, familias_por_vaga, ano_referencia)"
-                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                "  vaga_ociosa, familias_por_vaga, chance, ano_referencia)"
+                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 [(cadastro_id, p.posicao, p.id_escola, p.nome_escola, p.distancia_km,
-                  p.vaga_ociosa, p.familias_por_vaga, p.ano_referencia)
+                  p.vaga_ociosa, p.familias_por_vaga, p.chance, p.ano_referencia)
                  for p in cadastro.preferencias])
 
     def cadastro_de(self, contato_id: str, protocolo: str | None = None) -> Cadastro | None:
@@ -453,7 +464,8 @@ class RepositorioPostgres:
 
             cur.execute(
                 f"SELECT posicao, id_escola, nome_escola, distancia_km, vaga_ociosa,"
-                f" familias_por_vaga, ano_referencia FROM {self._s}.preferencia_escola"
+                f" familias_por_vaga, chance, ano_referencia"
+                f" FROM {self._s}.preferencia_escola"
                 " WHERE cadastro_id=%s ORDER BY posicao", (linha["id"],))
             preferencias = tuple(PreferenciaEscola(**p) for p in cur.fetchall())
 
@@ -462,10 +474,10 @@ class RepositorioPostgres:
             contato_id=linha["contato_id"], protocolo=linha["protocolo"],
             nome_crianca=linha["nome_crianca"],
             nascimento_crianca=nascimento.isoformat() if nascimento else None,
-            sexo=linha["sexo"], grupamento=linha["grupamento"],
-            documento_crianca=linha["documento_crianca"],
+            grupamento=linha["grupamento"],
+            documento_crianca=linha["documento_crianca"], origem=linha["origem"],
             nome_responsavel=linha["nome_responsavel"],
-            cpf_responsavel=linha["cpf_responsavel"], relacao=linha["relacao"],
+            cpf_responsavel=linha["cpf_responsavel"],
             cep=linha["cep"], numero=linha["numero"], logradouro=linha["logradouro"],
             bairro=linha["bairro"], lat=linha["lat"], lng=linha["lng"],
             horario=linha["horario"], telefone=linha["telefone"], email=linha["email"],

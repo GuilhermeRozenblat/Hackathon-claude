@@ -19,11 +19,11 @@ MAX_TENTATIVAS = 5
 
 
 def _copia(contexto: dict[str, Any]) -> dict[str, Any]:
-    """Cópia PROFUNDA, pelo mesmo caminho do jsonb — e as duas coisas importam.
+    """Cópia PROFUNDA, pelo mesmo caminho do jsonb, e as duas coisas importam.
 
     `dict(contexto)` copia só o primeiro nível, e o roteiro guarda listas na sessão
     (`preferencias`, `comprovados`). Os passos mutam essas listas no lugar, então com
-    cópia rasa o estado mudaria sem passar por `salvar_sessao()` — em memória, mas não
+    cópia rasa o estado mudaria sem passar por `salvar_sessao()`, em memória, mas não
     no Postgres. Duas implementações divergentes é o bug que a bateria existe para pegar.
 
     Ida e volta por JSON em vez de `deepcopy` porque é o que o `jsonb` faz: tupla vira

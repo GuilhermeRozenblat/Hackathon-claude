@@ -1,7 +1,7 @@
-"""Blocos 0, 0.1 e 1 — porta de entrada, retomada e consentimento.
+"""Blocos 0, 0.1 e 1: porta de entrada, retomada e consentimento.
 
 Três portas na primeira tela, de propósito: inscrever, acompanhar e tirar dúvida. A do
-meio serve inclusive para quem se inscreveu pelo site — é leitura pura, não toca no fluxo
+meio serve inclusive para quem se inscreveu pelo site, porque é leitura pura, não toca no fluxo
 de inscrição, e alcança as ~62 mil famílias que usaram o portal normalmente.
 """
 
@@ -60,7 +60,7 @@ def inicio(p: Passo) -> MensagemSaida:
 
 
 def retomada(p: Passo, estado_salvo: str) -> MensagemSaida:
-    """Bloco 0.1 — não recomeça quem já estava no meio."""
+    """Bloco 0.1: não recomeça quem já estava no meio."""
     p.dados["retomar_para"] = estado_salvo
     p.ir("RETOMADA")
     return MensagemSaida(
@@ -82,7 +82,7 @@ def porta(p: Passo) -> MensagemSaida:
     if p.msg.escolha != "inscrever":
         return p.diz("nao_entendi", botoes=BOTOES_INICIO)
 
-    # Fora do período, inscrever não é uma opção — e prometer que é seria mentira.
+    # Fora do período, inscrever não é uma opção, e prometer que é seria mentira.
     try:
         abertura, fechamento = p.backend.periodo_de_inscricao()
     except BackendIndisponivel:
@@ -104,6 +104,10 @@ def fora_do_periodo(p: Passo) -> MensagemSaida:
         from creche_bot.conversa.passos.consulta import comecar
 
         return comecar(p)
+    if p.msg.escolha != "avisar":
+        return p.diz("nao_entendi",
+                     botoes=(Botao("avisar", "Quero ser avisada"),
+                             Botao("acompanhar", "Acompanhar inscrição")))
     p.repo.registrar_consentimento(p.contato_id, f"comunicacao/{CONSENTIMENTO_VERSAO}",
                                    p.msg.canal, p.msg.id_externo)
     p.ir("PORTA")
@@ -111,7 +115,7 @@ def fora_do_periodo(p: Passo) -> MensagemSaida:
 
 
 def consentimento(p: Passo) -> MensagemSaida:
-    """Bloco 1 — gate obrigatório.
+    """Bloco 1: gate obrigatório.
 
     Algumas perguntas do bloco 8 tratam de saúde, violência e situação prisional. Sem
     base legal isso não pode nem ser gravado. O consentimento específico para dado
@@ -132,15 +136,22 @@ def consentimento(p: Passo) -> MensagemSaida:
 
 
 def retomar(p: Passo) -> MensagemSaida:
-    from creche_bot.conversa.maquina import PASSOS
+    from creche_bot.conversa.maquina import entrar
 
     if p.msg.escolha == "continuar":
         estado = p.dados.pop("retomar_para", "PORTA")
         p.ir(estado)
-        return PASSOS[estado](p)
+        # DESENHA a tela, não consome o "continuar" como se fosse a resposta dela.
+        # Com `PASSOS[estado]` aqui, retomar no CEP respondia "Não peguei o CEP" a uma
+        # mensagem que a família nunca mandou.
+        return entrar(p, estado)
 
     if p.msg.escolha == "recomecar":
+        from creche_bot.conversa.passos.ia import decisao
+
+        guardado = decisao(p.dados)   # recomeçar o cadastro não desliga a IA da pessoa
         p.dados.clear()
+        p.dados.update(guardado)
         return inicio(p)
 
     return p.diz("nao_entendi",

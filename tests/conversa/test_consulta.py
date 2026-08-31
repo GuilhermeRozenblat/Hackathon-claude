@@ -1,4 +1,4 @@
-"""Bloco C — acompanhar uma inscrição que já existe.
+"""Bloco C: acompanhar uma inscrição que já existe.
 
 Cobre os sete desfechos possíveis, os dois caminhos de busca do portal, e a regra que não
 pode ser quebrada: a família vê UM estado, nunca a situação por opção de creche.
@@ -171,11 +171,24 @@ def test_confirmar_a_vaga_registra_e_oferece_avisos(bot):
 
 
 def test_consulta_nao_exige_o_consentimento_de_inscricao(bot):
-    """Consultar a própria inscrição é direito de acesso (art. 18), não tratamento novo —
+    """Consultar a própria inscrição é direito de acesso (art. 18), não tratamento novo,
     e exigir o consentimento de inscrição barraria quem se inscreveu pelo site."""
     r = consultar(bot, NUMERO_CONHECIDO, "10/01/2024")
     assert "Ana" in r.texto
     assert not bot._repo.tem_consentimento(bot._repo.contato_de("telegram", "9"))
+
+
+def test_documento_pela_consulta_exige_consentimento(bot):
+    """CONSULTA_DOC recebe documento NOVO, diferente do resto do bloco C: mesmo chegando
+    direto pela consulta, sem nunca ter passado pelo bloco 1, cai no gate de consentimento
+    dos outros blocos (LGPD art. 14), em vez de aceitar o anexo calado."""
+    consultar(bot, NUMERO_CONHECIDO, "10/01/2024")
+    bot.processar(msg(escolha="acoes"))
+    bot.processar(msg(escolha="doc"))
+    contato = bot._repo.contato_de("telegram", "9")
+    bot.processar(msg(anexo=b"fake-bytes"))
+    assert not bot._repo.tem_consentimento(contato)
+    assert bot._repo.carregar_sessao(contato)[0] in ("INICIO", "PORTA", "IA_CONFIG")
 
 
 def test_desfecho_do_mock_bate_com_a_precedencia_do_dominio():

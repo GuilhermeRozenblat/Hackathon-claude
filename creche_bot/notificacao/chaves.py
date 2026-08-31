@@ -1,9 +1,9 @@
-"""CONTRATO CONGELADO — v2.
+"""CONTRATO CONGELADO: v2.
 
 Toda mensagem PROATIVA é (ChaveTemplate, variáveis). Nunca uma string pronta.
 
 No Telegram a chave vira texto com figurinha. No WhatsApp vira template aprovado pela
-Meta — que não aceita texto livre nem figurinha fora da janela de 24h, leva ~24h para
+Meta, que não aceita texto livre nem figurinha fora da janela de 24h, leva ~24h para
 aprovar, e é pago. Se o emissor gravasse a string pronta, o flip seria impossível.
 
 ## Por que estes fluxos existem
@@ -11,7 +11,7 @@ aprovar, e é pago. Se o emissor gravasse a string pronta, o flip seria impossí
 Em 2025, 5.519 famílias (7,7%) foram convocadas e perderam a vaga, concentradas em
 Pilares, Santa Teresa, Gávea e Bangu. **A maior parte nunca soube que foi chamada.** Hoje
 "não foi avisada" e "foi avisada e desistiu" viram o mesmo registro e as duas são tratadas
-como desistência — só a primeira é problema que o bot resolve. `CONVOCACAO` mais
+como desistência, e só a primeira é problema que o bot resolve. `CONVOCACAO` mais
 `LEMBRETE_CONVOCACAO` são a correção direta desse vazamento.
 
 ## Mudar este enum é grátis AGORA e caro depois
@@ -28,10 +28,10 @@ from creche_bot.dominio.tipos import TipoEtapa
 class ChaveTemplate(StrEnum):
     INSCRICAO_CONFIRMADA = "inscricao_confirmada"
     ETAPA_AVANCOU = "etapa_avancou"                  # andou, e não precisa fazer nada
-    DOCUMENTO_PENDENTE = "documento_pendente"        # R1 — falta comprovar um critério
+    DOCUMENTO_PENDENTE = "documento_pendente"        # R1: falta comprovar um critério
     ACAO_PRESENCIAL = "acao_presencial"              # precisa ir até a unidade
-    CONVOCACAO = "convocacao"                        # R2 — saiu vaga, e há prazo
-    LEMBRETE_CONVOCACAO = "lembrete_convocacao"      # R3 — R2 não foi lida em 24h
+    CONVOCACAO = "convocacao"                        # R2: saiu vaga, e há prazo
+    LEMBRETE_CONVOCACAO = "lembrete_convocacao"      # R3: R2 não foi lida em 24h
     RESULTADO_CLASSIFICADA = "resultado_classificada"  # R4
     RESULTADO_NAO_CLASSIFICADA = "resultado_nao_classificada"
     LEMBRETE_INCOMPLETO = "lembrete_incompleto"      # conversa parou pela metade

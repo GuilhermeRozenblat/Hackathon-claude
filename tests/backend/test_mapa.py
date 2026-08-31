@@ -1,7 +1,7 @@
 """`BackendMapa` sobre os CSVs reais de `MapaFilaCreche/`.
 
 Sem rede e sem banco: os dados viajam com o pacote. O que estes testes protegem é a
-fronteira entre o CSV bruto e o que a família lê — a conta da chance, os limites dela, e o
+fronteira entre o CSV bruto e o que a família lê: a conta da chance, os limites dela, e o
 fato de que nenhum número sai daqui sem o ano colado.
 """
 
@@ -17,6 +17,7 @@ from creche_bot.backend.mapa import (
     _Unidade,
     _unidades,
     bairro_legivel,
+    candidatos_por_vaga,
     chance_em,
     km_entre,
 )
@@ -37,7 +38,7 @@ def backend() -> BackendMapa:
 def unidade(demanda: int, confirmados: int) -> _Unidade:
     return _Unidade(desig7="0000001", nome="CRECHE X", tipo="Creche", microarea="7.9",
                     bairro="Curicica", rua="Rua X", lat=-22.9, lon=-43.4,
-                    demanda_1a=demanda, confirmados=confirmados, ociosas=0)
+                    demanda_1a=demanda, confirmados=confirmados)
 
 
 def test_honra_o_contrato_do_backend(backend):
@@ -63,7 +64,7 @@ def test_chance_nunca_e_zero_nem_um():
 
 
 def test_sem_demanda_no_ano_base_nao_ha_chance():
-    """Creche que ninguém pediu não vale 0% — vale "não dá para estimar"."""
+    """Creche que ninguém pediu não vale 0%, e sim "não dá para estimar"."""
     assert chance_em(unidade(demanda=0, confirmados=0), False) is None
 
 
@@ -73,6 +74,26 @@ def test_vaga_aberta_agora_levanta_o_piso():
     com_vaga = chance_em(unidade(demanda=100, confirmados=5), True)
     assert com_vaga > sem_vaga
     assert com_vaga <= CHANCE_MAX
+
+
+def test_confirmados_de_outras_opcoes_nao_estoura_a_chance():
+    """`cf` soma quem entrou por 2ª/3ª opção: 214 das 820 unidades reais têm
+    confirmados > demanda_1a (ex.: CM BETINHO, d1=3 cf=5). Sem o teto, isso viraria
+    "chance estimada" acima de 100% na tela da família."""
+    assert chance_em(unidade(demanda=3, confirmados=5), False) == CHANCE_MAX
+
+
+# ------------------------------------------------------------- famílias por vaga
+def test_candidatos_por_vaga_e_a_demanda_sobre_os_confirmados():
+    concorrencia = candidatos_por_vaga(unidade(demanda=100, confirmados=25))
+    assert concorrencia.familias_por_vaga == pytest.approx(4)
+    assert concorrencia.ano == ANO_BASE
+
+
+def test_confirmados_maior_que_demanda_nao_vira_menos_de_uma_familia_por_vaga():
+    """CM BETINHO real: d1=3, cf=5 (recebeu quem pediu como 2ª/3ª opção). `3/5 = 0,6`
+    "famílias por vaga" não existe: vira `None`, não um número menor que 1."""
+    assert candidatos_por_vaga(unidade(demanda=3, confirmados=5)) is None
 
 
 # -------------------------------------------------------------- escolas perto
@@ -101,14 +122,14 @@ def test_todo_numero_sai_com_o_ano(backend):
 
 
 def test_vaga_ociosa_e_por_grupamento(backend):
-    """Creche com sobra no Maternal II e fila no Berçário é o caso comum — uma flag por
+    """Creche com sobra no Maternal II e fila no Berçário é o caso comum, e uma flag por
     unidade mandaria a família pedir a turma errada."""
     por_id = {}
     for grupamento in ("bercario", "maternal_1", "maternal_2"):
         for v in backend.escolas_proximas(CATETE, grupamento, "integral", n=8):
             por_id.setdefault(v.id_escola, set()).add(v.vaga_ociosa)
     assert any(len(valores) > 1 for valores in por_id.values()), \
-        "nenhuma unidade divergiu entre grupamentos — o filtro por grupamento sumiu"
+        "nenhuma unidade divergiu entre grupamentos, o filtro por grupamento sumiu"
 
 
 # ------------------------------------------------------------- região e texto
@@ -121,13 +142,27 @@ def test_panorama_da_regiao_acha_a_microarea_certa(backend):
     assert panorama.demanda > 0
 
 
+def test_atendidos_da_regiao_nunca_passa_da_demanda(backend):
+    """13 das 232 microáreas têm `conf` > `demanda` no CSV bruto: a microárea 7.8
+    (Jacarepaguá/Taquara) é `demanda=320 conf=349`. Sem o teto, "achei_creches" diria
+    que mais famílias conseguiram vaga do que pediram, contradizendo o próprio texto.
+    A coordenada é de uma das 5 unidades da 7.8, para o voto de vizinhas cair nela."""
+    jacarepagua = Endereco(cep="22753130", numero="10", logradouro="teste",
+                           bairro="Jacarepaguá", lat=-22.93863, lng=-43.39598)
+    panorama = backend.panorama_da_regiao(jacarepagua)
+    assert panorama is not None
+    assert panorama.microarea == "7.8"
+    assert panorama.demanda == 320
+    assert panorama.atendidos == 320   # 349 no CSV bruto, travado em 320 pelo clamp
+
+
 def test_bairro_sai_legivel():
     assert bairro_legivel("Camorim- Jacarepaguá") == "Camorim / Jacarepaguá"
     assert bairro_legivel("Curicica") == "Curicica"
 
 
 def test_nome_real_da_escola_chega_na_inscricao(backend):
-    """`BackendMock.inscrever` não conhece os ids do mapa e gravava "creche" — que era o
+    """`BackendMock.inscrever` não conhece os ids do mapa e gravava "creche", que era o
     que a família lia no /status."""
     sugestoes = backend.escolas_proximas(CURICICA, "maternal_2", "integral")
     numero = backend.inscrever({"nome_crianca": "Ana"}, [sugestoes[0].id_escola])
