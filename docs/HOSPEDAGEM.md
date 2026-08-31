@@ -66,6 +66,8 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 | `DATABASE_URL` | a connection string do pooler do Supabase, ver [BANCO.md](BANCO.md) | sim |
 | `BACKEND` | vazio (oferta real) ou `mock` (demo determinística) | não |
 | `WHISPER` | `1` liga a transcrição de áudio. Baixa ~460 MB no primeiro boot | não |
+| `WHISPER_MODELO` | `small` (padrão) ou `base`: `base` é ~3x mais rápido e mais leve de RAM, erra mais nome próprio | não |
+| `REPOSITORIO` | `memoria` roda sem Postgres — válvula de escape se o Supabase cair | não |
 | `RAILWAY_DOCKERFILE_PATH` | `deploy/app.Dockerfile`. Existe desde o desenho antigo; se ficar apontando para `site.Dockerfile`, sobe o painel estático de novo | sim, até ser apagada |
 | `OUTBOX_INTERVALO_S` | segundos entre ciclos do worker. Padrão `60` | não |
 | `PORT` | o Railway injeta sozinho, **não defina** | não |
@@ -171,12 +173,12 @@ A allowlist do servidor entrega **só** o HTML do painel e os seis CSVs. `.env`,
 
 ## 6. O que já está configurado para não gastar
 
-A Railway cobra por **RAM × tempo**, **CPU × tempo** e **egresso**. As quatro escolhas
+A Railway cobra por **RAM × tempo**, **CPU × tempo** e **egresso**. As três escolhas
 abaixo já estão no repositório. Você não precisa fazer nada, é só saber que existem.
 
 | Alavanca | O que fizemos | Medido |
 |---|---|---|
-| **Dormir sem tráfego** | `sleepApplication: true` no `railway.json` | O serviço hiberna sozinho e acorda no primeiro request. É a maior economia das quatro |
+| **Dormir sem tráfego** | `sleepApplication: true` no `railway.json` | O serviço hiberna sozinho e acorda no primeiro request. É a maior economia das três |
 | **Egresso** | gzip em memória + `Cache-Control: max-age=3600` | Uma visita ao painel caiu de **951 KB para 278 KB**. Com o cache, o F5 não baixa nada |
 | **CPU ociosa** | `OUTBOX_INTERVALO_S=60` (era 5s) | 12x menos ciclos de worker. Cada ciclo é uma consulta ao backend e uma ao banco |
 

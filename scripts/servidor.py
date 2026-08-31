@@ -216,10 +216,13 @@ class Servidor(Painel):
         if not self.vistos.novo(update.get("update_id")):
             log.info("update repetido descartado")
             return
+        # Antes de `receber()`: ele já baixa anexo e responde callback, justo o que
+        # demora e o que o aviso deveria cobrir.
+        if (chat_id := self.canal.chat_id_do(update)) is not None:
+            self.canal.avisar_processando(chat_id)
         entrada = self.canal.receber(update)
         if entrada is None:
             return
-        self.canal.avisar_processando(entrada.id_externo)
         resposta = self.nucleo.processar(entrada)
         if resposta is not None:
             self.canal.enviar(entrada.id_externo, resposta)

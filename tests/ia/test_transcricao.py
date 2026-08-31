@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 from types import SimpleNamespace
 
 from creche_bot.ia.transcricao import MAX_CARACTERES, Transcritor
@@ -38,3 +39,29 @@ def test_carregar_nao_recarrega_o_que_ja_esta_na_memoria():
     t.carregar()
     assert t(b"ogg") == "oi, quero creche"
     assert t._whisper is fake and fake.chamadas == 1
+
+
+def test_carregar_e_travado_duas_vozes_na_janela_de_boot_nao_duplicam_o_modelo(monkeypatch):
+    """Se duas vozes chegam antes da thread do `__main__` terminar de carregar, cada
+    `__call__` também chama `carregar()`. Sem trava, cada uma construiria seu próprio
+    `WhisperModel` em paralelo — memória e download em dobro."""
+    construcoes: list[str] = []
+    liberar = threading.Event()
+
+    class ModeloLento:
+        def __init__(self, nome: str, **_: object) -> None:
+            construcoes.append(nome)
+            liberar.wait(timeout=2)   # segura para forçar a segunda thread a esperar
+
+    monkeypatch.setitem(sys.modules, "faster_whisper",
+                        SimpleNamespace(WhisperModel=ModeloLento))
+
+    t = Transcritor()
+    threads = [threading.Thread(target=t.carregar) for _ in range(5)]
+    for th in threads:
+        th.start()
+    liberar.set()
+    for th in threads:
+        th.join()
+
+    assert construcoes == [t._nome]

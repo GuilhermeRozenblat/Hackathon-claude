@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import threading
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class Transcritor:
     def __init__(self, modelo: str = MODELO) -> None:
         self._nome = modelo
         self._whisper = None
+        self._trava = threading.Lock()
 
     def carregar(self) -> None:
         """O `__main__` chama isto numa thread no boot, e engole tudo o que der errado.
@@ -40,19 +42,28 @@ class Transcritor:
         para todo mundo, não só para quem mandou o áudio. Sem a dependência ou sem rede,
         `_whisper` fica `None` e áudio vira pedido para escrever; o bot sobe do mesmo
         jeito.
+
+        A trava é para a hospedagem: se duas vozes chegam ainda na janela de boot, antes
+        da thread do `__main__` terminar de carregar, cada uma cai aqui também (`__call__`
+        chama `carregar()` antes de transcrever). Sem trava, as duas construiriam um
+        `WhisperModel` cada uma, em paralelo — memória e download em dobro. Com trava, a
+        segunda espera a primeira terminar em vez de duplicar o carregamento.
         """
         if self._whisper is not None:
             return
-        try:
-            from faster_whisper import WhisperModel
+        with self._trava:
+            if self._whisper is not None:   # outra thread carregou enquanto esperava
+                return
+            try:
+                from faster_whisper import WhisperModel
 
-            log.info("carregando o modelo de voz %r", self._nome)
-            self._whisper = WhisperModel(self._nome, device="cpu", compute_type="int8")
-        except ImportError:
-            log.warning("faster-whisper não instalado, áudio vai virar pedido para "
-                        "escrever. Para ligar: pip install -e '.[audio]'")
-        except Exception:
-            log.exception("não deu para carregar o modelo de voz")
+                log.info("carregando o modelo de voz %r", self._nome)
+                self._whisper = WhisperModel(self._nome, device="cpu", compute_type="int8")
+            except ImportError:
+                log.warning("faster-whisper não instalado, áudio vai virar pedido para "
+                            "escrever. Para ligar: pip install -e '.[audio]'")
+            except Exception:
+                log.exception("não deu para carregar o modelo de voz")
 
     def __call__(self, audio: bytes) -> str | None:
         """`None` = não deu para ouvir. Quem chama pede para a pessoa escrever."""

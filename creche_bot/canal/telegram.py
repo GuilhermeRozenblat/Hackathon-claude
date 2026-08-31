@@ -76,10 +76,14 @@ class Telegram:
         self._ultimo_envio: dict[str, float] = {}
 
     # ------------------------------------------------------------------ HTTP
-    def _chamar(self, metodo: str, timeout_local: int = 70, **params: Any) -> Any:
+    def _chamar(self, metodo: str, timeout_local: int = 70, *,
+                permitir_retry: bool = True, **params: Any) -> Any:
         """`timeout_local` é o timeout do socket; o `timeout` de getUpdates (long polling)
         é um parâmetro da API do Telegram e viaja em `params`, não aqui — os dois têm nomes
         parecidos mas são coisas diferentes, por isso o nome distinto.
+
+        `permitir_retry=False` pula o `sleep` do 429: usado por quem chama fora do fluxo
+        principal (`avisar_processando`) e não pode travar a thread esperando o Telegram.
         """
         corpo = urllib.parse.urlencode({
             k: (json.dumps(v) if isinstance(v, dict | list) else v)
@@ -90,12 +94,15 @@ class Telegram:
             with urllib.request.urlopen(req, timeout=timeout_local) as r:
                 return json.load(r)["result"]
         except urllib.error.HTTPError as e:
-            detalhe = json.load(e)
-            if e.code == 429:
+            try:
+                detalhe = json.load(e)
+            except ValueError:   # corpo de erro que não é JSON (proxy, edge fora do ar)
+                detalhe = {}
+            if e.code == 429 and permitir_retry:
                 espera = detalhe.get("parameters", {}).get("retry_after", 1)
                 log.warning("rate limit; aguardando %ss", espera)
                 time.sleep(espera + 0.5)
-                return self._chamar(metodo, timeout_local, **params)
+                return self._chamar(metodo, timeout_local, permitir_retry=permitir_retry, **params)
             if e.code == 409:
                 raise ErroTelegram(
                     "409: outro processo faz polling com este token. "
@@ -128,6 +135,17 @@ class Telegram:
         não precisar alcançar um `_privado` de fora do módulo.
         """
         return self._traduzir(upd)
+
+    def chat_id_do(self, upd: dict) -> str | None:
+        """Só olha o dicionário, sem chamar o Telegram: quem recebe o update chama isto
+        ANTES de `receber()`/`_traduzir()`, porque a tradução já baixa anexo e responde
+        callback — as duas coisas que o "digitando..." deveria cobrir.
+        """
+        if (cq := upd.get("callback_query")):
+            return str(cq["message"]["chat"]["id"])
+        if (m := upd.get("message")):
+            return str(m["chat"]["id"])
+        return None
 
     def _traduzir(self, upd: dict) -> MensagemEntrada | None:
         """Update do Telegram -> modelo canônico. Nada do dicionário dele sai daqui."""
@@ -163,13 +181,21 @@ class Telegram:
     def avisar_processando(self, id_externo: str) -> None:
         """"Zé Matrícula está digitando…" enquanto o núcleo processa. Cold start do
         serviço hospedado e transcrição de áudio levam alguns segundos calados; isto dá
-        um sinal de vida sem gastar o limite de 1 msg/s. Melhor esforço: falhar aqui não
-        pode atrasar nem derrubar a resposta de verdade.
+        um sinal de vida. Melhor esforço, e literalmente qualquer coisa: falhar aqui não
+        pode atrasar (por isso `permitir_retry=False`, sem o sleep do 429) nem derrubar
+        (por isso `Exception`, não só `ErroTelegram` — o corpo pode vir truncado ou fora
+        do formato esperado) a resposta de verdade.
+
+        Registra o horário como se tivesse enviado: senão o `enviar()` da resposta real,
+        logo em seguida, não vê essa chamada e arrisca estourar o limite de 1 msg/s.
         """
         try:
-            self._chamar("sendChatAction", 5, chat_id=id_externo, action="typing")
-        except ErroTelegram:
-            pass
+            self._chamar("sendChatAction", 5, permitir_retry=False,
+                         chat_id=id_externo, action="typing")
+        except Exception:
+            log.debug("aviso de \"digitando\" falhou, seguindo sem ele", exc_info=True)
+        finally:
+            self._ultimo_envio[id_externo] = time.monotonic()
 
     def enviar(self, id_externo: str, msg: MensagemSaida) -> None:
         if _debug():
@@ -199,12 +225,15 @@ class Telegram:
             for upd in updates:
                 offset = upd["update_id"] + 1
                 try:
+                    # Antes de traduzir: `_traduzir` já baixa anexo e responde callback,
+                    # justo o que demora e o que o aviso deveria cobrir.
+                    if (chat_id := self.chat_id_do(upd)) is not None:
+                        self.avisar_processando(chat_id)
                     entrada = self._traduzir(upd)
                     if entrada is None:
                         continue
                     if _debug():
                         log.info("← %s · %s", entrada.id_externo, _resumo_entrada(entrada))
-                    self.avisar_processando(entrada.id_externo)
                     if (resposta := processar(entrada)) is not None:
                         self.enviar(entrada.id_externo, resposta)
                 except Exception:

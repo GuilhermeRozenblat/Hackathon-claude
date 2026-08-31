@@ -27,6 +27,10 @@ class CanalFalso:
     def __init__(self) -> None:
         self.enviadas: list[tuple[str, MensagemSaida]] = []
 
+    def chat_id_do(self, upd: dict) -> str | None:
+        msg = upd.get("message")
+        return str(msg["chat"]["id"]) if msg else None
+
     def receber(self, upd: dict) -> MensagemEntrada | None:
         msg = upd.get("message")
         if not msg:
