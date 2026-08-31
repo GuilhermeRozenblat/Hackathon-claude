@@ -28,6 +28,10 @@
   --alerta:#a15c00; --alerta-tint:#fff5c2;
   --perigo:#b8280b; --perigo-tint:#fde0db;
   --neutro-mapa:#d9d9d9;
+  /* base do mapa: água, terra do município, vizinhança, costa e rótulo de água */
+  --mapa-agua:#d5e2ec; --mapa-terra:#ffffff; --mapa-vizinho:#dbd9d1;
+  --mapa-vizinho-linha:#cac8bf; --mapa-costa:#8b9ba7; --mapa-rotulo:#748ea3;
+  --mapa-relevo:rgba(31,45,58,.20);
   --sombra:0 1px 2px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.05);
   /* rampas sequenciais, L(OKLCH) estritamente decrescente */
   --r-fila-0:#f3eefb; --r-fila-1:#ddd0f0; --r-fila-2:#bda9de; --r-fila-3:#9a7fc7;
@@ -48,6 +52,9 @@
   --alerta:#e0a93a; --alerta-tint:#3a2f11;
   --perigo:#f08a72; --perigo-tint:#3b1a12;
   --neutro-mapa:#4a4a46;
+  --mapa-agua:#0d141b; --mapa-terra:#2c2f33; --mapa-vizinho:#191b1e;
+  --mapa-vizinho-linha:#212429; --mapa-costa:#4b5862; --mapa-rotulo:#66808f;
+  --mapa-relevo:rgba(0,0,0,.45);
   --sombra:0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.35);
   --r-fila-0:#2a2140; --r-fila-1:#3d2f5c; --r-fila-2:#55427e; --r-fila-3:#6f56a1;
   --r-fila-4:#8a6fc0; --r-fila-5:#a98cd8; --r-fila-6:#c6aeea;
@@ -153,7 +160,12 @@ select:focus-visible,.botao:focus-visible,.nav button:focus-visible,.pilula:focu
 .tabela-envelope{overflow-x:auto;margin-top:12px;-webkit-overflow-scrolling:touch;}
 table{border-collapse:collapse;width:100%;font-size:12px;}
 th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
-th:first-child,td:first-child{text-align:left;}
+/* a primeira coluna carrega nome, não número: deixá-la quebrar é o que faz caber a
+   última coluna num cartão estreito, em vez de sumir atrás do scroll horizontal. */
+th:first-child,td:first-child{text-align:left;white-space:normal;}
+/* tabela sem coluna de prosa não estica até a largura do cartão: quatro números
+   espalhados por 1.200 px perdem a linha de leitura. As de prosa seguem em 100%. */
+.tabela-envelope table:not(:has(.prosa)){width:fit-content;min-width:min(100%,640px);}
 th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);
   position:sticky;top:0;background:var(--surface);}
 tbody tr:hover{background:var(--surface-2);}
@@ -163,11 +175,23 @@ th.prosa,td.prosa{white-space:normal;text-align:left;min-width:22ch;line-height:
   cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
 
 /* ---- mapa ---- */
-.mapa-caixa{background:var(--surface-2);border-radius:10px;padding:8px;position:relative;}
+.mapa-caixa{background:var(--mapa-agua);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;position:relative;}
 .mapa-caixa svg{display:block;width:100%;height:auto;}
-.mapa-caixa circle{cursor:pointer;}
+.mapa-caixa circle[data-micro]{cursor:pointer;transition:stroke-width .12s ease-out;}
+.mapa-caixa circle[data-micro]:hover{stroke:var(--ink);stroke-width:2;}
 .mapa-caixa circle.selecionado{stroke:var(--ink);stroke-width:2.5;}
-.legenda{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:11px;color:var(--ink-soft);}
+/* a sombra descola o município da água e do vizinho: sem ela, no zoom de uma CRE,
+   Niterói e o Rio viram a mesma mancha clara */
+.mapa-caixa .municipio{filter:drop-shadow(0 1px 2px var(--mapa-relevo));}
+/* hidrografia em itálico, como em mapa impresso: orienta sem competir com as bolhas */
+.mapa-caixa .agua{fill:var(--mapa-rotulo);font-size:13px;font-style:italic;letter-spacing:.08em;
+  font-weight:600;pointer-events:none;}
+.mapa-caixa .localizador{pointer-events:none;}
+.mapa-caixa .localizador .moldura{fill:var(--mapa-agua);stroke:var(--border-strong);stroke-width:1;}
+.mapa-caixa .localizador .quadro{fill:var(--brand);fill-opacity:.15;stroke:var(--brand);stroke-width:1.5;}
+.legenda{display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--ink-soft);
+  padding:9px 12px;background:var(--surface);border-top:1px solid var(--border);}
 .legenda .escala{display:flex;align-items:center;gap:4px;}
 .legenda .degrau{width:22px;height:10px;border-radius:2px;}
 .dica{
@@ -4266,6 +4290,55 @@ desig7,grupamento,vagas,DENOMINACAO,BAIRRO,LATITUDE,LONGITUDE,sobra_3km
 0010085,Maternal II,8,CP CRECHE VIDA,GUARATIBA,-22.96926,-43.62339,0
 </script>
 
+<!-- ---------------------------------------------------------------------------
+  Silhueta do município e dos vizinhos que aparecem no quadro: malha municipal do
+  IBGE (2022), anéis externos simplificados a ~60 m e recortados ao enquadramento.
+  É referência geográfica, não dado: nenhum número do painel sai daqui. Vem embutida
+  pelo mesmo motivo dos CSVs, para o painel abrir com duplo clique.
+  Cada anel é [lon, lat, lon, lat, ...]; `rio` é o município, `viz` a vizinhança.
+  --------------------------------------------------------------------------- -->
+<script type="application/json" id="contorno-municipio">
+{"rio":[
+[-43.2728,-22.8098,-43.2778,-22.8074,-43.289,-22.8079,-43.2885,-22.8104,-43.2902,-22.8104,-43.2965,-22.8061,-43.298,-22.8068,-43.2996,-22.8062,-43.3009,-22.8036,-43.3032,-22.8035,-43.3041,-22.8008,-43.307,-22.8,-43.3207,-22.8016,-43.325,-22.8011,-43.3289,-22.8026,-43.3485,-22.8038,-43.354,-22.8024,-43.3593,-22.8029,-43.3617,-22.8045,-43.3655,-22.8041,-43.37,-22.8053,-43.3723,-22.8072,-43.3745,-22.8076,-43.3772,-22.8109,-43.3795,-22.8106,-43.3829,-22.8119,-43.3849,-22.814,-43.3879,-22.8148,-43.3906,-22.8138,-43.4007,-22.8174,-43.4079,-22.8212,-43.4112,-22.8202,-43.4154,-22.8216,-43.422,-22.8326,-43.4242,-22.8327,-43.4256,-22.8358,-43.4312,-22.8393,-43.4581,-22.849,-43.4824,-22.8304,-43.4901,-22.8155,-43.5218,-22.8225,-43.5594,-22.8289,-43.5885,-22.8387,-43.593,-22.8604,-43.5963,-22.8578,-43.624,-22.8627,-43.6441,-22.8557,-43.6496,-22.8571,-43.6587,-22.8634,-43.6651,-22.8652,-43.67,-22.8653,-43.6726,-22.8639,-43.677,-22.8655,-43.678,-22.864,-43.6811,-22.8627,-43.6844,-22.8644,-43.6897,-22.8652,-43.6925,-22.8643,-43.6974,-22.8647,-43.7011,-22.866,-43.7033,-22.8679,-43.707,-22.8686,-43.7103,-22.867,-43.7124,-22.8671,-43.7145,-22.8688,-43.7154,-22.8711,-43.7176,-22.8725,-43.7251,-22.8725,-43.7275,-22.8733,-43.7343,-22.8783,-43.7411,-22.8771,-43.7482,-22.8779,-43.7523,-22.8809,-43.7507,-22.8878,-43.7516,-22.8887,-43.7659,-22.8951,-43.7677,-22.8954,-43.7691,-22.8948,-43.7691,-22.8935,-43.7746,-22.8927,-43.7752,-22.8958,-43.7783,-22.8962,-43.7791,-22.8948,-43.7807,-22.8951,-43.7814,-22.8987,-43.7826,-22.9002,-43.7844,-22.9002,-43.7837,-22.9022,-43.7847,-22.904,-43.7871,-22.9009,-43.7889,-22.901,-43.7899,-22.9036,-43.793,-22.9029,-43.7951,-22.9038,-43.7955,-22.906,-43.7944,-22.908,-43.7922,-22.9083,-43.7907,-22.9143,-43.796,-22.9171,-43.7934,-22.9218,-43.7921,-22.9223,-43.7897,-22.9258,-43.7843,-22.9243,-43.7809,-22.927,-43.7813,-22.9279,-43.7757,-22.9318,-43.7725,-22.9331,-43.7684,-22.9326,-43.7667,-22.9356,-43.7546,-22.9413,-43.7484,-22.9456,-43.7463,-22.9459,-43.7316,-22.9579,-43.7247,-22.9607,-43.7187,-22.9667,-43.7179,-22.9696,-43.7202,-22.9711,-43.7195,-22.9718,-43.7141,-22.969,-43.711,-22.9706,-43.7066,-22.9749,-43.7001,-22.9861,-43.6958,-22.9846,-43.691,-22.9893,-43.6897,-22.9918,-43.6875,-22.986,-43.6836,-22.9844,-43.6808,-22.9814,-43.6745,-22.9803,-43.6659,-22.9853,-43.659,-22.9916,-43.6554,-22.9983,-43.6523,-23.0013,-43.65,-23.002,-43.6477,-23.0009,-43.6463,-23.002,-43.6432,-23.0011,-43.6388,-23.006,-43.6322,-23.0056,-43.6243,-23.0085,-43.6229,-23.0079,-43.6213,-23.0107,-43.6141,-23.0176,-43.6073,-23.0216,-43.5996,-23.0229,-43.5977,-23.0277,-43.5943,-23.0324,-43.5894,-23.0351,-43.5854,-23.0352,-43.5797,-23.0396,-43.5777,-23.0424,-43.5774,-23.0443,-43.5786,-23.0451,-43.5735,-23.0472,-43.568,-23.0509,-43.5647,-23.0512,-43.5624,-23.0532,-43.5628,-23.0569,-43.5616,-23.0582,-43.5687,-23.0655,-43.568,-23.0717,-43.5725,-23.0731,-43.5688,-23.0742,-43.5668,-23.0736,-43.5664,-23.0752,-43.5646,-23.0755,-43.5564,-23.0739,-43.5541,-23.0726,-43.5544,-23.074,-43.5523,-23.0759,-43.5492,-23.0728,-43.5528,-23.0715,-43.5513,-23.0687,-43.552,-23.0673,-43.5509,-23.0653,-43.5484,-23.0652,-43.5485,-23.0638,-43.55,-23.0629,-43.5489,-23.0607,-43.5474,-23.0607,-43.5454,-23.0588,-43.5421,-23.0591,-43.5396,-23.0564,-43.5369,-23.0561,-43.535,-23.0539,-43.536,-23.0514,-43.5344,-23.0503,-43.525,-23.0488,-43.5124,-23.0485,-43.508,-23.0473,-43.5068,-23.0457,-43.5074,-23.0429,-43.5066,-23.042,-43.503,-23.0401,-43.5004,-23.0411,-43.4988,-23.0376,-43.4928,-23.0353,-43.4776,-23.0317,-43.4753,-23.0316,-43.4707,-23.0333,-43.4677,-23.0299,-43.4628,-23.0278,-43.4456,-23.0229,-43.4198,-23.0176,-43.3879,-23.0131,-43.3576,-23.0111,-43.3359,-23.0114,-43.3094,-23.0157,-43.2969,-23.0159,-43.2963,-23.0168,-43.2935,-23.0167,-43.2924,-23.0153,-43.2855,-23.015,-43.2874,-23.0111,-43.2869,-23.0099,-43.2816,-23.0063,-43.2772,-23.0057,-43.2747,-23.0023,-43.2654,-23.0002,-43.2521,-22.9991,-43.2457,-23.001,-43.2408,-23.0004,-43.2397,-22.9988,-43.234,-22.9961,-43.234,-22.9952,-43.232,-22.9953,-43.2331,-22.9934,-43.231,-22.9908,-43.2272,-22.9903,-43.227,-22.9887,-43.2176,-22.987,-43.2082,-22.9872,-43.1952,-22.9884,-43.1925,-22.9893,-43.1915,-22.9908,-43.1892,-22.9882,-43.1843,-22.9854,-43.1882,-22.9858,-43.1893,-22.9836,-43.189,-22.9801,-43.1853,-22.9742,-43.1755,-22.9676,-43.1672,-22.9639,-43.1648,-22.9636,-43.1642,-22.9648,-43.1619,-22.9652,-43.1596,-22.9644,-43.1587,-22.9631,-43.1604,-22.9614,-43.1592,-22.9589,-43.161,-22.9571,-43.1626,-22.9574,-43.1644,-22.9563,-43.1644,-22.9547,-43.1609,-22.9528,-43.1566,-22.9533,-43.1502,-22.9507,-43.1508,-22.9492,-43.1549,-22.947,-43.1558,-22.9433,-43.1543,-22.9419,-43.152,-22.9417,-43.1511,-22.9405,-43.1522,-22.9386,-43.1577,-22.9412,-43.1577,-22.9433,-43.1625,-22.9438,-43.1638,-22.9459,-43.1631,-22.9475,-43.1651,-22.9477,-43.17,-22.9523,-43.1801,-22.9485,-43.1805,-22.9472,-43.1799,-22.9444,-43.1782,-22.943,-43.1743,-22.9442,-43.171,-22.9419,-43.1686,-22.9387,-43.1694,-22.9356,-43.1711,-22.9351,-43.1713,-22.9324,-43.1678,-22.9205,-43.1683,-22.9183,-43.1716,-22.9198,-43.1727,-22.9166,-43.1706,-22.9144,-43.1678,-22.9145,-43.1626,-22.9172,-43.1616,-22.9168,-43.1615,-22.9053,-43.1628,-22.9043,-43.1692,-22.9046,-43.1718,-22.9029,-43.1763,-22.8988,-43.1772,-22.8957,-43.1795,-22.8956,-43.1783,-22.8925,-43.1791,-22.8923,-43.1811,-22.8954,-43.1908,-22.8921,-43.1962,-22.8921,-43.2108,-22.8976,-43.2161,-22.8867,-43.2014,-22.8715,-43.203,-22.8722,-43.2047,-22.8713,-43.2099,-22.867,-43.2138,-22.8712,-43.2128,-22.8721,-43.2134,-22.8731,-43.2165,-22.8736,-43.217,-22.8758,-43.2188,-22.8749,-43.2188,-22.8721,-43.2257,-22.8741,-43.2262,-22.8692,-43.23,-22.8678,-43.2321,-22.8685,-43.2337,-22.8637,-43.2365,-22.862,-43.2382,-22.8544,-43.2422,-22.8473,-43.2435,-22.8421,-43.245,-22.8406,-43.2549,-22.8365,-43.2559,-22.8341,-43.2654,-22.8258,-43.2735,-22.8102,-43.2728,-22.8098],
+[-43.1752,-22.8012,-43.172,-22.7977,-43.1724,-22.7966,-43.1715,-22.7951,-43.1695,-22.7934,-43.1574,-22.7873,-43.1556,-22.7841,-43.1569,-22.7816,-43.1563,-22.7797,-43.1575,-22.7786,-43.1668,-22.7775,-43.1667,-22.7792,-43.1693,-22.7809,-43.1693,-22.7831,-43.1712,-22.7822,-43.1732,-22.7792,-43.1731,-22.7779,-43.1713,-22.777,-43.1722,-22.7757,-43.1755,-22.7771,-43.1781,-22.7828,-43.1817,-22.7835,-43.1825,-22.7816,-43.1835,-22.7818,-43.185,-22.7843,-43.1869,-22.7847,-43.1892,-22.7831,-43.1903,-22.7878,-43.1882,-22.7892,-43.1894,-22.7926,-43.1886,-22.7948,-43.1904,-22.7955,-43.1932,-22.7942,-43.1945,-22.7951,-43.1978,-22.7937,-43.2041,-22.7954,-43.2075,-22.7949,-43.213,-22.7891,-43.2169,-22.7865,-43.2207,-22.7846,-43.2285,-22.7836,-43.2289,-22.7882,-43.2339,-22.7907,-43.2338,-22.7915,-43.24,-22.7909,-43.2449,-22.792,-43.2475,-22.7929,-43.249,-22.7951,-43.2524,-22.7974,-43.2564,-22.7972,-43.2609,-22.8026,-43.2621,-22.8062,-43.2657,-22.8112,-43.2654,-22.8132,-43.2619,-22.8159,-43.2612,-22.8176,-43.2509,-22.8233,-43.2503,-22.8256,-43.2517,-22.8265,-43.2515,-22.8285,-43.2484,-22.8292,-43.2484,-22.8304,-43.242,-22.8338,-43.2392,-22.8338,-43.2378,-22.8328,-43.2305,-22.8237,-43.2255,-22.82,-43.2205,-22.8192,-43.2169,-22.8172,-43.2147,-22.8178,-43.2101,-22.8157,-43.2084,-22.8162,-43.2091,-22.8184,-43.2068,-22.8183,-43.2066,-22.8193,-43.2036,-22.8202,-43.1956,-22.8189,-43.1909,-22.8204,-43.1881,-22.8255,-43.1876,-22.8276,-43.1888,-22.8292,-43.1851,-22.8296,-43.1841,-22.8329,-43.1761,-22.8274,-43.1768,-22.8252,-43.1759,-22.8239,-43.1726,-22.8253,-43.1731,-22.8287,-43.1747,-22.8293,-43.1737,-22.8312,-43.1702,-22.8312,-43.1686,-22.8286,-43.1682,-22.8247,-43.1638,-22.8224,-43.1651,-22.8203,-43.1698,-22.8217,-43.1745,-22.8202,-43.1765,-22.8156,-43.1764,-22.8137,-43.1749,-22.8125,-43.1774,-22.8103,-43.1784,-22.8027,-43.1778,-22.8015,-43.1752,-22.8012],
+[-43.6678,-23.0531,-43.6304,-23.0503,-43.6061,-23.0505,-43.5868,-23.0533,-43.5807,-23.055,-43.5721,-23.0591,-43.5678,-23.0631,-43.5663,-23.0618,-43.5683,-23.0594,-43.5665,-23.0579,-43.5665,-23.0548,-43.573,-23.0514,-43.577,-23.0481,-43.5861,-23.0456,-43.5884,-23.0432,-43.593,-23.0429,-43.6009,-23.0405,-43.604,-23.0387,-43.6058,-23.0338,-43.614,-23.031,-43.6195,-23.0329,-43.6292,-23.0335,-43.6431,-23.0359,-43.6625,-23.0413,-43.6637,-23.0407,-43.6666,-23.0426,-43.6678,-23.0531],
+[-43.2172,-22.8703,-43.2146,-22.8698,-43.2143,-22.866,-43.2167,-22.8618,-43.2183,-22.8633,-43.2194,-22.8621,-43.214,-22.8597,-43.2124,-22.8606,-43.2106,-22.8598,-43.2088,-22.8603,-43.2083,-22.8587,-43.2095,-22.8576,-43.2122,-22.8585,-43.2154,-22.8572,-43.2172,-22.8586,-43.2227,-22.8588,-43.2283,-22.8544,-43.2324,-22.8472,-43.2313,-22.8441,-43.2262,-22.8415,-43.2239,-22.8419,-43.2223,-22.8438,-43.224,-22.8448,-43.2234,-22.8479,-43.2213,-22.8478,-43.2198,-22.8448,-43.2237,-22.8393,-43.225,-22.8397,-43.2277,-22.8371,-43.2376,-22.8392,-43.2423,-22.837,-43.2433,-22.8396,-43.2402,-22.8417,-43.241,-22.8467,-43.2365,-22.8539,-43.2362,-22.8611,-43.2325,-22.8631,-43.2317,-22.8664,-43.2277,-22.867,-43.2223,-22.8705,-43.22,-22.8696,-43.2172,-22.8703],
+[-43.5992,-23.0282,-43.6004,-23.0277,-43.604,-23.0291,-43.6027,-23.0331,-43.6033,-23.0373,-43.6023,-23.039,-43.5897,-23.0407,-43.5819,-23.0455,-43.5785,-23.0461,-43.5799,-23.0446,-43.5808,-23.0404,-43.5834,-23.0384,-43.5867,-23.0377,-43.5936,-23.0339,-43.5992,-23.0282],
+[-43.1102,-22.7693,-43.1083,-22.7699,-43.1025,-22.7651,-43.1026,-22.7635,-43.1047,-22.7628,-43.1066,-22.7635,-43.1085,-22.7578,-43.1071,-22.7551,-43.1019,-22.7521,-43.1026,-22.7506,-43.1037,-22.7511,-43.1058,-22.7489,-43.1079,-22.7496,-43.1108,-22.753,-43.1123,-22.7531,-43.1124,-22.7552,-43.1098,-22.7593,-43.1114,-22.7605,-43.1102,-22.7647,-43.1107,-22.7663,-43.1144,-22.7675,-43.1102,-22.7693],
+[-43.1945,-23.0672,-43.1982,-23.069,-43.1991,-23.0715,-43.193,-23.0741,-43.1912,-23.0721,-43.1912,-23.0706,-43.1922,-23.0684,-43.1945,-23.0672],
+[-43.1715,-22.8942,-43.1747,-22.8931,-43.1759,-22.8956,-43.175,-22.8975,-43.1713,-22.8987,-43.171,-22.8979,-43.1683,-22.8976,-43.1674,-22.8956,-43.1715,-22.8942],
+[-43.16,-22.77,-43.1609,-22.7702,-43.1605,-22.7746,-43.1589,-22.7758,-43.1533,-22.7752,-43.1521,-22.7742,-43.1526,-22.7725,-43.1545,-22.7733,-43.1574,-22.7726,-43.16,-22.77],
+[-43.1482,-23.0596,-43.1483,-23.0638,-43.1468,-23.0657,-43.1423,-23.0659,-43.1429,-23.0641,-43.1482,-23.0596],
+[-43.578,-23.0427,-43.5806,-23.0391,-43.5849,-23.0357,-43.5883,-23.0358,-43.5867,-23.0373,-43.5814,-23.0391,-43.5792,-23.0445,-43.5778,-23.0441,-43.578,-23.0427],
+[-43.2001,-23.0376,-43.1968,-23.0347,-43.1982,-23.0347,-43.2006,-23.0366,-43.2074,-23.0378,-43.2082,-23.0399,-43.206,-23.0402,-43.2026,-23.0379,-43.2001,-23.0376],
+[-43.5095,-23.0656,-43.5079,-23.0648,-43.5092,-23.0632,-43.5123,-23.0615,-43.5135,-23.0625,-43.5126,-23.0635,-43.514,-23.0644,-43.5135,-23.0658,-43.5095,-23.0656],
+[-43.1177,-22.7538,-43.1209,-22.7565,-43.1201,-22.7585,-43.1186,-22.7586,-43.1173,-22.7571,-43.1148,-22.7565,-43.1177,-22.7538],
+[-43.6045,-23.0307,-43.6076,-23.0296,-43.6116,-23.0302,-43.6116,-23.031,-43.6085,-23.0313,-43.605,-23.0331,-43.6045,-23.0307],
+[-43.4691,-23.0341,-43.4707,-23.0338,-43.472,-23.0355,-43.4709,-23.0378,-43.4675,-23.0371,-43.4691,-23.0341],
+[-43.1473,-22.9618,-43.1489,-22.9618,-43.1511,-22.9643,-43.1492,-22.9659,-43.1473,-22.9618],
+[-43.1622,-22.8112,-43.1647,-22.8119,-43.1649,-22.8138,-43.1619,-22.8151,-43.1614,-22.8122,-43.1622,-22.8112],
+[-43.7854,-22.9289,-43.7839,-22.928,-43.7833,-22.9257,-43.7869,-22.9264,-43.7854,-22.9289]
+],
+"viz":[
+[-43.4123,-22.6989,-43.4316,-22.7026,-43.4273,-22.7163,-43.4341,-22.7245,-43.4224,-22.75,-43.4139,-22.7556,-43.416,-22.765,-43.3971,-22.7776,-43.3854,-22.7666,-43.3293,-22.7559,-43.3272,-22.724,-43.3198,-22.7094,-43.3291,-22.6989,-43.4123,-22.6989],
+[-43.3309,-22.8027,-43.3041,-22.8008,-43.2996,-22.8062,-43.2728,-22.8098,-43.2713,-22.7948,-43.2774,-22.78,-43.2579,-22.7564,-43.2446,-22.7511,-43.2387,-22.7431,-43.2132,-22.7343,-43.2146,-22.7277,-43.2216,-22.7245,-43.2159,-22.6989,-43.3291,-22.6989,-43.3198,-22.7094,-43.3272,-22.724,-43.3309,-22.8027],
+[-43.796,-22.9171,-43.7907,-22.9143,-43.7951,-22.9038,-43.7847,-22.904,-43.7807,-22.8951,-43.7659,-22.8951,-43.7507,-22.8878,-43.7482,-22.8779,-43.7343,-22.8783,-43.6974,-22.8647,-43.6735,-22.864,-43.7548,-22.8187,-43.7549,-22.8147,-43.7679,-22.8124,-43.7935,-22.7911,-43.7888,-22.7719,-43.7731,-22.7689,-43.7749,-22.7622,-43.7662,-22.757,-43.7728,-22.7493,-43.765,-22.7292,-43.7524,-22.7293,-43.7457,-22.7236,-43.7406,-22.7051,-43.753,-22.7001,-43.7948,-22.6989,-43.8325,-22.7297,-43.8387,-22.7583,-43.829,-22.7679,-43.8125,-22.7718,-43.833,-22.7938,-43.846,-22.8002,-43.846,-22.9017,-43.839,-22.911,-43.846,-22.9181,-43.846,-22.9291,-43.832,-22.9312,-43.8102,-22.9176,-43.8028,-22.9248,-43.796,-22.9171],
+[-43.6678,-23.0531,-43.6666,-23.0426,-43.706,-23.0529,-43.793,-23.0639,-43.6678,-23.0531],
+[-43.6459,-22.6989,-43.6387,-22.7204,-43.6284,-22.7189,-43.6133,-22.6989,-43.6459,-22.6989],
+[-43.2159,-22.6989,-43.2216,-22.7245,-43.2146,-22.7277,-43.1803,-22.72,-43.161,-22.7099,-43.1425,-22.7084,-43.1347,-22.7145,-43.1247,-22.7137,-43.1161,-22.6989,-43.2159,-22.6989],
+[-43.7931,-23.0615,-43.846,-23.0527,-43.846,-23.0717,-43.7931,-23.0615],
+[-43.4107,-22.7917,-43.3971,-22.7776,-43.4107,-22.7681,-43.4323,-22.766,-43.4714,-22.7879,-43.5024,-22.7933,-43.4916,-22.8022,-43.4963,-22.8138,-43.4692,-22.8404,-43.448,-22.8256,-43.4287,-22.802,-43.4107,-22.7917],
+[-43.4692,-22.8404,-43.4581,-22.849,-43.4312,-22.8393,-43.4154,-22.8216,-43.3906,-22.8138,-43.4107,-22.7917,-43.4287,-22.802,-43.448,-22.8256,-43.4692,-22.8404],
+[-43.1034,-22.8559,-43.1342,-22.8813,-43.1249,-22.895,-43.1357,-22.8977,-43.1312,-22.9084,-43.1159,-22.9048,-43.0948,-22.9206,-43.0986,-22.9316,-43.1119,-22.9353,-43.1198,-22.926,-43.1312,-22.9392,-43.1156,-22.9391,-43.1104,-22.9536,-43.0725,-22.9568,-43.0544,-22.9625,-43.0419,-22.9728,-43.0419,-22.8725,-43.0674,-22.8696,-43.1034,-22.8559],
+[-43.5282,-22.6989,-43.5425,-22.7149,-43.5383,-22.7274,-43.5422,-22.7361,-43.5323,-22.7387,-43.5352,-22.7514,-43.5603,-22.7578,-43.5702,-22.7528,-43.5923,-22.7545,-43.6013,-22.7482,-43.6139,-22.7493,-43.6158,-22.7615,-43.6273,-22.7729,-43.6238,-22.7825,-43.6348,-22.7833,-43.6231,-22.8266,-43.648,-22.8448,-43.6702,-22.8528,-43.6735,-22.864,-43.6587,-22.8634,-43.6441,-22.8557,-43.624,-22.8627,-43.593,-22.8604,-43.5885,-22.8387,-43.4901,-22.8155,-43.4963,-22.8138,-43.4916,-22.8022,-43.5024,-22.7933,-43.4714,-22.7879,-43.4323,-22.766,-43.4107,-22.7681,-43.416,-22.765,-43.4139,-22.7556,-43.4224,-22.75,-43.4341,-22.7245,-43.4273,-22.7163,-43.4316,-22.7026,-43.4123,-22.6989,-43.5282,-22.6989],
+[-43.846,-22.6989,-43.846,-22.8002,-43.833,-22.7938,-43.8125,-22.7718,-43.829,-22.7679,-43.8387,-22.7583,-43.8325,-22.7297,-43.7948,-22.6989,-43.846,-22.6989],
+[-43.6348,-22.7833,-43.6238,-22.7825,-43.6273,-22.7729,-43.6158,-22.7615,-43.6139,-22.7493,-43.6013,-22.7482,-43.5923,-22.7545,-43.5702,-22.7528,-43.5603,-22.7578,-43.5352,-22.7514,-43.5323,-22.7387,-43.5422,-22.7361,-43.5383,-22.7274,-43.5425,-22.7149,-43.5282,-22.6989,-43.6133,-22.6989,-43.6284,-22.7189,-43.6387,-22.7204,-43.6447,-22.737,-43.6422,-22.7562,-43.6323,-22.7749,-43.6348,-22.7833],
+[-43.1034,-22.8559,-43.0674,-22.8696,-43.0419,-22.8725,-43.0419,-22.7527,-43.0643,-22.7651,-43.0684,-22.7786,-43.0814,-22.7898,-43.0791,-22.7989,-43.0651,-22.8029,-43.0969,-22.8279,-43.1034,-22.8559],
+[-43.3293,-22.7559,-43.3854,-22.7666,-43.4107,-22.7917,-43.3906,-22.8138,-43.3655,-22.8041,-43.3309,-22.8027,-43.3293,-22.7559],
+[-43.753,-22.7001,-43.7406,-22.7051,-43.7457,-22.7236,-43.7524,-22.7293,-43.765,-22.7292,-43.7728,-22.7493,-43.7662,-22.757,-43.7749,-22.7622,-43.7731,-22.7689,-43.7888,-22.7719,-43.7935,-22.7911,-43.7679,-22.8124,-43.7549,-22.8147,-43.7548,-22.8187,-43.6735,-22.864,-43.6702,-22.8528,-43.648,-22.8448,-43.6231,-22.8266,-43.6447,-22.737,-43.6368,-22.7174,-43.6459,-22.6989,-43.753,-22.7001]
+]}
+</script>
+
 <script>
 "use strict";
 /* ===========================================================================
@@ -5047,8 +5120,9 @@ function vistaMapa(){
     <div>
       <h1 class="disp" style="font-size:23px;">Mapa territorial</h1>
       <p class="subtitulo">Uma bolha por microárea, posicionada no centroide real das unidades daquela
-      microárea (média de latitude e longitude vindas dos CSVs, sem tiles e sem shapefile). Um bairro grande
-      reúne dezenas de microáreas em situações opostas; olhar só o total do bairro esconde isso.</p>
+      microárea: média de latitude e longitude vindas dos CSVs. A silhueta da cidade é desenho, não dado.
+      Um bairro grande reúne dezenas de microáreas em situações opostas; olhar só o total do bairro
+      esconde isso.</p>
     </div>
   </div>
 
@@ -5092,7 +5166,8 @@ function vistaMapa(){
       <div class="mapa-caixa" id="mapa">${desenharMapa(lista)}</div>
       <p class="legenda-painel" style="margin-top:10px;">Fonte: estudo <em>Fila de creche do Rio</em>,
       Impact Lab Rio · SME/IPP, inscrições de 2025. Coordenadas geocodificadas das unidades; a microárea
-      é atribuída por ponto-em-polígono no shapefile do IPP.${(() => {
+      é atribuída por ponto-em-polígono no shapefile do IPP. Silhueta do município e da vizinhança:
+      malha municipal do IBGE, 2022.${(() => {
         const fora = microareasVisiveis().filter(m => m.lat === null).length;
         return fora ? ` <strong>${fmt.format(fora)}</strong> microárea(s) do recorte não têm unidade com
           coordenada e por isso entram nos totais acima sem aparecer no desenho.` : "";
@@ -5172,20 +5247,68 @@ function detalheMicro(){
 }
 
 /* --------------------------------------------------------- desenho do mapa */
+/* A silhueta vem do bloco <script id="contorno-municipio">: malha do IBGE, anéis
+   [lon,lat,...]. Sem ela as bolhas flutuavam num retângulo vazio e ninguém
+   reconhecia a cidade. Nenhum número do painel sai daqui: é só o desenho. */
+const TERRA = (() => {
+  const bloco = document.getElementById("contorno-municipio");
+  try { return JSON.parse(bloco.textContent); } catch (_) { return { rio: [], viz: [] }; }
+})();
+
+/* Caixa do município, calculada uma vez: é o enquadramento da cidade inteira. */
+const CAIXA_RIO = (() => {
+  const c = { lonMin: 180, lonMax: -180, latMin: 90, latMax: -90 };
+  TERRA.rio.forEach(a => { for (let i = 0; i < a.length; i += 2){
+    c.lonMin = Math.min(c.lonMin, a[i]);     c.lonMax = Math.max(c.lonMax, a[i]);
+    c.latMin = Math.min(c.latMin, a[i + 1]); c.latMax = Math.max(c.latMax, a[i + 1]);
+  }});
+  if (c.lonMax <= c.lonMin) return null;
+  /* 4% de folga: sem isso a cidade encosta nas quatro bordas e o mar some do quadro. */
+  const fx = (c.lonMax - c.lonMin) * 0.04, fy = (c.latMax - c.latMin) * 0.04;
+  return { lonMin: c.lonMin - fx, lonMax: c.lonMax + fx,
+           latMin: c.latMin - fy, latMax: c.latMax + fy };
+})();
+
+/* A baía e o mar são o que orienta o olho num mapa do Rio. Ancorados em lon/lat:
+   quem sai do quadro no zoom de uma CRE some sozinho. */
+const AGUAS = [
+  { nome: "Baía de Guanabara", lon: -43.170, lat: -22.830 },
+  { nome: "Oceano Atlântico",  lon: -43.330, lat: -23.035 }
+];
+
 function desenharMapa(lista){
   if (!lista.length) return `<p class="legenda-painel" style="padding:20px;">Sem microáreas com coordenada neste recorte.</p>`;
 
-  const lats = lista.map(m => m.lat), lons = lista.map(m => m.lon);
-  const latMin = Math.min(...lats), latMax = Math.max(...lats);
-  const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
-  const lat0 = (latMin + latMax) / 2 * Math.PI / 180;
-  const k = Math.cos(lat0);                       // equiretangular: corrige a longitude
-  const larguraGeo = Math.max(1e-6, (lonMax - lonMin) * k);
-  const alturaGeo  = Math.max(1e-6, latMax - latMin);
-  const W = 1000, margem = 46;
-  const H = Math.max(320, Math.round((W - 2 * margem) * alturaGeo / larguraGeo) + 2 * margem);
-  const px = lon => margem + ((lon - lonMin) * k / larguraGeo) * (W - 2 * margem);
-  const py = lat => margem + ((latMax - lat) / alturaGeo) * (H - 2 * margem);
+  /* Enquadramento: a cidade inteira mostra o município inteiro; um recorte de CRE
+     aproxima nas bolhas daquela CRE, e a silhueta continua por baixo, cortada. */
+  let base = CAIXA_RIO;
+  if (estado.cre || !base){
+    const lats = lista.map(m => m.lat), lons = lista.map(m => m.lon);
+    const folgaLon = Math.max(0.012, (Math.max(...lons) - Math.min(...lons)) * 0.09);
+    const folgaLat = Math.max(0.012, (Math.max(...lats) - Math.min(...lats)) * 0.09);
+    base = { lonMin: Math.min(...lons) - folgaLon, lonMax: Math.max(...lons) + folgaLon,
+             latMin: Math.min(...lats) - folgaLat, latMax: Math.max(...lats) + folgaLat };
+  }
+
+  /* Equiretangular com escala única nos dois eixos: a altura sai do aspecto real do
+     recorte, presa entre 340 e 560 para o painel não virar uma tira. O que sobra da
+     folga fica com a silhueta, que é justamente o contexto que se quer ver. */
+  const W = 1000, MARGEM = 12;
+  const k = Math.cos((base.latMin + base.latMax) / 2 * Math.PI / 180);
+  const larguraGeo = Math.max(1e-6, (base.lonMax - base.lonMin) * k);
+  const alturaGeo  = Math.max(1e-6, base.latMax - base.latMin);
+  const util = W - 2 * MARGEM;
+  const H = Math.round(Math.min(560, Math.max(340, util * alturaGeo / larguraGeo)) + 2 * MARGEM);
+  const escala = Math.min(util / larguraGeo, (H - 2 * MARGEM) / alturaGeo);
+  const cLon = (base.lonMin + base.lonMax) / 2 * k, cLat = (base.latMin + base.latMax) / 2;
+  const px = lon => W / 2 + (lon * k - cLon) * escala;
+  const py = lat => H / 2 - (lat - cLat) * escala;
+  const trilha = (a, fx, fy) => {
+    let d = "";
+    for (let i = 0; i < a.length; i += 2) d += (i ? "L" : "M") + fx(a[i]).toFixed(1) + "," + fy(a[i + 1]).toFixed(1);
+    return d + "Z";
+  };
+  const caminho = a => trilha(a, px, py);
 
   const met = METRICAS[estado.metrica];
   const vals = lista.map(met.campo);
@@ -5209,17 +5332,41 @@ function desenharMapa(lista){
     return 3 + 19 * Math.sqrt(v / maxAbs);
   };
 
+  const silhueta = `
+    <rect x="0" y="0" width="${W}" height="${H}" fill="var(--mapa-agua)"></rect>
+    <g fill="var(--mapa-vizinho)" stroke="var(--mapa-vizinho-linha)" stroke-width="1" stroke-linejoin="round">
+      ${TERRA.viz.map(a => `<path d="${caminho(a)}"></path>`).join("")}
+    </g>
+    <g class="municipio" fill="var(--mapa-terra)" stroke="var(--mapa-costa)" stroke-width="1.1" stroke-linejoin="round">
+      ${TERRA.rio.map(a => `<path d="${caminho(a)}"></path>`).join("")}
+    </g>`;
+
+  const rotulosAgua = AGUAS.map(a => {
+    const x = px(a.lon), y = py(a.lat);
+    if (x < 80 || x > W - 80 || y < 20 || y > H - 14) return "";
+    return `<text class="agua" x="${x.toFixed(0)}" y="${y.toFixed(0)}" text-anchor="middle">${esc(a.nome)}</text>`;
+  }).join("");
+
+  /* No zoom de uma CRE, as microáreas vizinhas ficam como pontos neutros: mostram que
+     o território continua depois da borda do recorte, sem entrar na escala de cor. */
+  const fora = estado.cre ? M.microareas
+    .filter(m => m.cre !== estado.cre && m.lat !== null)
+    .map(m => [px(m.lon), py(m.lat)])
+    .filter(([x, y]) => x > -10 && x < W + 10 && y > -10 && y < H + 10)
+    .map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2"
+      fill="var(--neutro-mapa)" fill-opacity=".6"></circle>`).join("") : "";
+
   const bolhas = lista.slice().sort((a, b) => raioDe(b) - raioDe(a)).map(m => {
     const r = raioDe(m);
     return `<circle data-micro="${esc(m.cod)}" cx="${px(m.lon).toFixed(1)}" cy="${py(m.lat).toFixed(1)}"
-      r="${r.toFixed(1)}" fill="${corDe(m)}" fill-opacity=".85" stroke="var(--surface)" stroke-width="1.6"
+      r="${r.toFixed(1)}" fill="${corDe(m)}" fill-opacity=".82" stroke="var(--mapa-terra)" stroke-width="1.2"
       class="${estado.microSel === m.cod ? "selecionado" : ""}"><title>Microárea ${esc(m.cod)}, ${esc(m.bairro)}</title></circle>`;
   }).join("");
 
   const pontos = estado.mostrarUnidades ? lista.flatMap(m => m.unidadesMapa
     .filter(u => temNum(u.lat))
     .map(u => `<circle data-unidade="${esc(u.desig7)}" cx="${px(n(u.lon)).toFixed(1)}" cy="${py(n(u.lat)).toFixed(1)}"
-      r="2" fill="var(--ink)" fill-opacity=".5"></circle>`)).join("") : "";
+      r="1.8" fill="var(--ink)" fill-opacity=".45"></circle>`)).join("") : "";
 
   /* legenda: degraus da rampa + escala de tamanho, sempre presentes */
   let legendaCor;
@@ -5237,9 +5384,37 @@ function desenharMapa(lista){
       <span>${fmt.format(Math.max(...vals))} ${esc(met.unidade)}</span></div>`;
   }
 
+  /* Mapa de localização: no recorte de uma CRE o quadro corta a cidade, e sem esta
+     miniatura ninguém sabe que pedaço do Rio está vendo. O retângulo é o próprio
+     enquadramento, obtido projetando os cantos do quadro de volta para lon/lat. */
+  let localizador = "";
+  if (estado.cre && CAIXA_RIO){
+    const largRio = (CAIXA_RIO.lonMax - CAIXA_RIO.lonMin) * k, altRio = CAIXA_RIO.latMax - CAIXA_RIO.latMin;
+    const iw = 176, ih = Math.round(iw * altRio / largRio), pad = 7;
+    const ix = W - iw - 2 * pad - 14, iy = H - ih - 2 * pad - 14;
+    const e = iw / largRio;
+    const qx = lon => ix + pad + (lon - CAIXA_RIO.lonMin) * k * e;
+    const qy = lat => iy + pad + (CAIXA_RIO.latMax - lat) * e;
+    const canto = (x, y) => [(cLon + (x - W / 2) / escala) / k, cLat + (H / 2 - y) / escala];
+    const [lonA, latA] = canto(0, 0), [lonB, latB] = canto(W, H);
+    const rx = Math.max(qx(lonA), ix + pad), ry = Math.max(qy(latA), iy + pad);
+    const rw = Math.min(qx(lonB), ix + pad + iw) - rx, rh = Math.min(qy(latB), iy + pad + ih) - ry;
+    localizador = `<g class="localizador" aria-hidden="true">
+      <rect class="moldura" x="${ix}" y="${iy}" width="${iw + 2 * pad}" height="${ih + 2 * pad}" rx="9"></rect>
+      <g fill="var(--mapa-terra)" stroke="var(--mapa-costa)" stroke-width=".7" stroke-linejoin="round">
+        ${TERRA.rio.map(a => `<path d="${trilha(a, qx, qy)}"></path>`).join("")}
+      </g>
+      <rect class="quadro" x="${rx.toFixed(1)}" y="${ry.toFixed(1)}"
+        width="${Math.max(5, rw).toFixed(1)}" height="${Math.max(5, rh).toFixed(1)}" rx="2"></rect>
+    </g>`;
+  }
+
   return `<svg viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="Mapa de bolhas do Rio de Janeiro: ${esc(met.nome)} por microárea. Os mesmos valores estão nas tabelas ao lado.">
-      <g>${pontos}</g><g id="camada-micro">${bolhas}</g>
+      aria-label="Mapa do município do Rio de Janeiro: uma bolha por microárea mostrando ${esc(met.nome)}. Os mesmos valores estão nas tabelas ao lado.">
+      ${silhueta}
+      <g>${rotulosAgua}</g>
+      <g>${fora}</g><g>${pontos}</g><g id="camada-micro">${bolhas}</g>
+      ${localizador}
     </svg>
     <div class="legenda">
       ${legendaCor}
@@ -5971,6 +6146,7 @@ function render(){
   const alvo = document.getElementById("conteudo");
   const desenha = VISTAS_RENDER[estado.vista] || vistaPainel;
   alvo.innerHTML = desenha();
+  esconderDica();
   if (vistaAnterior !== estado.vista){ window.scrollTo(0, 0); vistaAnterior = estado.vista; }
 }
 
@@ -6042,9 +6218,14 @@ function textoDica(cod){
       ${m.kmMediana !== null ? par("Vaga mais próxima", fmt1.format(m.kmMediana) + " km") : ""}
     </dl>`;
 }
+function esconderDica(){
+  dica.classList.remove("visivel");
+  dica.setAttribute("aria-hidden", "true");
+}
+document.addEventListener("scroll", esconderDica, { passive: true });
 document.addEventListener("pointermove", ev => {
   const alvo = ev.target.closest ? ev.target.closest("circle[data-micro]") : null;
-  if (!alvo){ dica.classList.remove("visivel"); dica.setAttribute("aria-hidden", "true"); return; }
+  if (!alvo){ esconderDica(); return; }
   dica.innerHTML = textoDica(alvo.dataset.micro);
   dica.classList.add("visivel"); dica.setAttribute("aria-hidden", "false");
   const r = dica.getBoundingClientRect();

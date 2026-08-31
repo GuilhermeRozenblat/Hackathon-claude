@@ -1,6 +1,13 @@
-<img src="Ze-mascot.jpeg" align="right" width="170" alt="Zé Matrícula, o mascote">
-
 # Zé Matrícula
+
+<p align="center">
+  <img src="Ze-mascot.jpeg" width="240" alt="Zé Matrícula, o mascote">
+</p>
+
+<p align="center">
+  <img src="claude-community.png" width="64" alt="Claude Community · Rio de Janeiro Impact Lab"><br>
+  <sub>Feito para o hackathon oficial da <b>Claude Community · Rio de Janeiro Impact Lab</b></sub>
+</p>
 
 Assistente da **Matrícula Rio**: uma conversa no lugar do formulário de inscrição em creche
 municipal. Reconhece o cadastro do ano passado, faz as perguntas da régua de prioridade
@@ -18,7 +25,9 @@ troca de adaptador, não reescrita.
 
 ## Usar o bot em três minutos
 
-<img src="Ze-telegram-link.jpeg" align="right" width="140" alt="QR code do @ZeMatricula_bot">
+<p align="center">
+  <img src="Ze-telegram-link.jpeg" width="340" alt="QR code do @ZeMatricula_bot">
+</p>
 
 1. Abra **[t.me/ZeMatricula_bot](https://t.me/ZeMatricula_bot)**, ou aponte a câmera para o QR.
 2. `/start`. A primeira tela pergunta sobre a IA: **toque em "Seguir sem IA"**. O cadastro
