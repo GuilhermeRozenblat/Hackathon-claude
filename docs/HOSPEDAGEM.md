@@ -178,12 +178,12 @@ abaixo já estão no repositório. Você não precisa fazer nada, é só saber q
 |---|---|---|
 | **Dormir sem tráfego** | `sleepApplication: true` no `railway.json` | O serviço hiberna sozinho e acorda no primeiro request. É a maior economia das quatro |
 | **Egresso** | gzip em memória + `Cache-Control: max-age=3600` | Uma visita ao painel caiu de **951 KB para 278 KB**. Com o cache, o F5 não baixa nada |
-| **RAM** | sem `[audio]` no build | **36 MB de RSS**. Com o Whisper seriam ~170 MB de biblioteca mais 460 MB de modelo em disco |
 | **CPU ociosa** | `OUTBOX_INTERVALO_S=60` (era 5s) | 12x menos ciclos de worker. Cada ciclo é uma consulta ao backend e uma ao banco |
 
-Nesse tamanho o serviço cabe folgado no crédito mensal do plano Hobby. Confira o número
-real em **Usage**, no painel da Railway, porque o preço por GB e por vCPU muda, e não vale
-decorar aqui um valor que envelhece.
+`[audio]` está no build e `WHISPER=1` ligado: RSS subiu de 36 MB para ~170 MB de biblioteca
+mais o modelo (~460 MB, baixado uma vez no primeiro boot). Confira o número real em **Usage**,
+no painel da Railway, porque o preço por GB e por vCPU muda, e não vale decorar aqui um valor
+que envelhece.
 
 ### O preço de deixar dormir, e é real
 

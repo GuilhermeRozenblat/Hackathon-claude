@@ -21,10 +21,10 @@ WORKDIR /app
 # As dependências primeiro, em camada própria: mudar código do bot não reinstala psycopg.
 COPY pyproject.toml README.md ./
 COPY creche_bot/__init__.py ./creche_bot/
-# `[ia]` entra porque `/ia` valida a chave da pessoa com uma chamada real. `[audio]` NÃO:
-# são ~170 MB de biblioteca e 460 MB de modelo, e áudio vira "pode escrever?" sem eles.
-# `[dev]` também não — pytest e ruff não sobem para produção. Ver docs/HOSPEDAGEM.md §6.
-RUN pip install --no-cache-dir -e ".[ia]"
+# `[ia]` entra porque `/ia` valida a chave da pessoa com uma chamada real. `[audio]` também:
+# ~170 MB de biblioteca, e o modelo (~460 MB) baixa no primeiro boot via `WHISPER=1`.
+# `[dev]` não sobe — pytest e ruff não vão para produção. Ver docs/HOSPEDAGEM.md §6.
+RUN pip install --no-cache-dir -e ".[ia,audio]"
 
 # O código e os dados, nomeados um a um.
 COPY creche_bot/ ./creche_bot/
