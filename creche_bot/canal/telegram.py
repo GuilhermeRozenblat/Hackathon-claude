@@ -160,6 +160,17 @@ class Telegram:
         )
 
     # ----------------------------------------------------------------- saída
+    def avisar_processando(self, id_externo: str) -> None:
+        """"Zé Matrícula está digitando…" enquanto o núcleo processa. Cold start do
+        serviço hospedado e transcrição de áudio levam alguns segundos calados; isto dá
+        um sinal de vida sem gastar o limite de 1 msg/s. Melhor esforço: falhar aqui não
+        pode atrasar nem derrubar a resposta de verdade.
+        """
+        try:
+            self._chamar("sendChatAction", 5, chat_id=id_externo, action="typing")
+        except ErroTelegram:
+            pass
+
     def enviar(self, id_externo: str, msg: MensagemSaida) -> None:
         if _debug():
             log.info("→ %s · %s", id_externo, _resumo_saida(msg))
@@ -193,6 +204,7 @@ class Telegram:
                         continue
                     if _debug():
                         log.info("← %s · %s", entrada.id_externo, _resumo_entrada(entrada))
+                    self.avisar_processando(entrada.id_externo)
                     if (resposta := processar(entrada)) is not None:
                         self.enviar(entrada.id_externo, resposta)
                 except Exception:

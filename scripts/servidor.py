@@ -219,6 +219,7 @@ class Servidor(Painel):
         entrada = self.canal.receber(update)
         if entrada is None:
             return
+        self.canal.avisar_processando(entrada.id_externo)
         resposta = self.nucleo.processar(entrada)
         if resposta is not None:
             self.canal.enviar(entrada.id_externo, resposta)

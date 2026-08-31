@@ -37,6 +37,9 @@ class CanalFalso:
     def enviar(self, id_externo: str, msg: MensagemSaida) -> None:
         self.enviadas.append((id_externo, msg))
 
+    def avisar_processando(self, id_externo: str) -> None:
+        pass
+
 
 class NucleoFalso:
     def __init__(self) -> None:
