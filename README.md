@@ -193,8 +193,4 @@ faltam duas coisas, o retry com backoff no outbox e o cofre de documentos.
 | [BANCO.md](docs/BANCO.md) · [TELEGRAM.md](docs/TELEGRAM.md) · [HOSPEDAGEM.md](docs/HOSPEDAGEM.md) | Configurar o Supabase · criar o bot · publicar |
 | [CLAUDE.md](CLAUDE.md) · [MODULOS.md](docs/MODULOS.md) | As regras invioláveis para qualquer agente · quem trabalha em quê |
 
-Vários agentes mexem aqui ao mesmo tempo, e cada um só escreve nos arquivos que o `CLAUDE.md`
-da sua pasta lista como seus: [canal](creche_bot/canal/CLAUDE.md) ·
-[conversa](creche_bot/conversa/CLAUDE.md) · [ia](creche_bot/ia/CLAUDE.md) ·
-[dados](creche_bot/dados/CLAUDE.md) · [backend](creche_bot/backend/CLAUDE.md) ·
-[notificacao](creche_bot/notificacao/CLAUDE.md) · [dominio](creche_bot/dominio/CLAUDE.md)
+
