@@ -80,8 +80,14 @@ REMOVIDA = ("Apaguei sua chave. A IA está desligada, e o cadastro continua func
 
 # Pergunta solta sem IA ligada. Cair calado no roteiro fazia a pergunta virar "não
 # entendi" no campo seguinte, que é a pior resposta possível para quem pediu ajuda.
-SEM_IA = ("Pergunta solta eu só respondo com a IA ligada, e por enquanto ela roda com a "
-          "chave da própria pessoa, e /ia explica como ligar.\n\n"
+#
+# Começa reconhecendo que a pergunta chegou porque este texto também é a resposta de quem
+# perguntou FALANDO: a transcrição é local e roda sem chave nenhuma, então o áudio foi
+# ouvido e entendido, e só a resposta livre é que depende da IA. Recusar seco fazia
+# parecer que o bot tinha ignorado o áudio, que é o contrário do que aconteceu.
+SEM_IA = ("Recebi sua pergunta, mas responder pergunta solta eu só consigo com a IA "
+          "ligada, e por enquanto ela roda com a chave da própria pessoa, e /ia explica "
+          "como ligar.\n\n"
           "Para falar com gente, ligue 1746. Podemos continuar de onde paramos?")
 
 # Anexado pela máquina quando a chave da pessoa falha NO MEIO da conversa. O cadastro não

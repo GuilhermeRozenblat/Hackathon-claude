@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="assets/claude-community.png" alt="Selo da Claude Community · Rio de Janeiro Impact Lab" width="88">
+<img src="assets/claude-community.png" alt="Selo da Claude Community · Rio de Janeiro Impact Lab" width="52">
 
-### Feito para o hackathon oficial da Claude Community · Rio de Janeiro Impact Lab
+<sub>Feito para o **hackathon oficial da Claude Community · Rio de Janeiro Impact Lab**</sub>
 
-<img src="assets/ze-mascot.png" alt="Zé Matrícula, o mascote: uma gaivota de chapéu de palha, óculos e mochila de escola" width="150">
+<br>
+
+<img src="assets/ze-mascot.png" alt="Zé Matrícula, o mascote: uma gaivota de chapéu de palha, óculos e mochila de escola" width="170">
 
 # Zé Matrícula
 
@@ -45,11 +47,15 @@ troca de adaptador, não reescrita.
 
 ## Testar em três minutos
 
-<p align="center">
-  <img src="assets/ze-telegram-qr.png" alt="QR code que abre o @ZeMatricula_bot no Telegram" width="190">
-</p>
+<div align="center">
 
-1. Abra **[t.me/ZeMatricula_bot](https://t.me/ZeMatricula_bot)**, ou aponte a câmera para o QR.
+<img src="assets/ze-telegram-qr.png" alt="QR code que abre o @ZeMatricula_bot no Telegram" width="300">
+
+### Aponte a câmera. O QR abre o [@ZeMatricula_bot](https://t.me/ZeMatricula_bot)
+
+</div>
+
+1. Abra o bot pelo QR acima, ou pelo link **[t.me/ZeMatricula_bot](https://t.me/ZeMatricula_bot)**.
 2. `/start`. A primeira tela pergunta sobre a IA: toque em **"Seguir sem IA"**. O cadastro
    funciona igual com os textos à mão, e ninguém precisa de chave para avaliar o bot.
 3. `/demo`, e escolha uma família. Cada uma entra na conversa já na tela que vale ver, sem
@@ -192,11 +198,3 @@ da sua pasta lista como seus: [canal](creche_bot/canal/CLAUDE.md) ·
 [conversa](creche_bot/conversa/CLAUDE.md) · [ia](creche_bot/ia/CLAUDE.md) ·
 [dados](creche_bot/dados/CLAUDE.md) · [backend](creche_bot/backend/CLAUDE.md) ·
 [notificacao](creche_bot/notificacao/CLAUDE.md) · [dominio](creche_bot/dominio/CLAUDE.md)
-
----
-
-<div align="center">
-
-<sub>Feito para o hackathon oficial da Claude Community · Rio de Janeiro Impact Lab</sub>
-
-</div>
