@@ -1,10 +1,9 @@
 <div align="center">
 
-<img src="assets/claude-community.png" alt="Selo da Claude Community · Rio de Janeiro Impact Lab" width="52">
-
-<sub>Feito para o **hackathon oficial da Claude Community · Rio de Janeiro Impact Lab**</sub>
-
-<br>
+<h4 align="center">
+  <img src="assets/claude-community.png" alt="Selo da Claude Community · Rio de Janeiro Impact Lab" width="96" align="middle">
+  &nbsp;&nbsp;Hackathon oficial da Claude Community · Rio de Janeiro Impact Lab
+</h4>
 
 <img src="assets/ze-mascot.png" alt="Zé Matrícula, o mascote: uma gaivota de chapéu de palha, óculos e mochila de escola" width="170">
 
