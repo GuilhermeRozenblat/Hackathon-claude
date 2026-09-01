@@ -10,7 +10,7 @@
 
 **A inscrição em creche municipal do Rio, feita por conversa.**
 
-Assistente da Matrícula Rio. Reconhece o cadastro do ano passado, faz as perguntas da régua de
+Assistente da Matrícula Rio via Chat de IA. Reconhece o cadastro do ano passado, faz as perguntas da régua de
 prioridade vigente, mostra as creches perto de casa com os números reais da rede, cobra o
 documento que falta e avisa a cada mudança de etapa.
 
