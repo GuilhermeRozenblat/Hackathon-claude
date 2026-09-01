@@ -140,7 +140,12 @@ def _abrir_educacao_especial(p: Passo, prefixo: str = "") -> MensagemSaida:
     if "tem_especial" in p.dados:
         if p.dados["tem_especial"] != "sim":
             return _abrir_familia(p, prefixo)
-        criterio = _do_grupo(p, "8.2")[0]
+        # Régua sem o grupo 8.2 é o caso que D15 existe para suportar: entre 2023 e 2024
+        # só 3 das 13 perguntas sobreviveram. Sem a guarda, `[0]` estoura IndexError no
+        # primeiro turno da régua de quem declarou deficiência no bloco 2.
+        if not (grupo := _do_grupo(p, "8.2")):
+            return _abrir_familia(p, prefixo)
+        criterio = grupo[0]
         _marcar(p, criterio["codigo"])
         pedido = _pedir_anexo(p, criterio, seguinte="CRIT_FAMILIA")
         return replace(pedido, texto=prefixo + pedido.texto)
@@ -178,7 +183,9 @@ def educacao_especial(p: Passo) -> MensagemSaida:
     if p.msg.escolha == "nao":
         return _abrir_familia(p)
 
-    criterio = _do_grupo(p, "8.2")[0]
+    if not (grupo := _do_grupo(p, "8.2")):
+        return _abrir_familia(p)
+    criterio = grupo[0]
     _marcar(p, criterio["codigo"])
     return _pedir_anexo(p, criterio, seguinte="CRIT_FAMILIA")
 

@@ -53,34 +53,35 @@ def test_carrega_as_unidades_do_mapa():
 
 # ------------------------------------------------------------------- a chance
 def test_chance_e_a_fracao_atendida_no_ano_base():
-    assert chance_em(unidade(demanda=100, confirmados=25), False) == pytest.approx(0.25)
+    assert chance_em(unidade(demanda=100, confirmados=25)) == pytest.approx(0.25)
 
 
 def test_chance_nunca_e_zero_nem_um():
     """Vaga ociosa hoje não garante vaga em fevereiro, e fila cheia no ano passado não
     fecha a porta deste ano. Os dois extremos seriam promessa, em direções opostas."""
-    assert chance_em(unidade(demanda=1000, confirmados=0), False) == CHANCE_MIN
-    assert chance_em(unidade(demanda=10, confirmados=500), False) == CHANCE_MAX
+    assert chance_em(unidade(demanda=1000, confirmados=0)) == CHANCE_MIN
+    assert chance_em(unidade(demanda=10, confirmados=10)) == CHANCE_MAX
 
 
 def test_sem_demanda_no_ano_base_nao_ha_chance():
     """Creche que ninguém pediu não vale 0%, e sim "não dá para estimar"."""
-    assert chance_em(unidade(demanda=0, confirmados=0), False) is None
+    assert chance_em(unidade(demanda=0, confirmados=0)) is None
 
 
-def test_vaga_aberta_agora_levanta_o_piso():
-    """Fato do presente vale mais que a média do ano passado, e mesmo assim não vira 100%."""
-    sem_vaga = chance_em(unidade(demanda=100, confirmados=5), False)
-    com_vaga = chance_em(unidade(demanda=100, confirmados=5), True)
-    assert com_vaga > sem_vaga
-    assert com_vaga <= CHANCE_MAX
+def test_vaga_ociosa_nao_entra_na_estimativa():
+    """A chance é `confirmados ÷ demanda`, e só. Um piso por vaga aberta fazia uma
+    unidade de razão real 14% sair como "chance estimada 80% (base 2025)": número que
+    não é a fórmula, não tem ano próprio, e ainda suprimia a linha de concorrência que o
+    contradizia. Vaga aberta agora continua na tela pelo 🟢, por conta própria."""
+    assert chance_em(unidade(demanda=100, confirmados=5)) == pytest.approx(0.05)
 
 
-def test_confirmados_de_outras_opcoes_nao_estoura_a_chance():
+def test_confirmados_de_outras_opcoes_nao_viram_chance():
     """`cf` soma quem entrou por 2ª/3ª opção: 214 das 820 unidades reais têm
-    confirmados > demanda_1a (ex.: CM BETINHO, d1=3 cf=5). Sem o teto, isso viraria
-    "chance estimada" acima de 100% na tela da família."""
-    assert chance_em(unidade(demanda=3, confirmados=5), False) == CHANCE_MAX
+    confirmados > demanda_1a (ex.: CM BETINHO, d1=3 cf=5). A razão deixa de ser "quem
+    pediu aqui e conseguiu", então não sai número nenhum — a mesma guarda de
+    `candidatos_por_vaga`. Antes, o teto travava em 95% e a tela lia quase-certeza."""
+    assert chance_em(unidade(demanda=3, confirmados=5)) is None
 
 
 # ------------------------------------------------------------- famílias por vaga

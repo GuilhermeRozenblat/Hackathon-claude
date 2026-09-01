@@ -7,6 +7,7 @@ de inscrição, e alcança as ~62 mil famílias que usaram o portal normalmente.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 
 from creche_bot.backend.porta import BackendIndisponivel
@@ -132,7 +133,8 @@ def consentimento(p: Passo) -> MensagemSaida:
     from creche_bot.conversa.maquina import entrar
 
     p.ir("CADASTRO")
-    return entrar(p, "CADASTRO")
+    tela = entrar(p, "CADASTRO")
+    return replace(tela, texto=f"{p.txt('consentimento_ok')}\n\n{tela.texto}")
 
 
 def retomar(p: Passo) -> MensagemSaida:

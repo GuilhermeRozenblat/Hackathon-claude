@@ -129,6 +129,9 @@ TEXTOS = {
                        "e já fecharam.\n\nQuer que eu te avise quando o próximo abrir?",
     "aviso_ligado": "Combinado! Vou te avisar por aqui.",
     "preciso_autorizacao": "Preciso da sua autorização para continuar 🤝",
+    # Prefixo, não tela: entra colado na primeira pergunta do cadastro. Toda resposta da
+    # família volta confirmada, e o toque no "Autorizo" não é exceção.
+    "consentimento_ok": "Autorização registrada ✅",
 
     # ------------------------------------------------------ blocos 1 a 3
     "atendente": "Vou te passar para um atendente da CRE, que resolve melhor que eu. "
@@ -152,6 +155,8 @@ TEXTOS = {
     "cep_nao_achado": "Não achei esse CEP. Pode conferir? Se estiver certo, me chama "
                       "que a gente resolve de outro jeito.",
     "confere_endereco": "Confere se é aqui?\n\n📍 {endereco}",
+    # Prefixo da pergunta do horário: quem tocou em "É isso" vê que o bot registrou.
+    "endereco_confirmado": "Endereço confirmado ✅",
 
     # ------------------------------------------------------ bloco 7 e 10
     "pedir_horario": "Você precisa de vaga em tempo integral (dia todo) ou parcial "

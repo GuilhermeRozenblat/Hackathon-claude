@@ -12,8 +12,11 @@ vieram nos blocos 1 e 3, e o telefone continua sendo perguntado: é por ele que 
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from creche_bot.backend.porta import BackendIndisponivel
 from creche_bot.canal.tipos import Botao, MensagemSaida
+from creche_bot.conversa.passos.formulario_passo import eco_escolha
 from creche_bot.conversa.sessao import Passo
 from creche_bot.dominio.tipos import CadastroAnterior, Endereco
 
@@ -92,4 +95,6 @@ def cadastro_anterior(p: Passo) -> MensagemSaida:
     p.dados.update({c: v for c, v in anterior.items() if v is not None})
 
     p.ir("CADASTRO")
-    return entrar(p, "CADASTRO")
+    tela = entrar(p, "CADASTRO")
+    rotulo = {b.id: b.rotulo for b in BOTOES_CADASTRO}[escolha]
+    return replace(tela, texto=eco_escolha(rotulo) + tela.texto)

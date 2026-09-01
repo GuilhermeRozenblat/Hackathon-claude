@@ -84,10 +84,6 @@ RAIOS_KM = (2.0, 3.5, 5.0)
 CHANCE_MIN = 0.03
 CHANCE_MAX = 0.95
 
-# Vaga aberta agora no grupamento certo é fato do presente, e vale mais que a média do ano
-# passado: o piso reconhece isso sem prometer o teto.
-CHANCE_COM_VAGA_OCIOSA = 0.80
-
 # Quantas creches vizinhas votam na microárea da família. Uma só erra na divisa.
 VIZINHAS_DA_REGIAO = 7
 
@@ -180,21 +176,27 @@ def _microareas() -> dict[str, dict[str, str]]:
     return {linha["cod"]: linha for linha in _linhas("mapa_microareas.csv")}
 
 
-def chance_em(unidade: _Unidade, tem_vaga_ociosa: bool) -> float | None:
-    """Aproximação da fração de quem pediu esta creche como 1ª opção em 2025 e foi
-    atendido, aproximação porque `confirmados` também soma quem entrou por 2ª ou 3ª
-    opção, então a razão passa de 100% em ~1 a cada 4 unidades. É por isso que o
-    resultado é sempre travado abaixo do teto: o número cru não é confiável acima dele.
+def chance_em(unidade: _Unidade) -> float | None:
+    """`confirmados ÷ demanda de 1ª opção` na unidade, no ano-base. Nada além disso.
 
     `None` quando a unidade não teve demanda no ano-base: sem denominador não há
     estimativa, e 0% seria mentira sobre uma creche que simplesmente não foi disputada.
+
+    `None` também quando `confirmados` supera `demanda_1a` — a mesma guarda de
+    `candidatos_por_vaga`, pela mesma razão: a unidade recebeu criança que pediu outra
+    creche em 1º lugar, então a razão não é mais "quem pediu aqui e conseguiu". Antes
+    disso, o teto de 0,95 travava essas 214 unidades numa quase-certeza inventada, e
+    `projecao.py` gravava a chance com `ano_referencia` NULL, porque o ano vem do
+    `Concorrencia` que já era `None` nesse caso. As duas funções agora concordam.
+
+    NÃO existe piso por vaga ociosa. O piso de 0,80 fazia uma unidade de razão real 14%
+    aparecer como "chance estimada 80% (base 2025)" — um número que não é a fórmula, não
+    tem ano próprio, e ainda suprimia a linha de concorrência que o contradizia. Vaga
+    aberta agora é fato do presente e continua na tela por conta própria, pelo 🟢.
     """
-    if unidade.demanda_1a <= 0:
+    if unidade.demanda_1a <= 0 or unidade.confirmados > unidade.demanda_1a:
         return None
-    bruta = unidade.confirmados / unidade.demanda_1a
-    if tem_vaga_ociosa:
-        bruta = max(bruta, CHANCE_COM_VAGA_OCIOSA)
-    return min(CHANCE_MAX, max(CHANCE_MIN, bruta))
+    return min(CHANCE_MAX, max(CHANCE_MIN, unidade.confirmados / unidade.demanda_1a))
 
 
 def candidatos_por_vaga(unidade: _Unidade) -> Concorrencia | None:
@@ -246,7 +248,7 @@ class BackendMapa(BackendMock):
                 lat=u.lat, lng=u.lon, grupamento=grupamento, horario=horario,
                 distancia_km=round(km, 2), vaga_ociosa=tem_vaga,
                 concorrencia=candidatos_por_vaga(u),
-                chance=chance_em(u, tem_vaga),
+                chance=chance_em(u),
                 referencia=u.bairro, polo=u.microarea,
                 horario_atendimento="Confirme na unidade"))
         return sugestoes

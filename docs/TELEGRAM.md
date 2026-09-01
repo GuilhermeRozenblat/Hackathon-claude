@@ -1,15 +1,15 @@
 # Configurar o bot no Telegram
 
-10 minutos, sem escrever código. Faça **um bot por desenvolvedor**: dois processos com o
+10 minutos, sem escrever código. Faça um bot por desenvolvedor: dois processos com o
 mesmo token dão `409 Conflict` e um derruba o outro.
 
 ## 1. Criar
 
 No [@BotFather](https://t.me/BotFather), `/newbot`. Ele pede o nome (livre, aparece no topo do
-chat) e o username (único no Telegram inteiro e **tem que terminar em `bot`**), e responde com
+chat) e o username (único no Telegram inteiro, e tem que terminar em `bot`), e responde com
 o token: `8123456789:AAH...`.
 
-**O token é segredo**: quem o tem controla o bot. Se vazar, `/revoke`.
+O token é segredo: quem o tem controla o bot. Se vazar, `/revoke`.
 
 ## 2. Desligar grupos, antes de qualquer teste
 
@@ -23,28 +23,27 @@ contexto com terceiros. O bot é 1:1, e só. `make verificar` imprime
 
 ## 3. Vestir o bot
 
-`/mybots` → seu bot → **Edit Bot**:
+`/mybots` → seu bot → Edit Bot:
 
-- **Description** (tela vazia, antes do primeiro `/start`):
+- Description (tela vazia, antes do primeiro `/start`):
   > Oi! Eu te ajudo a inscrever seu filho ou filha numa creche perto de casa. A gente faz
   > junto, no seu ritmo, e eu te aviso de cada novidade. 💚
-- **About** (perfil, 120 caracteres):
+- About (perfil, 120 caracteres):
   > Ajudo famílias a conseguir vaga em creche. Rapidinho e sem burocracia.
-- **Botpic**: imagem quadrada. Reconhecimento visual importa quando a pessoa volta semanas
+- Botpic: imagem quadrada. Reconhecimento visual importa quando a pessoa volta semanas
   depois.
-- **Commands**: cole exatamente:
+- Commands: cole exatamente:
 
 ```
 start - Começar ou retomar minha inscrição
 status - Ver como está minha inscrição
-ia - Ligar a conversa com IA (chave própria)
-ajuda - Falar com uma pessoa
+ajuda - Ver os comandos e o telefone do 1746
 apagar - Apagar meus dados
 ```
 
-`apagar` não é enfeite: é o direito de eliminação da LGPD, e deixá-lo visível no menu é a forma
-honesta de oferecer. `ia` liga, troca ou remove a chave da Anthropic de quem conversa, e o bot
-roda inteiro sem ela ([D20](DECISOES.md)).
+O `apagar` não é enfeite: é o direito de eliminação da LGPD, e deixá-lo visível no menu é a
+forma honesta de oferecer. Fora do menu ficam `/ia`, `/demo` e `/avancar`. Os três funcionam e
+o `/ajuda` os anuncia, mas o menu está em linguagem de família e eles não estão.
 
 ## 4. Rodar
 

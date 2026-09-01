@@ -135,3 +135,26 @@ def test_nenhuma_variavel_carrega_dado_sensivel(cenario):
         texto = " ".join(str(v) for v in evento.variaveis.values()).lower()
         for proibido in ("cpf", "nis", "violência", "deficiência", "preso"):
             assert proibido not in texto
+
+
+# ------------------------------------------------------- o botão da push tem dono
+def test_todo_botao_de_notificacao_e_tratado_pela_conversa():
+    """Botão de push é o único do sistema sem tela por trás.
+
+    Ele chega dias ou meses depois — a convocação de junho responde a uma inscrição de
+    março —, quando a sessão de 72h já expirou e o despacho por estado não alcança nada.
+    Sem dono, o toque em "Confirmar vaga" caía em `INICIO` e a família recebia a saudação
+    com o prazo correndo. Este teste falha no dia em que alguém acrescentar um botão novo
+    ao catálogo e esquecer de dizer para onde ele leva.
+    """
+    from creche_bot.conversa.maquina import DA_NOTIFICACAO
+    from creche_bot.notificacao.catalogo import renderizar
+    from creche_bot.notificacao.chaves import VARIAVEIS, ChaveTemplate
+
+    tratados = set(DA_NOTIFICACAO) | {"retomar"}   # `retomar` entra junto do /start
+    for chave in ChaveTemplate:
+        msg = renderizar(chave, dict.fromkeys(VARIAVEIS[chave], "x"))
+        for botao in msg.botoes:
+            assert botao.id in tratados, (
+                f"{chave.name} emite o botão {botao.id!r}, que nenhum estado trata: "
+                "quem tocar nele recebe a saudação inicial")

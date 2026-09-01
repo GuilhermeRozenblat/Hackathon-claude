@@ -11,6 +11,7 @@ A família vê o bairro uma vez só: para confirmar, nunca para digitar.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from creche_bot.backend.porta import BackendIndisponivel
 from creche_bot.canal.tipos import Botao, Local, MensagemSaida
@@ -101,7 +102,8 @@ def confirmar(p: Passo) -> MensagemSaida:
     from creche_bot.conversa.passos.escolas import pedir_horario
 
     if p.msg.escolha == "confirma":
-        return pedir_horario(p)
+        tela = pedir_horario(p)
+        return replace(tela, texto=f"{p.txt('endereco_confirmado')}\n\n{tela.texto}")
 
     if p.msg.escolha == "corrige":
         p.dados.pop("endereco", None)

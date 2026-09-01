@@ -4555,7 +4555,6 @@ const BOT = {
   RAIOS_KM: [2.0, 3.5, 5.0],   // 82,9% de quem trocou de creche andou até 2 km
   CHANCE_MIN: 0.03,            // nunca 0: fila cheia no ano passado não fecha a porta
   CHANCE_MAX: 0.95,            // nunca 1: vaga hoje não garante vaga em fevereiro
-  CHANCE_COM_VAGA_OCIOSA: 0.80,
   VIZINHAS_DA_REGIAO: 7,       // uma vizinha só erra na divisa
   N_ESCOLAS: 3,                // limite de botões do WhatsApp, valendo já no Telegram
   // De `conversa/passos/escolas.py`: abaixo de 1,5 "N famílias por vaga" arredonda para 1
@@ -4573,13 +4572,13 @@ function kmEntre(lat1, lon1, lat2, lon2){
   return 2 * 6371 * Math.asin(Math.sqrt(a));
 }
 
-/* chance = confirmados ÷ demanda de 1ª opção, com piso, teto e o piso de vaga aberta.
-   `null` sem denominador: 0% seria mentira sobre creche que ninguém disputou. */
-function chanceEm(u, temVagaOciosa){
-  if (u.d1 <= 0) return null;
-  let bruta = u.cf / u.d1;
-  if (temVagaOciosa) bruta = Math.max(bruta, BOT.CHANCE_COM_VAGA_OCIOSA);
-  return Math.min(BOT.CHANCE_MAX, Math.max(BOT.CHANCE_MIN, bruta));
+/* chance = confirmados ÷ demanda de 1ª opção, com piso e teto. Nada além disso.
+   `null` sem denominador (0% seria mentira sobre creche que ninguém disputou) e `null`
+   quando confirmados passa a demanda, a mesma guarda de `candidatosPorVaga`: ali a razão
+   não é mais "quem pediu aqui e conseguiu". Espelha `chance_em` de backend/mapa.py. */
+function chanceEm(u){
+  if (u.d1 <= 0 || u.cf > u.d1) return null;
+  return Math.min(BOT.CHANCE_MAX, Math.max(BOT.CHANCE_MIN, u.cf / u.d1));
 }
 
 /* Famílias por vaga preenchida em 2025. `null` quando confirmados passa a demanda de
@@ -5711,14 +5710,14 @@ function vistaCalculos(){
           [cod + (cod === reg.micro.cod ? " ◀ vence" : ""), fmt.format(n2)]))}
         <div class="tiles" style="margin-top:12px;">
           ${tile("Demanda 1ª opção", fmt.format(reg.micro.demanda), `microárea ${reg.micro.cod}`)}
-          ${tile("Atendidos", fmt.format(reg.micro.conf), `${pct(reg.micro.conf, reg.micro.demanda)} da demanda`, "var(--brand)")}
+          ${tile("Atendidos", fmt.format(Math.min(reg.micro.demanda, reg.micro.conf)), `${pct(Math.min(reg.micro.demanda, reg.micro.conf), reg.micro.demanda)} da demanda`, "var(--brand)")}
           ${tile("Ainda na fila", fmt.format(reg.micro.espera), "em " + BOT.ANO_BASE, "var(--fila)")}
           ${tile("Vagas ociosas", fmt.format(reg.micro.ociosas), "critério estrito", "var(--ociosa)")}
         </div>
         <p class="legenda-painel" style="margin-top:10px;">É isto que vira a frase
         “na região de <strong>${esc(reg.bairro)}</strong>, em <strong>${BOT.ANO_BASE}</strong>,
         ${fmt.format(reg.micro.demanda)} famílias pediram creche e
-        ${fmt.format(reg.micro.conf)} conseguiram”. Sem o ano, viraria previsão sobre o
+        ${fmt.format(Math.min(reg.micro.demanda, reg.micro.conf))} conseguiram”. Sem o ano, viraria previsão sobre o
         processo de agora, que é justamente o que o bot não pode dizer.</p>
       </div>
     </div>
@@ -5733,21 +5732,23 @@ function cartaoConta(x, grup){
   const vagasNoGrup = u.ociosas[grup] || 0;
   const temVaga = vagasNoGrup > 0;
   const bruta = u.d1 > 0 ? u.cf / u.d1 : null;
-  const comPiso = bruta === null ? null : (temVaga ? Math.max(bruta, BOT.CHANCE_COM_VAGA_OCIOSA) : bruta);
-  const final = chanceEm(u, temVaga);
+  const final = chanceEm(u);
   const conc = candidatosPorVaga(u);
-  const travou = final !== null && comPiso !== null
-    && (comPiso > BOT.CHANCE_MAX || comPiso < BOT.CHANCE_MIN);
+  const travou = final !== null && bruta !== null
+    && (bruta > BOT.CHANCE_MAX || bruta < BOT.CHANCE_MIN);
 
   const passosChance = bruta === null
     ? [["sem demanda de 1ª opção em " + BOT.ANO_BASE, "a conta não roda, e o bot não mostra percentual"]]
+    : final === null
+    ? [[`crua = confirmados ÷ demanda = ${fmt.format(u.cf)} ÷ ${fmt.format(u.d1)}`,
+        fmt1.format(bruta * 100) + "%"],
+       ["confirmados passa a demanda: a unidade recebeu quem pediu outra creche em 1º lugar",
+        "a conta não é mais “quem pediu aqui e conseguiu” → sem percentual"]]
     : [
         [`crua = confirmados ÷ demanda = ${fmt.format(u.cf)} ÷ ${fmt.format(u.d1)}`,
          fmt1.format(bruta * 100) + "%"],
-        temVaga
-          ? [`piso de vaga aberta: máx(crua; ${Math.round(BOT.CHANCE_COM_VAGA_OCIOSA * 100)}%), ${fmt.format(vagasNoGrup)} vaga(s) em ${grup} agora`,
-             fmt1.format(comPiso * 100) + "%"]
-          : [`sem vaga aberta em ${grup} hoje: o piso de ${Math.round(BOT.CHANCE_COM_VAGA_OCIOSA * 100)}% não se aplica`, "—"],
+        [`vaga aberta em ${grup} agora: ${fmt.format(vagasNoGrup)}`,
+         temVaga ? "aparece na linha como 🟢, e NÃO entra na estimativa" : "nenhuma"],
         [`limites: entre ${Math.round(BOT.CHANCE_MIN * 100)}% e ${Math.round(BOT.CHANCE_MAX * 100)}%`,
          (travou ? "travou → " : "não travou → ") + Math.round(final * 100) + "%"]
       ];
@@ -5841,8 +5842,8 @@ function reguaDoEstimador(){
   const us = M.unidadesBot;
   const semDenominador = us.filter(u => u.d1 <= 0).length;
   const acima = us.filter(u => u.d1 > 0 && u.cf > u.d1);
-  const noTeto = us.filter(u => { const c = chanceEm(u, false); return c !== null && c >= BOT.CHANCE_MAX; }).length;
-  const noPiso = us.filter(u => { const c = chanceEm(u, false); return c !== null && c <= BOT.CHANCE_MIN; }).length;
+  const noTeto = us.filter(u => { const c = chanceEm(u); return c !== null && c >= BOT.CHANCE_MAX; }).length;
+  const noPiso = us.filter(u => { const c = chanceEm(u); return c !== null && c <= BOT.CHANCE_MIN; }).length;
   const semConc = us.filter(u => candidatosPorVaga(u) === null).length;
   const pior = acima.slice().sort((a, b) => (b.cf / b.d1) - (a.cf / a.d1))[0];
 
@@ -5851,7 +5852,7 @@ function reguaDoEstimador(){
   const hist = faixas.map((f, k) => ({
     nome: `${Math.round(f[0] * 100)}% a ${Math.round(Math.min(1, f[1]) * 100)}%`,
     cor: rAzul[2 + k],
-    valor: us.filter(u => { const c = chanceEm(u, false); return c !== null && c >= f[0] && c < f[1]; }).length
+    valor: us.filter(u => { const c = chanceEm(u); return c !== null && c >= f[0] && c < f[1]; }).length
   }));
 
   return `<section class="cartao painel">
@@ -6056,7 +6057,7 @@ function vistaBanco(){
        "Vaga na hora", "Ano", "Chance que ela leu", "Chance hoje"],
       b.preferencias.map(x => {
         const u = M.unidadesBot.find(y => y.desig7 === x.id_escola);
-        const c = u ? chanceEm(u, false) : null;
+        const c = u ? chanceEm(u) : null;
         return [
           u ? `${u.nome} · ${u.bairro}` : `${x.nome_escola} (fora do recorte do mapa)`,
           x.id_escola, fmt.format(x.escolhas), fmt.format(x.primeiras),

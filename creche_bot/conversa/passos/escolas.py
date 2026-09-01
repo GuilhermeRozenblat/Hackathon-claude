@@ -149,7 +149,15 @@ def sugerir(p: Passo) -> MensagemSaida:
         return p.diz("backend_fora")
 
     if not sugestoes:
-        p.ir("ESCOLAS")
+        # Sem creche não há painel para desenhar. Antes isto deixava o estado em ESCOLAS
+        # com `dados["escolas"]` INEXISTENTE: a resposta seguinte caía em `_painel`,
+        # estourava KeyError, virava "deu um probleminha" e — porque a exceção impede o
+        # `salvar_sessao` — repetia para sempre. A conversa só saía com /start, que apaga
+        # o cadastro inteiro. Volta para o CEP, que é a primeira saída que a própria
+        # pergunta oferece, e o estado passa a aceitar a resposta que ele pede.
+        p.dados["escolas"] = []
+        p.dados["preferencias"] = []
+        p.ir("ENDERECO_CEP")
         return p.diz("sem_escolas")
 
     p.dados["escolas"] = [_achatar(v) for v in sugestoes]
@@ -191,13 +199,26 @@ def _restantes(p: Passo) -> list[dict]:
 
 
 def escolher(p: Passo) -> MensagemSaida:
+    if not p.dados.get("escolas"):
+        # Cinto: só se alcança com sessão gravada por uma versão anterior, ou por
+        # retomada em ESCOLAS sem painel. Redesenhar é impossível sem lista.
+        return sugerir(p)
+
     if p.msg.escolha == "pronto":
         return _confirmar(p)
 
     if not (p.msg.escolha or "").startswith("esc:"):
         return _painel(p) if not p.dados.get("preferencias") else _mais_uma(p)
 
-    p.dados["preferencias"].append(p.msg.escolha[4:])
+    escolha = p.msg.escolha[4:]
+    if escolha not in {e["id"] for e in _restantes(p)}:
+        # No Telegram o teclado da mensagem anterior continua clicável, e o painel é
+        # redesenhado sempre que a conversa volta para cá. Sem esta guarda o mesmo toque
+        # duplica a creche na ordem do Sisu (a família perde uma opção real) e o sexto
+        # toque estoura o `ORDINAL`.
+        return _mais_uma(p) if p.dados["preferencias"] else _painel(p)
+
+    p.dados["preferencias"].append(escolha)
     return _confirmar(p) if not _restantes(p) else _mais_uma(p)
 
 

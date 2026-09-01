@@ -13,9 +13,12 @@ Duas coisas que NÃO aparecem aqui:
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from creche_bot.canal.tipos import Botao, ItemLista, MensagemSaida
 from creche_bot.conversa.formulario import campo_de, formatar
 from creche_bot.conversa.passos.criterios import pendentes
+from creche_bot.conversa.passos.formulario_passo import eco_escolha
 from creche_bot.conversa.sessao import Passo
 from creche_bot.dominio.tipos import GRUPAMENTO_LEGIVEL
 
@@ -102,7 +105,8 @@ def confirmacao(p: Passo) -> MensagemSaida:
 
     if p.msg.escolha == "certo":
         # Endereço vindo do cadastro anterior já foi confirmado no bloco 3.
-        return pedir_horario(p) if p.dados.get("endereco") else pedir_cep(p)
+        tela = pedir_horario(p) if p.dados.get("endereco") else pedir_cep(p)
+        return replace(tela, texto=eco_escolha(BOTOES_RESUMO[0].rotulo) + tela.texto)
 
     return resumo(p)
 

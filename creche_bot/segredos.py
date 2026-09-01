@@ -52,7 +52,6 @@ def configurar_log(nivel: int = logging.INFO) -> None:
         segredos=[v for chave in SEGREDOS if (v := os.environ.get(chave, ""))],
     ))
     logging.basicConfig(level=nivel, handlers=[saida])
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 def carregar_env(env: Path) -> None:

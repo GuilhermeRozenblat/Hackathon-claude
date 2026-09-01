@@ -2,18 +2,17 @@
 
 Linguagem pensada para WhatsApp: mensagens curtas, uma pergunta por vez, botões quando possível em vez de texto livre.
 
-> **Este documento é a fonte da conversa, e é de produto.** O código segue a ordem dos
-> blocos daqui. Cinco coisas ele faz diferente, de propósito — a busca é pelo CPF do
-> responsável, o endereço é só CEP + número, não existe nota de corte, o resumo não repete
-> dado de saúde, e a entrega de documento só é perguntada quando há pendência. Cada uma com
+> Este documento é a fonte da conversa, e é de produto. O código segue a ordem dos blocos
+> daqui. Cinco coisas ele faz diferente, de propósito: a busca é pelo CPF do responsável, o
+> endereço é só CEP + número, não existe nota de corte, o resumo não repete dado de saúde,
+> e a entrega de documento só é perguntada quando há pendência. Cada uma com
 > o motivo em [ROTEIRO.md](ROTEIRO.md#onde-o-código-não-segue-o-roteiro-e-por-quê); o mapa
 > bloco → estado do código está no mesmo arquivo. Por que existe um roteiro só:
 > [D22](DECISOES.md).
 >
-> Três coisas que a conversa faz e não estão aqui: a **régua de prioridade** do processo
-> vigente (que é dado do backend, não deste roteiro), o **bloco C** de acompanhamento de
-> quem se inscreveu pelo site, e a tela que pergunta se a pessoa quer ligar a **IA** com a
-> própria chave.
+> Três coisas que a conversa faz e não estão aqui: a régua de prioridade do processo vigente
+> (que é dado do backend, não deste roteiro), o bloco C de acompanhamento de quem se
+> inscreveu pelo site, e a tela que pergunta se a pessoa quer ligar a IA com a própria chave.
 
 ---
 

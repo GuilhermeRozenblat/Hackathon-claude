@@ -99,7 +99,11 @@ def consultas(schema: str = "creche") -> dict[str, str]:
        count(*) FILTER (WHERE vaga_ociosa)  AS com_vaga_ociosa,
        -- `::float8` no fim porque `numeric` chega ao JSON como string ("1.20"), e a
        -- tela então compara texto com número. Número sai daqui como número.
-       round(avg(distancia_km)::numeric, 2)::float8 AS km_medio,
+       -- Arredondado ao QUILÔMETRO, não à centena de metro: média de um grupo de um é o
+       -- valor daquela pessoa, e duas distâncias com resolução de 10 m a partir de duas
+       -- creches de coordenada pública deixam a casa dela em dois pontos candidatos.
+       -- Este endpoint é público de propósito; 1 km é bairro, 10 m é endereço.
+       round(avg(distancia_km)::numeric, 0)::float8 AS km_medio,
        round(avg(chance)::numeric, 3)::float8       AS chance_media,
        max(ano_referencia)                  AS ano_referencia
   FROM {s}.preferencia_escola
@@ -180,6 +184,19 @@ class Painel(SimpleHTTPRequestHandler):
             self.send_error(404, "fora da allowlist do painel")
             return
         super().do_GET()
+
+    def do_HEAD(self) -> None:
+        """A allowlist vale para HEAD também.
+
+        `SimpleHTTPRequestHandler.do_HEAD` não passava por `do_GET`, então `HEAD /.env`
+        respondia 200 com `Content-Length` e `Last-Modified`. O corpo não sai num HEAD,
+        mas o oráculo de existência e tamanho sai — para o `.env` do dev, inclusive.
+        """
+        caminho = self.path.split("?", 1)[0].split("#", 1)[0].lstrip("/")
+        if caminho not in PUBLICOS:
+            self.send_error(404, "fora da allowlist do painel")
+            return
+        super().do_HEAD()
 
     def _banco(self) -> None:
         dsn = _dsn()

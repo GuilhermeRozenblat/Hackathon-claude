@@ -12,6 +12,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from functools import partial
 from http.server import ThreadingHTTPServer
 
@@ -26,6 +27,7 @@ SEGREDO = "segredo-de-teste"
 class CanalFalso:
     def __init__(self) -> None:
         self.enviadas: list[tuple[str, MensagemSaida]] = []
+        self.digitou: list[str | None] = []
 
     def chat_id_do(self, upd: dict) -> str | None:
         msg = upd.get("message")
@@ -41,8 +43,10 @@ class CanalFalso:
     def enviar(self, id_externo: str, msg: MensagemSaida) -> None:
         self.enviadas.append((id_externo, msg))
 
-    def avisar_processando(self, id_externo: str) -> None:
-        pass
+    @contextmanager
+    def digitando(self, id_externo: str | None):
+        self.digitou.append(id_externo)
+        yield
 
 
 class NucleoFalso:
@@ -121,6 +125,7 @@ def test_update_valido_chega_na_maquina_e_a_resposta_volta(servidor):
     assert codigo == 200
     assert [e.texto for e in nucleo.turnos] == ["oi"]
     assert canal.enviadas and canal.enviadas[0][0] == "4242"
+    assert canal.digitou == ["4242"], "o \"digitando…\" cobre o webhook, não só o polling"
 
 
 # ------------------------------------------------------------------------ idempotência

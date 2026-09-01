@@ -49,7 +49,11 @@ MAX_LINHAS = 4
 # estampado é informação; "você vai conseguir" continua sendo mentira.
 PROMESSAS = ("garantid", "com certeza", "certamente", "vai conseguir", "prometo",
              "asseguro", "pode comemorar", "está na frente",
-             "sua pontuação", "sua nota", "posição na fila")
+             "sua pontuação", "sua nota", "posição na fila",
+             # "chance estimada 40% (base 2025)" reescrito como "sua chance é 40%" mantém
+             # os números, passa em `_numeros`, e transforma estimativa sobre o ano
+             # passado em previsão sobre esta família. É a forma possessiva que mente.
+             "sua chance", "suas chances")
 
 # O `base` já vem com nome de criança e de responsável interpolados — texto que a família
 # digitou. Vai delimitado pelo mesmo motivo de `classificar` e `responder_duvida`: o
@@ -117,6 +121,15 @@ def _tem_numero_longo(texto: str) -> bool:
     return bool(re.search(r"\d{5,}", re.sub(r"[.\-/()\s]", "", texto)))
 
 
+def _tem_link(texto: str) -> bool:
+    """O processo não tem site paralelo, então endereço inventado só leva a golpe. Pega
+    esquema explícito, `www.` e domínio nu com TLD comum, porque a injeção pelo campo de
+    dúvida pede exatamente o domínio sem `http://`. Falso positivo aqui cai no texto
+    pronto, que é o comportamento seguro."""
+    return bool(re.search(r"https?://|www\.|\b[\w-]+\.(?:com|br|net|org|app|io|xyz|info)\b",
+                          texto, re.I))
+
+
 def _truncar(texto: str) -> str:
     return "\n".join(texto.splitlines()[:MAX_LINHAS])[:MAX_RESPOSTA]
 
@@ -173,7 +186,9 @@ class RedatorClaude:
             )
         except Exception as erro:
             self.ultima_falha = _motivo(erro)
-            log.exception("chamada ao modelo falhou")
+            # Sem `exc_info`: o traceback do SDK carrega a requisição, e o `str` de
+            # `APIStatusError` é "Error code: N - {body}". Mesma razão de `diagnosticar`.
+            log.warning("chamada ao modelo falhou: %s", type(erro).__name__)
             return None
 
         # A chamada foi. O que vier daqui para baixo é conteúdo reprovado, não chave
@@ -220,7 +235,7 @@ class RedatorClaude:
         if novo is None:
             return base
         curta = _truncar(novo)
-        if _numeros(curta) != _numeros(base):
+        if _numeros(curta) != _numeros(base) or _tem_link(curta):
             return base      # número mexido, ou cortado, é dado errado na tela da família
         return curta
 
@@ -232,7 +247,7 @@ class RedatorClaude:
             f"CONTEXTO: a pessoa está na etapa {etapa} do cadastro. Nenhum dado pessoal "
             f"dela está disponível aqui.\n\n<pergunta>{limpa}</pergunta>",
         )
-        if resposta is None or _tem_numero_longo(resposta):
+        if resposta is None or _tem_numero_longo(resposta) or _tem_link(resposta):
             return self._reserva.texto("duvida_sem_resposta")
         curta = _truncar(resposta)
         return f"{curta}\n\n{self._reserva.texto('retomando')}"

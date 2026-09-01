@@ -65,7 +65,12 @@ def renderizar(chave: ChaveTemplate, variaveis: dict[str, Any],
     modelo, figurinha = _TELEGRAM[chave]
     msg: dict[str, Any] = {"texto": modelo.format(**variaveis), "figurinha": figurinha}
 
-    if chave is ChaveTemplate.ACAO_PRESENCIAL and variaveis.get("lat") is not None:
+    # Os dois, não só `lat`: `Etapa.lat` e `Etapa.lng` são independentes, e um `Local`
+    # sem longitude vira `sendVenue` que o Telegram recusa — a mensagem que manda a
+    # família à unidade some depois de queimar as tentativas. O endereço já está no
+    # texto, então ficar sem o pino é degradação aceitável; perder a mensagem não é.
+    if (chave is ChaveTemplate.ACAO_PRESENCIAL
+            and variaveis.get("lat") is not None and variaveis.get("lng") is not None):
         msg["local"] = Local(variaveis["lat"], variaveis["lng"],
                              variaveis["nome_escola"], variaveis["endereco"])
     if chave in (ChaveTemplate.CONVOCACAO, ChaveTemplate.LEMBRETE_CONVOCACAO):

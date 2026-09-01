@@ -25,10 +25,23 @@ BOTOES_OUTRA = (Botao("outra_crianca", "Sim, outra criança"),
 
 
 def _documentos(dados: dict) -> list[str]:
-    """O que comprova cada critério que ficou pendente. Só isso, nada genérico."""
+    """O que comprova cada critério que ficou pendente. Só isso, nada genérico.
+
+    `documento_opcional` fica de fora, que é exatamente para isso que o campo existe no
+    contrato: documento que nunca se exige. São os três do 8.4, e cobrá-los nomeia de
+    volta o que a família declarou ("B.O., medida protetiva ou encaminhamento",
+    "Declaração") num histórico que fica no aparelho dela, que pode ser o mesmo do
+    agressor (D7). O critério continua declarado no cadastro e no espelho em colunas; só
+    para de virar cobrança na tela. Até esta guarda o campo era dado morto: ninguém no
+    repositório o lia.
+
+    `dict.fromkeys` porque `cadunico` e `bolsa_familia` pedem o mesmo "Número do NIS", e
+    a lista saía com a linha repetida.
+    """
     falta = set(pendentes(dados))
-    return [c["documento"] for c in dados.get("criterios", ())
-            if c["codigo"] in falta and c["documento"]]
+    return list(dict.fromkeys(
+        c["documento"] for c in dados.get("criterios", ())
+        if c["codigo"] in falta and c["documento"] and not c.get("opcional")))
 
 
 def enviar(p: Passo) -> MensagemSaida:

@@ -27,6 +27,7 @@ R4, e não tem gatilho HTTP.
 from __future__ import annotations
 
 import gzip
+import hmac
 import json
 import logging
 import os
@@ -114,6 +115,27 @@ class _Vistos:
             return True
 
 
+# Um turno por chat de cada vez. `Maquina.processar` é ler-modificar-gravar sobre a
+# sessão, e o `ThreadingHTTPServer` atende cada update numa thread: a mãe que toca no
+# botão e digita em seguida tem duas threads lendo o mesmo estado, e a última gravação
+# vence — a resposta de um campo some, ou o bot repete a pergunta que ela já respondeu.
+# `_Vistos` não cobre isto: lá são reenvios do MESMO update, aqui são updates diferentes.
+# `max_connections=1` no setWebhook também não resolve, porque o 200 sai antes do
+# trabalho e libera a conexão na hora.
+#
+# ponytail: um Lock por chat visto, sem expiração. São dezenas de bytes cada e a
+# hospedagem roda uma réplica só (`numReplicas: 1`). Com mais de um processo, a trava
+# tem que descer para o banco (`SELECT … FOR UPDATE` na sessão): trava de processo não
+# serializa nada entre processos.
+_TRAVAS: dict[str, threading.Lock] = {}
+_TRAVAS_MUTEX = threading.Lock()
+
+
+def _trava_do_chat(chat_id: str) -> threading.Lock:
+    with _TRAVAS_MUTEX:
+        return _TRAVAS.setdefault(chat_id, threading.Lock())
+
+
 class Servidor(Painel):
     """O painel mais o webhook. Herda a allowlist e o `api/banco.json` de `painel.py`."""
 
@@ -168,12 +190,14 @@ class Servidor(Painel):
 
     def do_POST(self) -> None:
         caminho = self.path.split("?", 1)[0].lstrip("/")
-        if not self.segredo or caminho != f"telegram/{self.segredo}":
+        # `compare_digest`, não `!=`: o segredo é a única coisa entre a internet e um
+        # update forjado, e update forjado executa `/apagar` no chat de outra família.
+        if not self.segredo or not hmac.compare_digest(caminho, f"telegram/{self.segredo}"):
             self.send_error(404, "nada aqui")
             return
         # Cinto e suspensório: o caminho pode vazar em log de proxy, o cabeçalho não.
         cabecalho = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if cabecalho != self.segredo:
+        if not hmac.compare_digest(cabecalho, self.segredo):
             log.warning("webhook chamado sem o cabeçalho de segredo")
             self.send_error(403, "segredo não confere")
             return
@@ -185,8 +209,10 @@ class Servidor(Painel):
             # fechada sem resposta nenhuma — nem erro, nem log.
             self.send_error(400, "Content-Length inválido")
             return
-        if tamanho > MAX_CORPO:
-            self.send_error(413, "corpo grande demais")
+        if not 0 <= tamanho <= MAX_CORPO:
+            # O limite inferior importa: `int("-1")` não estoura, `-1 > MAX_CORPO` é
+            # falso, e `rfile.read(-1)` lê até EOF — a thread ficava presa até o timeout.
+            self.send_error(413, "corpo fora do tamanho aceito")
             return
         try:
             bruto = self.rfile.read(tamanho)
@@ -216,16 +242,19 @@ class Servidor(Painel):
         if not self.vistos.novo(update.get("update_id")):
             log.info("update repetido descartado")
             return
-        # Antes de `receber()`: ele já baixa anexo e responde callback, justo o que
-        # demora e o que o aviso deveria cobrir.
-        if (chat_id := self.canal.chat_id_do(update)) is not None:
-            self.canal.avisar_processando(chat_id)
-        entrada = self.canal.receber(update)
-        if entrada is None:
-            return
-        resposta = self.nucleo.processar(entrada)
-        if resposta is not None:
-            self.canal.enviar(entrada.id_externo, resposta)
+        # Desde antes de `receber()`: ele já baixa anexo e responde callback, justo o que
+        # demora e o que o aviso deveria cobrir. O "digitando…" fica no ar até a resposta
+        # sair, e no serviço hospedado o cold start sozinho já passa dos 5s do aviso.
+        chat = self.canal.chat_id_do(update)
+        # A trava vem antes de tudo: `receber` já muta (baixa anexo, responde callback) e
+        # `processar` é ler-modificar-gravar sobre a sessão daquele chat.
+        with _trava_do_chat(chat or ""), self.canal.digitando(chat):
+            entrada = self.canal.receber(update)
+            if entrada is None:
+                return
+            resposta = self.nucleo.processar(entrada)
+            if resposta is not None:
+                self.canal.enviar(entrada.id_externo, resposta)
 
     def log_message(self, formato: str, *args: object) -> None:
         """O log padrão do http.server imprime o caminho, e o caminho tem o segredo."""
@@ -241,6 +270,12 @@ def montar() -> tuple[Maquina, Telegram]:
         sys.exit("TELEGRAM_TOKEN não configurado. Veja docs/TELEGRAM.md")
     if not Servidor.segredo:
         sys.exit("TELEGRAM_WEBHOOK_SECRET não configurado. Veja docs/HOSPEDAGEM.md")
+    if len(Servidor.segredo) < 32:
+        # Segredo curto é adivinhável, e adivinhar dá para forjar update: `/apagar`
+        # executa o expurgo dos dados de outra família, `/status` manda a situação da
+        # inscrição dela para o chat de quem forjou.
+        sys.exit("TELEGRAM_WEBHOOK_SECRET curto demais (mínimo 32). "
+                 "Gere com: python -c \"import secrets; print(secrets.token_urlsafe(32))\"")
 
     repo = escolher_repositorio()      # já recusa DSN com `<...>` do exemplo
     backend = escolher_backend()
@@ -253,7 +288,10 @@ def montar() -> tuple[Maquina, Telegram]:
     # uma ao banco, barato, mas é CPU que a plataforma cobra 24h por dia. Com webhook o
     # bot só precisa entregar aviso, e minuto de atraso numa notificação de matrícula não
     # muda nada para a família. Ver docs/HOSPEDAGEM.md §6.
-    intervalo = float(os.environ.get("OUTBOX_INTERVALO_S", "60"))
+    try:
+        intervalo = float(os.environ.get("OUTBOX_INTERVALO_S", "60"))
+    except ValueError:
+        sys.exit("OUTBOX_INTERVALO_S precisa ser um número de segundos")
     threading.Thread(target=rodar_worker, args=(backend, canal, repo, intervalo),
                      daemon=True).start()
     if os.environ.get("WHISPER", "").lower() in {"1", "true", "sim"}:

@@ -10,7 +10,12 @@ de negócio**: não decide o que responder, só como entregar.
 ```python
 def rodar(nucleo: Nucleo) -> None      # long polling, loop principal
 def enviar(id_externo: str, msg: MensagemSaida) -> None
+def digitando(id_externo: str | None)  # contexto: "digitando…" enquanto o núcleo trabalha
 ```
+
+O `sendChatAction` do Telegram dura ~5s, e turno com áudio ou modelo passa disso: `digitando`
+renova o aviso numa thread daemon até a resposta sair. É melhor esforço — falhar ali nunca
+atrasa nem derruba a resposta. **O webhook usa o mesmo contexto** (`scripts/servidor.py`).
 
 1. Update do Telegram → `MensagemEntrada`: texto, foto (bytes), áudio de voz, documento e
    clique de botão (`callback_query` → `escolha`). `id_mensagem` sempre preenchido.

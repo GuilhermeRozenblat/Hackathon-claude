@@ -1,16 +1,16 @@
 # Divisão do trabalho
 
-O repositório é dividido por **fronteiras de código**, não por combinação verbal: cada frente
+O repositório é dividido por fronteiras de código, e não por combinação verbal: cada frente
 tem pasta própria, `CLAUDE.md` próprio, e um teste que falha se alguém atravessar.
 
 | Frente | Pasta | Dono | Roda com |
 |---|---|---|---|
-| **Chat e conversa** | `canal/` · `conversa/` · `ia/` · `notificacao/` | Guilherme | `make memoria`, **não depende de `dados/`** |
-| **Banco e persistência** | só `dados/` | outra pessoa | `make dados` |
-| **Dados do município** | `backend/` | outro time, outra máquina | `BackendMapa` sobre os CSVs reais, `BackendMock` por baixo |
+| Chat e conversa | `canal/` · `conversa/` · `ia/` · `notificacao/` | Guilherme | `make memoria`, sem depender de `dados/` |
+| Banco e persistência | só `dados/` | outra pessoa | `make dados` |
+| Dados do município | `backend/` | outro time, outra máquina | `BackendMapa` sobre os CSVs reais, `BackendMock` por baixo |
 
 As três se encontram em dois arquivos congelados: `dados/porta.py` (21 operações) e
-`backend/porta.py` (17). **Mudar um deles é PR próprio, revisado por todos os lados**, e
+`backend/porta.py` (17). Mudar um deles é PR próprio, revisado por todos os lados, e
 `make fronteira` prova que ninguém atravessou.
 
 ## Estado de cada módulo
@@ -31,25 +31,26 @@ histórica de 2021 a 2025 mudou foi o desenho:
 
 | Mudança | Motivo |
 |---|---|
-| Busca pelo CPF do **responsável** | 27,9% das crianças já constavam no ano anterior; e criança de 0 a 3 anos muitas vezes não tem CPF |
-| Endereço só por **CEP + número** | Campo livre gerou 1.608 grafias para ~925 bairros |
-| Régua de prioridade virou **dado do backend** | Entre 2023 e 2024, 3 das 13 perguntas sobreviveram |
-| A consulta mostra um **desfecho calculado** | 77,8% dos "cancelado pelo sistema" são de quem foi atendido |
-| Saiu a nota de corte, entrou **concorrência + chance estimada** | Pontuação não é comparável entre anos; concorrência é fato |
-| Entrou o **bloco C**, de acompanhamento | Alcança as ~62 mil famílias que se inscreveram pelo portal |
-| Entraram **voz** e **dúvida solta** | A família fala; e perguntar não pode fazer perder o lugar na fila |
+| Busca pelo CPF do responsável | 27,9% das crianças já constavam no ano anterior; e criança de 0 a 3 anos muitas vezes não tem CPF |
+| Endereço só por CEP + número | Campo livre gerou 1.608 grafias para ~925 bairros |
+| Régua de prioridade virou dado do backend | Entre 2023 e 2024, 3 das 13 perguntas sobreviveram |
+| A consulta mostra um desfecho calculado | 77,8% dos "cancelado pelo sistema" são de quem foi atendido |
+| Saiu a nota de corte, entrou concorrência + chance estimada | Pontuação não é comparável entre anos; concorrência é fato |
+| Entrou o bloco C, de acompanhamento | Alcança as ~62 mil famílias que se inscreveram pelo portal |
+| Entraram voz e dúvida solta | A família fala; e perguntar não pode fazer perder o lugar na fila |
 
 ## Por que funciona na prática
 
 `REPOSITORIO=memoria make bot` sobe o bot sem tocar em disco: quem trabalha no banco pode
 quebrar `postgres.py` à vontade que o chat continua rodando, só não pode mexer em `porta.py`.
-No sentido inverso, os testes rodam **parametrizados contra as duas implementações**: se o
+No sentido inverso, os testes rodam parametrizados contra as duas implementações: se o
 Postgres divergir da memória em qualquer comportamento, o teste acusa.
 
-**Ressalva de hoje:** a metade em memória passa inteira; a metade Postgres não
-sobrevive à bateria completa contra o pooler do Supabase: deadlock no `TRUNCATE` entre
-arquivos de teste e prepared statement na conexão administrativa do `conftest`. Por trilha
-(`make dados`) funciona. Detalhe em [BANCO.md](BANCO.md#4-testes).
+Ressalva de hoje: a metade em memória passa inteira, e a metade Postgres é sensível a
+concorrência. O `conftest` usa um schema fixo, `creche_teste`, e o dropa no teardown, então
+duas baterias simultâneas contra o mesmo projeto Supabase derrubam o schema uma da outra.
+Um bloco de falhas `[postgres]` quase sempre é isso, e some rodando o arquivo sozinho.
+Detalhe em [BANCO.md](BANCO.md#4-testes).
 
 ## Como despachar um agente
 

@@ -332,6 +332,38 @@ def test_resposta_sensivel_nunca_e_ecoada(bot):
     assert "Recebido" not in r.texto and "preso" not in r.texto.split("\n")[0]
 
 
+def test_toda_resposta_volta_confirmada(bot):
+    """A família confere no mesmo balão em que responde, e erro de digitação aparece ali,
+    não no resumo do bloco 5. Vale para o que ela digita, para o que ela toca e para a
+    saída de fuga do campo aberto."""
+    responder(bot, msg("/start"), msg(escolha="inscrever"))
+
+    r = bot.processar(msg(escolha="autorizo"))
+    assert "Autorização registrada ✅" in r.texto
+
+    r = bot.processar(msg(escolha="nao_tenho"))          # a fuga do CPF da criança
+    assert "Anotei: Não tenho o CPF ✅" in r.texto
+
+    r = bot.processar(msg("10/01/2024"))
+    assert "Recebido: 10/01/2024 ✅" in r.texto
+
+    r = bot.processar(msg(escolha="nunca"))              # bloco 2, toque em botão
+    assert "Anotei: Nunca estudou ✅" in r.texto
+
+
+def test_resposta_de_saude_do_formulario_nao_volta_ecoada(bot):
+    """A exceção do eco, e é regra, não estilo: dado de saúde não volta escrito num
+    histórico que fica no aparelho da família (LGPD art. 11)."""
+    responder(bot, msg("/start"), msg(escolha="inscrever"), msg(escolha="autorizo"),
+              msg(CPF_NOVO), msg("10/01/2024"), msg(escolha="nunca"))
+
+    r = bot.processar(msg(escolha="pode"))               # autoriza o gate do art. 11
+    assert "deficiência" in r.texto.lower()
+
+    r = bot.processar(msg(escolha="nao"))
+    assert "Anotei" not in r.texto and "Recebido" not in r.texto
+
+
 def test_documento_ilegivel_nao_vira_comprovacao(bot):
     responder(bot, *COM_PENDENCIA)
     responder(bot, msg(escolha="esc:edi-leila-diniz"), msg(escolha="pronto"),
@@ -545,6 +577,47 @@ def test_sessao_expirada_recomeca_limpa(bot):
 
     r = bot.processar(msg("oi"))
     assert "Zé Matrícula" in r.texto, "passou de 72h: começa do zero"
+
+
+def test_sem_creche_perto_nao_prende_a_conversa():
+    """Beco sem saída: a tela pergunta "outro endereço, ou mudar o horário?" e o estado
+    ficava em ESCOLAS sem `dados["escolas"]`. Qualquer resposta estourava KeyError em
+    `_painel`, virava "deu um probleminha" e, como a exceção impede o `salvar_sessao`,
+    repetia para sempre — a conversa só saía com /start, que apaga o cadastro.
+    """
+    class SemCreche(BackendMock):
+        def escolas_proximas(self, *a, **kw):
+            return ()
+
+    repo = RepositorioMemoria()
+    bot = Maquina(SemCreche(), RedatorEstatico(), repo)
+    r = responder(bot, *ATE_AS_ESCOLAS)
+    assert "não achei creche" in r.texto.lower()
+
+    # A resposta seguinte tem que ser atendida, não virar erro nem repetir o erro.
+    r2 = bot.processar(msg("22770-005, 50"))
+    assert "probleminha" not in r2.texto.lower(), "continua preso no estado sem painel"
+    r3 = bot.processar(msg("22770-005, 50"))
+    assert "probleminha" not in r3.texto.lower(), "o erro se repete a cada mensagem"
+
+
+def test_convocacao_meses_depois_nao_cai_na_saudacao(bot):
+    """O botão da push chega com a sessão já expirada, e é o caso NORMAL: a inscrição é
+    de março e a convocação sai em junho. Sem roteamento, o toque em "Confirmar vaga"
+    caía em INICIO e a família lia "quer inscrever uma criança?" com o prazo correndo.
+    """
+    from datetime import datetime, timedelta
+
+    ate_o_protocolo(bot)
+    contato = bot._repo.contato_de("telegram", "777")
+    estado, dados = bot._repo.carregar_sessao(contato)
+    dados["visto_em"] = (datetime.now() - timedelta(days=90)).isoformat()
+    bot._repo.salvar_sessao(contato, estado, dados)
+
+    r = bot.processar(msg(escolha="confirmar_vaga"))
+    assert "quer inscrever" not in r.texto.lower(), "caiu na saudação com o prazo correndo"
+    assert "Ana" in r.texto or "inscrição" in r.texto.lower(), (
+        "o toque tem que abrir a situação da inscrição, não uma conversa nova")
 
 
 def test_sem_consentimento_nada_e_alcancavel(bot):

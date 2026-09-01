@@ -28,11 +28,11 @@ class Campo:
     pergunta: str
     tipo: Tipo = "texto"
     opcoes: tuple[tuple[str, str], ...] = ()      # (id, rótulo), máx. 3, limite WhatsApp
-    eco: bool = False                             # "Recebido: Fulano ✅"
     erro: str = "Não entendi 🤔 Pode mandar de novo?"
     escape: tuple[str, str] | None = None         # (id, rótulo) de fuga em campo aberto
     digitos: tuple[int, int] = (1, 40)            # faixa de tamanho para tipo "numero"
-    sensivel: bool = False                        # saúde: exige o consentimento do art. 11
+    # Saúde: exige o consentimento do art. 11, e é a ÚNICA resposta que não volta ecoada.
+    sensivel: bool = False
     pular_se: Callable[[dict[str, Any]], bool] | None = field(default=None, compare=False)
     pergunta_alt: Callable[[dict[str, Any]], str] | None = field(default=None, compare=False)
 
@@ -47,10 +47,6 @@ class Campo:
         assert not (self.escape and self.opcoes), (
             f"campo {self.chave!r}: escape é para pergunta aberta; com opções, "
             f"a saída é mais uma opção"
-        )
-        assert not (self.sensivel and self.eco), (
-            f"campo {self.chave!r}: resposta sensível nunca é ecoada de volta: o "
-            f"histórico fica no aparelho da família"
         )
 
 
@@ -128,10 +124,10 @@ CADASTRO: tuple[Campo, ...] = (
     # ---- Bloco 1: a pesquisa inicial começa pela criança
     # Sem o CPF a inscrição SEGUE: nada bloqueia além do consentimento e da faixa etária.
     Campo("cpf_crianca", "Vamos começar pela criança. Qual é o CPF dela? (só os números)",
-          "cpf", eco=True, escape=("nao_tenho", "Não tenho o CPF"),
+          "cpf", escape=("nao_tenho", "Não tenho o CPF"),
           erro="Esse CPF não confere 🤔 Pode conferir os números?"),
     Campo("nascimento_crianca", "E qual a data de nascimento dela? (dia/mês/ano)", "data",
-          eco=True, erro="Não peguei a data 🤔 Escreve assim: 10/01/2024"),
+          erro="Não peguei a data 🤔 Escreve assim: 10/01/2024"),
 
     # ---- Bloco 2: sobre a vaga
     # 4 opções não cabem em 3 botões: a terceira abre a segunda pergunta.
@@ -162,7 +158,7 @@ CADASTRO: tuple[Campo, ...] = (
           sensivel=True, pular_se=lambda d: d.get("tipo_especial") != "outra_situacao"),
 
     # ---- Bloco 3: dados pessoais
-    Campo("nome_crianca", "Qual é o nome completo da criança? (sem abreviar)", eco=True,
+    Campo("nome_crianca", "Qual é o nome completo da criança? (sem abreviar)",
           erro="Preciso do nome completo, com sobrenome 🙂"),
     # O portal trata isso nas duas telas de consulta: é a chave alternativa de busca, e
     # existe justamente para criança sem filiação registrada.
@@ -171,20 +167,19 @@ CADASTRO: tuple[Campo, ...] = (
           "botoes", (("consta", "Consta"), ("nao_consta", "Não consta"))),
     Campo("filiacao",
           "Pode me passar o nome completo da mãe e/ou do pai, como está na certidão?",
-          eco=True,
           pergunta_alt=lambda d: ("Pode me passar o nome do responsável legal pela "
                                   "criança?") if d.get("filiacao_consta") == "nao_consta"
           else None),
     Campo("nome_responsavel",
           "E qual é o seu nome completo? Você é quem vai acompanhar a matrícula.",
-          eco=True, erro="Preciso do nome completo, com sobrenome 🙂"),
+          erro="Preciso do nome completo, com sobrenome 🙂"),
     # Não está na v1, mas é a chave do histórico: `buscar_por_responsavel` é a única
     # busca de cadastro anterior que o backend oferece.
-    Campo("cpf_responsavel", "Qual é o seu CPF? (só os números)", "cpf", eco=True,
+    Campo("cpf_responsavel", "Qual é o seu CPF? (só os números)", "cpf",
           erro="Esse CPF não confere 🤔 Pode conferir os números?"),
     # Responde sozinha o critério de desempate "responsável menor de 18 anos".
     Campo("nascimento_responsavel", "E qual a sua data de nascimento? (dia/mês/ano)",
-          "data", eco=True, erro="Não peguei a data 🤔 Escreve assim: 07/11/1990"),
+          "data", erro="Não peguei a data 🤔 Escreve assim: 07/11/1990"),
     Campo("deficiencia_responsavel",
           "Algum dos pais ou responsáveis tem alguma deficiência?", "botoes",
           (("sim", "Sim"), ("nao", "Não"), ("nao_responder", "Prefiro não dizer")),
@@ -196,18 +191,19 @@ CADASTRO: tuple[Campo, ...] = (
 CONTATO: tuple[Campo, ...] = (
     Campo("telefone",
           "Agora preciso do seu celular, para eu te avisar sobre a inscrição. (com DDD)",
-          "telefone", eco=True,
+          "telefone",
           erro="Esse telefone não parece completo 🤔 Manda com DDD."),
     Campo("tem_outro_contato",
           "Tem outro celular de contato, de uma segunda pessoa, caso eu não consiga "
           "falar com você?", "botoes",
-          (("sim", "Tenho outro"), ("nao", "Não tenho"))),
+          (("sim", "Tenho outro"), ("nao", "Não tenho outro"))),
     Campo("outro_contato", "Pode me passar esse outro número? (com DDD)", "telefone",
-          eco=True, pular_se=lambda d: d.get("tem_outro_contato") != "sim",
+          pular_se=lambda d: d.get("tem_outro_contato") != "sim",
           erro="Esse telefone não parece completo 🤔 Manda com DDD."),
+    # Rótulos completos: eles voltam no eco, e "Não tenho" sozinho não diz de quê.
     Campo("quer_email", "Você tem e-mail?", "botoes",
-          (("sim", "Tenho"), ("nao", "Não tenho"))),
-    Campo("email", "Pode me passar o e-mail?", "email", eco=True,
+          (("sim", "Tenho e-mail"), ("nao", "Não tenho e-mail"))),
+    Campo("email", "Pode me passar o e-mail?", "email",
           pular_se=lambda d: d.get("quer_email") != "sim",
           erro="Esse e-mail parece incompleto 🤔 Manda de novo?"),
 )

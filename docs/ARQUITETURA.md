@@ -20,13 +20,13 @@ decisão, em [DECISOES.md](DECISOES.md).
 | Infra mínima | **Long polling, roda em localhost** | Webhook HTTPS público |
 | Começar | `@BotFather`, 2 min | Verificação Meta + templates (~24h cada) |
 
-**A consequência que mata projeto ingênuo:** "avisar quando o status mudar" é
-business-initiated. Fora da janela de 24h isso **não pode ser texto gerado por IA**: tem que ser
+A consequência que mata projeto ingênuo é esta: "avisar quando o status mudar" é
+business-initiated. Fora da janela de 24h isso não pode ser texto gerado por IA, tem que ser
 template registrado antes.
 
-**A regra que salva:** toda mensagem proativa é `(ChaveTemplate, variáveis)` desde a V1, nunca
-string pronta. No Telegram a chave vira texto com figurinha; no WhatsApp, o template. Quem
-emite o evento não sabe a diferença. E o template só bate na porta: um botão ("Novidade sobre
+A regra que salva o projeto disso: toda mensagem proativa é `(ChaveTemplate, variáveis)` desde
+a V1, nunca string pronta. No Telegram a chave vira texto com figurinha; no WhatsApp, o
+template. Quem emite o evento não sabe a diferença. E o template só bate na porta: um botão ("Novidade sobre
 a vaga do(a) {nome} 👀") abre janela nova de 24h, e a persona vive lá dentro, de graça.
 
 > ⚠️ A Meta anunciou cobrança de serviço/utility dentro da janela de 24h a partir de
@@ -36,19 +36,21 @@ a vaga do(a) {nome} 👀") abre janela nova de 24h, e a persona vive lá dentro,
 
 Elegibilidade a ZDR da Anthropic, só o acionável:
 
-- **Messages API (`/v1/messages`) é elegível; Files API não.** → documento vai **base64
-  inline**, nunca `client.files.*`.
-- **Também não elegíveis:** Batch API, code execution, MCP connector, Managed Agents, Agent
-  Skills. Nenhum toca dado de usuário.
-- **Fable 5 e Mythos 5 são Covered Models** (retenção de 30 dias, sem ZDR). → `claude-haiku-4-5`.
-- Mesmo com ZDR, conteúdo sinalizado pode ser retido até 2 anos. **Minimização é o controle
-  de verdade, não a política:** imagem reduzida a ~1568px, extraída uma vez, guardada
-  estruturada e **nunca reenviada**.
+- A Messages API (`/v1/messages`) é elegível e a Files API não. Documento vai base64 inline,
+  nunca por `client.files.*`.
+- Também ficam de fora Batch API, code execution, MCP connector, Managed Agents e Agent
+  Skills. Nenhum toca dado de usuário aqui.
+- Fable 5 e Mythos 5 são Covered Models, com retenção de 30 dias e sem ZDR. Por isso
+  `claude-haiku-4-5`.
+- Mesmo com ZDR, conteúdo sinalizado pode ser retido até 2 anos. O controle que vale é a
+  minimização, não a política: imagem reduzida a ~1568px, extraída uma vez, guardada
+  estruturada e nunca reenviada.
 
-**LGPD art. 14** exige consentimento específico e destacado para dado de criança. É tabela de
-primeira classe, e `EXIGEM_CONSENTIMENTO` torna todo estado que trata dado de criança
-inalcançável sem o registro. **Art. 11** (saúde, violência, substâncias, situação prisional)
-tem consentimento próprio, opcional, nunca bloqueante, e a resposta nunca é ecoada.
+O art. 14 da LGPD exige consentimento específico e destacado para dado de criança. Ele é
+tabela de primeira classe aqui, e `EXIGEM_CONSENTIMENTO` torna todo estado que trata dado de
+criança inalcançável sem o registro. O art. 11, que cobre saúde, violência, substâncias e
+situação prisional, tem consentimento próprio: opcional, nunca bloqueante, e a resposta nunca
+é ecoada.
 
 ## 2. Visão geral
 
@@ -57,7 +59,7 @@ flowchart TB
     U([Família])
 
     subgraph CANAL["canal/: Telegram hoje, WhatsApp depois"]
-        TG["telegram.py<br/>long polling"]
+        TG["telegram.py<br/>webhook no ar, polling local"]
         RD["render.py"]
     end
 
@@ -112,23 +114,24 @@ município.
     └────────────────────────┘  └──────────────────────────────┘
 ```
 
-**A regra é verificável, não combinada.** `make fronteira` varre o pacote e falha se
-`psycopg`, `sqlite3`, `SELECT`, `cursor` ou `session` aparecerem fora de `dados/`.
+A regra não é combinada, é verificada: `make fronteira` varre o pacote e falha se `psycopg`,
+`sqlite3`, `SELECT`, `cursor` ou `session` aparecerem fora de `dados/`.
 
 Consequência: `REPOSITORIO=memoria make bot` roda o bot inteiro sem tocar em disco, e a
 bateria de persistência roda parametrizada contra as duas implementações.
 
-**O que o backend do município entrega** são 17 operações em sete grupos: processo (período,
+O backend do município entrega 17 operações em sete grupos: processo (período,
 resultado, data de corte, régua), histórico, endereço, oferta, inscrição, consulta e
 notificação. A lista completa está em
 [`backend/CLAUDE.md`](../creche_bot/backend/CLAUDE.md). Três delas carregam decisão:
 
-- **`criterios_do_processo()`** devolve a régua vigente. Régua no código quebra na virada do
-  ano ([D15](DECISOES.md)).
-- **`buscar_por_responsavel(cpf)`** é pelo CPF do adulto, nunca da criança ([D12](DECISOES.md)).
-- **`resolver_cep(cep, numero)`** é o único caminho para bairro e coordenadas ([D13](DECISOES.md)).
+- `criterios_do_processo()` devolve a régua vigente. Régua escrita no código quebra na virada
+  do ano ([D15](DECISOES.md)).
+- `buscar_por_responsavel(cpf)` é pelo CPF do adulto, nunca da criança ([D12](DECISOES.md)).
+- `resolver_cep(cep, numero)` é o único caminho para bairro e coordenadas ([D13](DECISOES.md)).
 
-O bot não reordena, não recalcula e não decide. Ele conversa e narra.
+O bot não reordena nada, não recalcula nada e não decide nada. Ele conversa e narra o que o
+backend disse.
 
 ### 3.1 O que o bot pode dizer sobre uma creche
 
@@ -136,16 +139,16 @@ Quatro números, todos observados:
 
 | | De onde vem |
 |---|---|
-| **Distância** | haversine do CEP até a coordenada da unidade |
-| **Vaga ociosa agora**, no grupamento pedido | `vagas_ociosas_geo.csv`. Sobra no Maternal II não serve a Berçário |
-| **Concorrência do ano passado** | `Concorrencia.familias_por_vaga`, com `ano` **obrigatório no tipo** |
-| **Chance estimada** | `confirmados ÷ demanda de 1ª opção` na unidade, em 2025 |
+| Distância | haversine do CEP até a coordenada da unidade |
+| Vaga ociosa agora, no grupamento pedido | `vagas_ociosas_geo.csv`. Sobra no Maternal II não serve a Berçário |
+| Concorrência do ano passado | `Concorrencia.familias_por_vaga`, com `ano` obrigatório no tipo |
+| Chance estimada | `confirmados ÷ demanda de 1ª opção` na unidade, em 2025 |
 
-Fora: **pontuação, nota de corte e posição na fila**. Não existe campo para elas nos tipos,
-então nenhuma tela pode mostrá-las por acidente: a classificação é norma e só roda depois do
-fechamento das inscrições. A chance estimada é honesta sob três condições: ano colado no
-número, nunca 0% nem 100%, e a classificação não está dentro dela. Ver [D5](DECISOES.md) e
-[D19](DECISOES.md).
+Ficam de fora pontuação, nota de corte e posição na fila. Não existe campo para elas nos
+tipos, então nenhuma tela pode mostrá-las por acidente: a classificação é norma, e só roda
+depois do fechamento das inscrições. A chance estimada é honesta sob três condições, o ano
+colado no número, o piso e o teto que a mantêm longe de 0% e de 100%, e o fato de a
+classificação não estar dentro dela. Ver [D5](DECISOES.md) e [D19](DECISOES.md).
 
 ## 4. Os contratos congelados
 
@@ -157,7 +160,7 @@ Seis arquivos, PR próprio para mudar qualquer um:
 | `dominio/tipos.py` | Vocabulário aberto (`Etapa.codigo` é `str` livre), comportamento fechado (`Etapa.tipo` é `Literal` de 6). `Situacao` é o que muda e notifica; `Desfecho` é o que a família vê. Duas guardas valem ouro: `acao_presencial` sem endereço e `convocacao` sem prazo são erro de tipo |
 | `dados/porta.py` | 21 operações de persistência |
 | `backend/porta.py` | 17 operações do município |
-| `notificacao/chaves.py` | 9 chaves de template, e **cada uma vira um template submetido à Meta**, ~24h de aprovação. Mudar é grátis agora e caro depois |
+| `notificacao/chaves.py` | 9 chaves de template, e cada uma vira um template submetido à Meta, com ~24h de aprovação. Mudar é grátis agora e caro depois |
 | `backend/mock.py` | O espelho executável do contrato: é contra ele que a bateria roda |
 
 ## 5. Notificação
@@ -166,7 +169,7 @@ Seis arquivos, PR próprio para mudar qualquer um:
 mudança de status → INSERT em outbox (mesma transação) → worker drena → enviar()
 ```
 
-Transactional outbox: uma tabela e um loop. Sem Kafka, sem Celery, sem Redis.
+Transactional outbox, que aqui é uma tabela e um loop. Nada de Kafka, Celery ou Redis.
 `notificacao/catalogo.py` traduz a chave por canal: no Telegram, texto com figurinha
 (`ACAO_PRESENCIAL` vira `sendVenue` com o pino); no WhatsApp, template + botão.
 
@@ -175,30 +178,30 @@ processo: em 2025, 5.519 famílias foram convocadas e perderam a vaga, a maior p
 que foi chamada. `POR_TIPO_ETAPA` mapeia `TipoEtapa` → `ChaveTemplate` numa tabela, não numa
 cadeia de `if`, e um teste garante que todo tipo tem template.
 
-**A lacuna do CRAS.** Documento entregue no CRAS ainda segue para a creche, e hoje ninguém
-avisa quando esse trajeto termina. É lacuna do processo, não do código: o bot diz que o
+Sobre a lacuna do CRAS: documento entregue lá ainda segue para a creche, e hoje ninguém avisa
+quando esse trajeto termina. Quem tem a lacuna é o processo, não o código. O bot diz que o
 trajeto existe, quanto demora, e que avisa quando a creche confirmar. Quando a confirmação
 existir, entra como mais uma etapa do backend, sem código novo ([D10](DECISOES.md)).
 
 ## 6. Privacidade como código
 
-`ia/redacao.py` é o único lugar que fala com a Anthropic, e um teste faz `grep` na pasta
-procurando `files.upload|batches|code_execution`, cinco linhas que impedem a regra de virar
-comentário morto.
+`ia/redacao.py` é o único lugar que fala com a Anthropic, e `tests/test_contratos.py` faz
+`grep` na pasta atrás de `.files.`, `messages.batches`, `code_execution` e `beta.agents`. São
+dez linhas, e são elas que impedem a regra de virar comentário morto.
 
 | Controle | Hoje |
 |---|---|
-| Documentos em repouso | **Não persistimos documento**: extrai, guarda estruturado, descarta os bytes ([D9](DECISOES.md)) |
+| Documentos em repouso | Nenhum documento é persistido: extrai, guarda estruturado, descarta os bytes ([D9](DECISOES.md)) |
 | Voz | Transcrição local (`faster-whisper`). O áudio não sai da máquina |
 | Entrada livre perto de prompt | Delimitada, declarada como dado, resposta filtrada antes de entrar na conversa |
-| Logs | Só IDs. Formatador redige segredo em mensagem **e** traceback ([D11](DECISOES.md)) |
+| Logs | Só IDs. O formatador redige segredo em mensagem e em traceback ([D11](DECISOES.md)) |
 | Consentimento | Bloqueante, com versão do texto gravada |
 | Direito de eliminação | `apagar_tudo(contato_id)` desde a V1, porque incluir depois é bem mais caro |
 | Chave da Anthropic | É de quem conversa, guardada na sessão daquele contato ([D20](DECISOES.md)) |
 
 ## 7. O caminho até o WhatsApp
 
-**Não muda:** `dominio/`, `conversa/`, `ia/`, as chaves do catálogo, o modelo de mensagem.
+O que não muda: `dominio/`, `conversa/`, `ia/`, as chaves do catálogo e o modelo de mensagem.
 
 | Área | Hoje | Depois |
 |---|---|---|
@@ -207,12 +210,12 @@ comentário morto.
 | Outbox | loop em processo | fila com retry exponencial e DLQ |
 | Backend | `BackendMapa` + `BackendMock` | `BackendHTTP` do município |
 | Idempotência | id de mensagem | obrigatória, o WhatsApp reentrega webhook |
-| Privacidade | termos comerciais padrão | **ZDR negociado** |
+| Privacidade | termos comerciais padrão | ZDR negociado |
 
-**Ordem do flip:** (1) verificação Meta Business; (2) submeter os templates do enum
-`ChaveTemplate`, ~24h cada, **é o caminho crítico, começar cedo**; (3) HTTPS público;
+A ordem do flip: (1) verificação Meta Business; (2) submeter os templates do enum
+`ChaveTemplate`, ~24h cada, que é o caminho crítico e começa cedo; (3) HTTPS público;
 (4) escrever `canal/whatsapp.py`; (5) figurinhas WebP; (6) dois canais em paralelo. Só o
-passo 4 é código, e é pequeno. É para isso que serve tudo acima.
+passo 4 é código, e é pequeno, que é o ponto de tudo acima.
 
 ## 8. Verificação
 
@@ -225,11 +228,11 @@ make seguranca    # segredo não sobrevive ao log nem ao traceback
 make lint
 ```
 
-332 testes em ~50s. A **persistência** roda duas vezes, contra `RepositorioMemoria` e contra
-o Postgres — esta metade só quando há `DATABASE_URL`, sempre no schema `creche_teste`
-([BANCO.md](BANCO.md#4-testes)). O resto roda em memória: em `tests/conversa` o objeto de teste
-é o roteiro, e repetir cada turno contra um banco remoto multiplicaria o tempo por cem sem
-cobrir uma linha a mais.
+351 testes em ~35s. A persistência roda duas vezes, contra `RepositorioMemoria` e contra o
+Postgres, e essa segunda metade só quando há `DATABASE_URL`, sempre no schema `creche_teste`
+([BANCO.md](BANCO.md#4-testes)). O resto roda em memória. Em `tests/conversa` o objeto de
+teste é o roteiro, e repetir cada turno contra um banco remoto multiplicaria o tempo por cem
+sem cobrir uma linha a mais.
 
 O que quebraria em produção sem os testes que existem:
 
@@ -255,7 +258,7 @@ O que quebraria em produção sem os testes que existem:
 | Áudio longo nem é baixado | Polling travado para todo mundo por um áudio de cinco minutos |
 | Token não sobrevive ao log nem ao traceback | Quem tem o token controla o bot |
 
-**Fim a fim, no Telegram real:** `/start` → tela da IA → "Quero inscrever" → consentimento →
+Fim a fim, no Telegram real: `/start` → tela da IA → "Quero inscrever" → consentimento →
 blocos 1 a 3 (CPF do responsável `529.982.247-25` traz o cadastro do ano passado) → contato →
 resumo → CEP `22710-560` + número → creches em toques → régua → foto do documento →
 protocolo. Depois: `/avancar` (as notificações R1 a R4 chegam sozinhas), matar o processo e
@@ -271,9 +274,9 @@ subir de novo (a conversa continua), `/status`, `/apagar`. Os CEPs e o CPF são 
 | Cofre de documentos cifrado | Quando a creche exigir o arquivo original |
 | Fila (Redis/Celery) | Quando o loop da outbox não der conta |
 | Figurinhas próprias | Quando houver pack no @Stickers; hoje é emoji |
-| Painel que **escreve** no banco | Quando alguém que não é dev precisar mudar status |
+| Painel que escreve no banco | Quando alguém que não é dev precisar mudar status |
 | Retorno CRAS → creche | Depende de processo, não de código ([D10](DECISOES.md)) |
-| Previsão de admissão, pontuação, posição na fila | **Nunca.** Não somos o alocador |
+| Previsão de admissão, pontuação, posição na fila | Nunca. Não somos o alocador |
 
 ## 10. Fontes
 

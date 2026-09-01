@@ -196,6 +196,16 @@ EXIGEM_CONSENTIMENTO = frozenset(
 # acabou de ligar, nem perguntar de novo o que ela já respondeu no bloco 0.0.
 PRESERVAR = ("numero", "nome_crianca", "nascimento_crianca", *ia.CHAVES_DECISAO)
 
+# Os ids de botão que `notificacao/catalogo.py` emite, e o estado que cada um abre. Eles
+# são o único botão do sistema sem dono numa tela: chegam por push, fora de qualquer
+# conversa em curso, e por isso o despacho por estado não os alcança. `retomar` fica de
+# fora porque é tratado junto do `/start`, que já sabe desenhar a retomada.
+DA_NOTIFICACAO = {
+    "confirmar_vaga": "ACOMPANHAR",
+    "nao_vou_poder": "ACOMPANHAR",
+    "avisar_proximo": "ACOMPANHAR",
+}
+
 # Teto de perguntas livres por contato. Cada uma é uma chamada paga ao modelo, e um chat
 # aberto na internet é um botão de gastar dinheiro dos outros. Estourou a cota, a mensagem
 # volta a ser tratada como resposta do roteiro. O cadastro continua, só a IA descansa.
@@ -268,7 +278,7 @@ class Maquina:
         # `/start` no meio da conversa DESENHA a retomada; não consome "/start" como se
         # fosse resposta de botão. Era o bug que fazia o bot responder "não entendi".
         retomar_de = None
-        if comando == "/start":
+        if comando == "/start" or msg.escolha == "retomar":
             if estado in entrada.ONDE_PAROU:
                 retomar_de, estado = estado, "RETOMADA"
             else:
@@ -281,6 +291,19 @@ class Maquina:
             return self._avancar(dados)
         elif comando == "/demo":
             estado = "DEMO"
+
+        # Botão que veio numa NOTIFICAÇÃO, não da tela que está no ar. Ele chega dias ou
+        # meses depois — a convocação de junho responde a uma inscrição de março — e aí a
+        # sessão de 72h já expirou e o estado voltou para `INICIO` logo acima. Sem este
+        # roteamento, quem apertava "Confirmar vaga" recebia a saudação ("quer inscrever
+        # uma criança?") com o prazo da convocação correndo: o vazamento dos 7,7% que a
+        # notificação existe justamente para fechar.
+        #
+        # Vai para `ACOMPANHAR` e não direto para a confirmação porque a tela de situação
+        # é quem carrega a inscrição do backend e redesenha os botões com os ids que
+        # `passos/consulta.py` trata. Um toque a mais, e nenhum estado inventado aqui.
+        if msg.escolha in DA_NOTIFICACAO:
+            estado = DA_NOTIFICACAO[msg.escolha]
 
         if estado in EXIGEM_CONSENTIMENTO and not self._repo.tem_consentimento(contato_id):
             estado, dados = "INICIO", {}      # sem autorização, volta ao começo

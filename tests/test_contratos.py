@@ -240,10 +240,14 @@ def test_persistencia_nao_vaza_para_fora_da_pasta():
     import pathlib
     import re
 
+    # `psycopg` sem \b no fim: `\b` não quebra em "_", então `psycopg_pool` — a forma
+    # mais provável de vazamento real — escapava. `SELECT\b` sem o espaço, senão
+    # `SELECT *` passava. Os DDL e o `TRUNCATE` entram porque apagam dado igual.
     vazamento = re.compile(
-        r"\bsqlite3\b|\bpsycopg\b|\bsqlalchemy\b|\basyncpg\b"
-        r"|\bSELECT \b|\bINSERT INTO\b|\bDELETE FROM\b|\bUPDATE \w+ SET\b"
-        r"|\.cursor\(|\.execute\(|\.commit\(",
+        r"\bsqlite3\b|psycopg|\bsqlalchemy\b|\basyncpg\b"
+        r"|\bSELECT\b|\bINSERT\s+INTO\b|\bDELETE\s+FROM\b|\bUPDATE\s+\w+\s+SET\b"
+        r"|\bTRUNCATE\b|\b(?:CREATE|ALTER|DROP)\s+(?:TABLE|SCHEMA|INDEX)\b"
+        r"|\.cursor\(|\.execute\(|\.commit\(|\.connection\(",
         re.IGNORECASE,
     )
     # __main__ é a raiz de composição: é o único lugar que pode escolher a implementação.

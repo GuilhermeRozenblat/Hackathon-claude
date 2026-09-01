@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "creche-bot"
 version = "0.1.0"
@@ -5,14 +9,14 @@ requires-python = ">=3.12"
 # A única dependência de runtime é o driver do Postgres. Canal e conversa continuam
 # stdlib pura, e `REPOSITORIO=memoria` roda o bot inteiro sem banco.
 # Sem SQLAlchemy nem Alembic de propósito, ver creche_bot/dados/postgres.py.
-dependencies = ["psycopg[binary,pool]>=3.2"]
+dependencies = ["psycopg[binary,pool]>=3.2,<4"]
 
 [project.optional-dependencies]
-ia = ["anthropic>=0.40"]          # só para a variação de linguagem do Claude
+ia = ["anthropic>=1,<2"]          # só para a variação de linguagem do Claude
 # Transcrição LOCAL de áudio: a voz da família não sai da máquina. Claude não recebe
 # áudio, e mandar para um serviço de terceiros quebraria a regra de privacidade.
-audio = ["faster-whisper>=1.0"]
-dev = ["pytest>=8", "ruff>=0.7", "pydantic>=2.9"]
+audio = ["faster-whisper>=1.0,<2"]
+dev = ["pytest>=8", "ruff>=0.7"]
 
 [tool.setuptools.packages.find]
 include = ["creche_bot*", "fakes*"]

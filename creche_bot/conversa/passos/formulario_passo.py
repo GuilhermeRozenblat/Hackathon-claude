@@ -96,11 +96,42 @@ def responder(p: Passo, lista: str, seguir: Seguir) -> MensagemSaida:
         from creche_bot.conversa.passos.responsavel import olhar_historico
 
         if (achou := olhar_historico(p)) is not None:
-            return achou
+            return replace(achou, texto=_eco(p, campo) + achou.texto)
 
-    eco = (f"Recebido: {formatar(campo, p.dados[campo.chave])} ✅\n\n"
-           if campo.eco and p.dados[campo.chave] != (campo.escape or ("",))[0] else "")
-    return perguntar(p, lista, seguir, prefixo=eco)
+    return perguntar(p, lista, seguir, prefixo=_eco(p, campo))
+
+
+def _eco(p: Passo, campo: Campo) -> str:
+    """O que o bot entendeu, de volta, antes da próxima pergunta.
+
+    Vale para TODA resposta: digitada, tocada no botão ou de fuga ("Não tenho o CPF").
+    A família confere no mesmo balão em que responde, e erro de digitação aparece ali, e
+    não no resumo do bloco 5.
+
+    A única exceção é a resposta sensível, e é regra, não estilo: ecoar "Recebido: alguém
+    de casa está preso ✅" num histórico que fica no aparelho da família é perigoso
+    (LGPD art. 11, D7).
+    """
+    if campo.sensivel:
+        return ""
+    valor = p.dados[campo.chave]
+    rotulos = dict(campo.opcoes)
+    if campo.escape:
+        rotulos[campo.escape[0]] = campo.escape[1]
+    if (rotulo := rotulos.get(valor)):
+        return eco_escolha(rotulo)
+    return f"Recebido: {formatar(campo, valor)} ✅\n\n"
+
+
+def eco_escolha(rotulo: str) -> str:
+    """O toque num botão, confirmado de volta. Público porque quem consome escolha fora
+    do formulário confirma do mesmo jeito, e duas grafias de "Anotei" divergiriam.
+
+    NUNCA com rótulo de resposta sensível: o checklist do 8.4 confirma pelo ✅ na própria
+    lista, e é assim de propósito (LGPD art. 11). Quem chama daqui passa rótulo de botão
+    fixo do roteiro, nada que a família tenha declarado sobre saúde ou violência.
+    """
+    return f"Anotei: {rotulo} ✅\n\n"
 
 
 def _fora_da_faixa(p: Passo) -> MensagemSaida | None:
@@ -125,7 +156,10 @@ def _fora_da_faixa(p: Passo) -> MensagemSaida | None:
                          + corte.month - nascimento.month, 12)
     p.ir("FORA_DA_FAIXA")
     return p.diz("fora_da_faixa",
-                 nome=p.dados.get("nome_crianca", "a criança").split()[0],
+                 # `_primeiro_nome`, não `.get(..., "a criança").split()[0]`: no bloco 1
+                 # a data vem ANTES do nome, o default caía no split e virava "a" — toda
+                 # tela de fora-da-faixa saía "Pela data de nascimento, a vai ter 9 anos".
+                 nome=_primeiro_nome(p.dados),
                  idade=f"{anos} anos e {meses} meses", mes=f"{corte:%m/%Y}",
                  botoes=(Botao("pre_escola", "Como faço?"),
                          Botao("outra", "Outra criança")))
