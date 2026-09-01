@@ -67,8 +67,9 @@ troca de adaptador, não reescrita.
 | **Volta de 2025** | o CPF que o bot reconhece do processo do ano passado |
 | **Sem demo, do zero** | sai da demonstração e começa a conversa normal |
 
-Responder é tocar botão, mas digitar vale igual, e documento pode ir como foto. Pergunta fora
-do roteiro é respondida sem que ninguém perca o lugar na fila.
+Responder é tocar botão, mas digitar vale igual e **mandar áudio também**: o bot transcreve o
+que você falou e segue a conversa no ponto em que estava. Documento pode ir como foto. Pergunta
+fora do roteiro é respondida sem que ninguém perca o lugar na fila.
 
 ### Comandos do bot
 
